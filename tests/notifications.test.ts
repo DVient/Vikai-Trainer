@@ -7,6 +7,7 @@ import {
   ensureDefaultRemindersScheduledAsync,
   scheduleActivityLogReminderAsync,
   scheduleCheckInReminderAsync,
+  scheduleFuelReminderAsync,
   scheduleRecoveryReminderAsync,
   syncScheduleReminderAsync,
   SCHEDULE_REMINDER_LEAD_MINUTES,
@@ -155,6 +156,20 @@ describe("READINESS_CHECKIN & ACTIVITY_LOG daily reminders", () => {
     expect(useAppStore.getState().notificationIdentifiers.activityLog).toBe("notif-id-1");
   });
 
+  it("schedules the brand-spec smart nudges: fuel 3:30 PM, sweat log 8:30 PM", async () => {
+    await scheduleFuelReminderAsync();
+    const fuel = lastScheduleCall();
+    expect(fuel.trigger).toMatchObject({ type: "daily", hour: 15, minute: 30 });
+    expect(fuel.content).toMatchObject({ title: "Fuel Up 🍎" });
+    expect(useAppStore.getState().notificationIdentifiers.fuelReminder).toBe("notif-id-1");
+
+    await scheduleActivityLogReminderAsync();
+    const sweat = lastScheduleCall();
+    expect(sweat.trigger).toMatchObject({ type: "daily", hour: 20, minute: 30 });
+    expect(sweat.content).toMatchObject({ title: "Log Today's Sweat 🏀" });
+    expect(useAppStore.getState().notificationIdentifiers.activityLog).toBe("notif-id-2");
+  });
+
   it("replaces the previous reminder by its specific identifier on reschedule", async () => {
     await scheduleCheckInReminderAsync();
     await scheduleCheckInReminderAsync({ hour: 9, minute: 30 });
@@ -210,7 +225,7 @@ describe("SCHEDULE_REMINDER per-event reminders", () => {
     );
 
     const request = lastScheduleCall();
-    expect(request.content.body).toContain("Game coming up — Home opener");
+    expect(request.content.body).toContain("🏆 Game coming up — Home opener");
   });
 
   it("removes stale reminders for past events instead of scheduling", async () => {
@@ -252,13 +267,13 @@ describe("SCHEDULE_REMINDER per-event reminders", () => {
 });
 
 describe("first-run defaults", () => {
-  it("schedules both daily reminders only when their slots are empty", async () => {
+  it("schedules check-in, fuel-up, and activity-log reminders only when slots are empty", async () => {
     await ensureDefaultRemindersScheduledAsync();
-    expect(notificationsMock.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+    expect(notificationsMock.scheduleNotificationAsync).toHaveBeenCalledTimes(3);
 
     // Second run: slots are filled, nothing new scheduled.
     await ensureDefaultRemindersScheduledAsync();
-    expect(notificationsMock.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+    expect(notificationsMock.scheduleNotificationAsync).toHaveBeenCalledTimes(3);
   });
 });
 

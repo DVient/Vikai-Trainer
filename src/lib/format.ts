@@ -16,24 +16,24 @@ import type {
 /* ───────────────────────────── Label maps ─────────────────────────────── */
 
 export const SCHEDULED_EVENT_LABELS: Record<ScheduledEventType, string> = {
-  TEAM_PRACTICE: "Team practice",
-  GAME: "Game",
-  STRENGTH_SESSION: "Strength session",
-  SKILL_SESSION: "Skill session",
-  SCHOOL: "School",
-  OTHER: "Other",
+  TEAM_PRACTICE: "🏀 Team practice",
+  GAME: "🏆 Game",
+  STRENGTH_SESSION: "💪 Strength session",
+  SKILL_SESSION: "🎯 Skill session",
+  SCHOOL: "🏫 School",
+  OTHER: "✨ Other",
 };
 
 export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
-  TEAM_PRACTICE: "Team practice",
-  GAME: "Game",
-  SCHOOL_PE: "School PE",
-  FITNESS_TESTING: "Fitness testing",
-  PICKUP_BASKETBALL: "Pickup basketball",
-  SKILL_WORK: "Skill work",
-  STRENGTH_TRAINING: "Strength training",
-  SPEED_TRAINING: "Speed training",
-  OTHER: "Other",
+  TEAM_PRACTICE: "🏀 Hoops (practice)",
+  GAME: "🏆 Game",
+  SCHOOL_PE: "🏫 PE",
+  FITNESS_TESTING: "📋 Fitness testing",
+  PICKUP_BASKETBALL: "🤾 Pickup hoops",
+  SKILL_WORK: "🎯 Skill work",
+  STRENGTH_TRAINING: "💪 Strength",
+  SPEED_TRAINING: "⚡ Sprints",
+  OTHER: "✨ Other",
 };
 
 export const TRAINING_GOAL_LABELS: Record<TrainingGoal, string> = {
@@ -96,18 +96,23 @@ export interface RpeBand {
   colorClass: string;
 }
 
+/** Effort slider bands, chilled-out → all-out (youth micro-copy). */
 export const RPE_BANDS: readonly RpeBand[] = [
-  { maxRpe: 3, label: "Light", colorClass: "bg-emerald-500" },
-  { maxRpe: 6, label: "Moderate", colorClass: "bg-amber-500" },
-  { maxRpe: 8, label: "Hard", colorClass: "bg-orange-500" },
-  { maxRpe: 10, label: "Max", colorClass: "bg-red-500" },
+  { maxRpe: 3, label: "Chilling", colorClass: "bg-sky-500" },
+  { maxRpe: 6, label: "Warming Up", colorClass: "bg-green-500" },
+  { maxRpe: 8, label: "Locked In", colorClass: "bg-yellow-500" },
+  { maxRpe: 10, label: "All Out", colorClass: "bg-red-500" },
 ];
 
-export function rpeBandClass(rpe: number): string {
+export function rpeBand(rpe: number): RpeBand {
   for (const band of RPE_BANDS) {
-    if (rpe <= band.maxRpe) return band.colorClass;
+    if (rpe <= band.maxRpe) return band;
   }
-  return RPE_BANDS[RPE_BANDS.length - 1]?.colorClass ?? "bg-slate-500";
+  return RPE_BANDS[RPE_BANDS.length - 1] ?? { maxRpe: 10, label: "All Out", colorClass: "bg-red-500" };
+}
+
+export function rpeBandClass(rpe: number): string {
+  return rpeBand(rpe).colorClass;
 }
 
 /**

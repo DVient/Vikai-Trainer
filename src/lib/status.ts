@@ -1,9 +1,13 @@
 /**
- * VIKAI — Engine status presentation (Phase 4)
+ * VIKAI — Engine status presentation (design refresh: dark mode, GO/MODULATE/
+ * SHIELD color logic).
  *
  * Visual + copy configuration for engine statuses and reasons. Pure data and
  * functions: no React Native imports, no engine imports, no medical
  * terminology anywhere (AGENTS.md safety non-goals / SPEC §6.2 audit).
+ *
+ * Palette contract (brand spec): base #0F172A (slate-900), GO #22C55E
+ * (green-500), MODULATE #EAB308 (yellow-500), SHIELD #EF4444 (red-500).
  */
 
 import type { EngineReason, EngineStatus } from "../types";
@@ -19,44 +23,44 @@ export interface EngineStatusTheme {
 
 export const ENGINE_STATUS_THEME: Record<EngineStatus, EngineStatusTheme> = {
   CHECKIN_REQUIRED: {
-    label: "Check-in required",
-    description: "Complete today's check-in to unlock your training status.",
-    containerClass: "bg-slate-200",
-    headingClass: "text-slate-900",
-    chipClass: "bg-slate-300",
-    chipTextClass: "text-slate-800",
+    label: "Tap to charge ⚡",
+    description: "3 taps unlock your Ready State for today.",
+    containerClass: "bg-slate-800 border border-slate-700",
+    headingClass: "text-slate-100",
+    chipClass: "bg-slate-700",
+    chipTextClass: "text-slate-200",
   },
   INSUFFICIENT_DATA: {
-    label: "Limited data",
-    description: "There is not enough data yet to size up today's readiness.",
-    containerClass: "bg-slate-200",
-    headingClass: "text-slate-900",
-    chipClass: "bg-slate-300",
-    chipTextClass: "text-slate-800",
+    label: "Charging up…",
+    description: "Not enough data yet to size up your Ready State.",
+    containerClass: "bg-slate-800 border border-slate-700",
+    headingClass: "text-slate-100",
+    chipClass: "bg-slate-700",
+    chipTextClass: "text-slate-200",
   },
   GREEN: {
-    label: "Ready to go",
-    description: "Cleared for quality training today.",
-    containerClass: "bg-emerald-100",
-    headingClass: "text-emerald-900",
-    chipClass: "bg-emerald-200",
-    chipTextClass: "text-emerald-900",
+    label: "GO 🟢",
+    description: "Ready State locked — cleared for quality training.",
+    containerClass: "bg-green-500/15 border border-green-500/40",
+    headingClass: "text-green-400",
+    chipClass: "bg-green-500/20",
+    chipTextClass: "text-green-300",
   },
   YELLOW: {
-    label: "Take it easy",
-    description: "Reduced training is recommended today.",
-    containerClass: "bg-amber-100",
-    headingClass: "text-amber-900",
-    chipClass: "bg-amber-200",
-    chipTextClass: "text-amber-900",
+    label: "MODULATE 🟡",
+    description: "Good day to dial the volume down.",
+    containerClass: "bg-yellow-500/15 border border-yellow-500/40",
+    headingClass: "text-yellow-400",
+    chipClass: "bg-yellow-500/20",
+    chipTextClass: "text-yellow-300",
   },
   RED: {
-    label: "Training paused",
+    label: "SHIELD 🔴",
     description: "Focus on rest and recovery today.",
-    containerClass: "bg-red-100",
-    headingClass: "text-red-900",
-    chipClass: "bg-red-200",
-    chipTextClass: "text-red-900",
+    containerClass: "bg-red-500/15 border border-red-500/40",
+    headingClass: "text-red-400",
+    chipClass: "bg-red-500/20",
+    chipTextClass: "text-red-300",
   },
 };
 
@@ -66,11 +70,11 @@ export const ENGINE_REASON_LABELS: Record<EngineReason, string> = {
   PAIN_CONCERN: "Pain reported",
   IMMINENT_GAME: "Game coming up",
   UPCOMING_GAME: "Game within 24h",
-  HIGH_RECENT_WORKLOAD: "High recent load",
+  HIGH_RECENT_WORKLOAD: "Big recent workload",
   LOW_SLEEP: "Short sleep",
-  LOW_ENERGY: "Low energy",
-  MULTIPLE_READINESS_CONCERNS: "Multiple concerns",
-  NORMAL_READINESS: "Normal readiness",
+  LOW_ENERGY: "Low battery",
+  MULTIPLE_READINESS_CONCERNS: "Running low",
+  NORMAL_READINESS: "All systems go",
 };
 
 /** Non-medical callout shown when the engine flags requiresAdultAttention. */

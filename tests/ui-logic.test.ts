@@ -208,11 +208,11 @@ describe("validateActivityDraft (SPEC §10 ranges)", () => {
 });
 
 describe("rpeBandClass legend", () => {
-  it("maps the four visual bands", () => {
-    expect(rpeBandClass(1)).toBe("bg-emerald-500");
-    expect(rpeBandClass(3)).toBe("bg-emerald-500");
-    expect(rpeBandClass(6)).toBe("bg-amber-500");
-    expect(rpeBandClass(8)).toBe("bg-orange-500");
+  it("maps the four visual bands (Chilling → All Out)", () => {
+    expect(rpeBandClass(1)).toBe("bg-sky-500");
+    expect(rpeBandClass(3)).toBe("bg-sky-500");
+    expect(rpeBandClass(6)).toBe("bg-green-500");
+    expect(rpeBandClass(8)).toBe("bg-yellow-500");
     expect(rpeBandClass(10)).toBe("bg-red-500");
   });
 });

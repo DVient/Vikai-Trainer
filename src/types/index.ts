@@ -311,11 +311,16 @@ export interface WorkoutLog {
 export type NotificationType =
   | "READINESS_CHECKIN"
   | "ACTIVITY_LOG"
+  | "FUEL_REMINDER"
   | "RECOVERY_REMINDER"
   | "SCHEDULE_REMINDER";
 
 /** App-level reminder slots: at most one live scheduled notification each. */
-export type NotificationSlot = "readinessCheckIn" | "activityLog" | "recoveryReminder";
+export type NotificationSlot =
+  | "readinessCheckIn"
+  | "activityLog"
+  | "fuelReminder"
+  | "recoveryReminder";
 
 /**
  * Scheduled-notification identifier tracking (SPEC §35, AGENTS.md guardrail).
@@ -326,6 +331,7 @@ export type NotificationSlot = "readinessCheckIn" | "activityLog" | "recoveryRem
 export interface NotificationIdentifiers {
   readinessCheckIn?: string;
   activityLog?: string;
+  fuelReminder?: string;
   recoveryReminder?: string;
   /** SCHEDULE_REMINDER per scheduled event, keyed by event id. */
   scheduleReminders: Record<string, string>;

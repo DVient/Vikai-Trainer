@@ -2,11 +2,13 @@
  * VIKAI — Local notifications pipeline (Phase 5.1, SPEC §35)
  *
  * expo-notifications based, fully local (no push tokens, no servers — SPEC
- * §34). Implements the four §35 notification types:
+ * §34). Implements the §35 notification types plus the brand-spec smart
+ * nudges:
  *
  *   READINESS_CHECKIN  → daily morning check-in reminder      (store slot:
  *                         readinessCheckIn)
- *   ACTIVITY_LOG       → daily evening activity-log reminder  (activityLog)
+ *   ACTIVITY_LOG       → 8:30 PM "Log Today's Sweat" reminder (activityLog)
+ *   FUEL_REMINDER      → 3:30 PM "Fuel Up" bus-ride nudge     (fuelReminder)
  *   RECOVERY_REMINDER  → one-shot nudge after high workload   (recoveryReminder)
  *   SCHEDULE_REMINDER  → per-event lead reminder for games/   (scheduleReminders
  *                         practices, keyed by event id)
@@ -30,7 +32,10 @@ export interface ReminderTime {
 }
 
 export const DEFAULT_CHECKIN_REMINDER_TIME: ReminderTime = { hour: 8, minute: 0 };
-export const DEFAULT_ACTIVITY_LOG_REMINDER_TIME: ReminderTime = { hour: 19, minute: 30 };
+/** Brand-spec smart nudge: 8:30 PM "Log Today's Sweat". */
+export const DEFAULT_ACTIVITY_LOG_REMINDER_TIME: ReminderTime = { hour: 20, minute: 30 };
+/** Brand-spec smart nudge: 3:30 PM "Fuel Up" bus-ride snack. */
+export const DEFAULT_FUEL_REMINDER_TIME: ReminderTime = { hour: 15, minute: 30 };
 /** SCHEDULE_REMINDER fires this many minutes before a game or practice. */
 export const SCHEDULE_REMINDER_LEAD_MINUTES = 120;
 
@@ -117,8 +122,21 @@ export async function scheduleActivityLogReminderAsync(
   return scheduleDailyReminderAsync(
     "activityLog",
     {
-      title: "Log today's activity",
-      body: "Practices, games, or sessions — log them while it's fresh.",
+      title: "Log Today's Sweat 🏀",
+      body: "Quick 10-sec check-in — practices, games, or sessions.",
+    },
+    time,
+  );
+}
+
+export async function scheduleFuelReminderAsync(
+  time: ReminderTime = DEFAULT_FUEL_REMINDER_TIME,
+): Promise<string | null> {
+  return scheduleDailyReminderAsync(
+    "fuelReminder",
+    {
+      title: "Fuel Up 🍎",
+      body: "Grab a bus ride snack before practice.",
     },
     time,
   );
@@ -223,12 +241,13 @@ export async function cancelScheduleReminderAsync(eventId: string): Promise<void
 /* ── First-run setup ───────────────────────────────────────────────────── */
 
 /**
- * Schedules the two daily reminders when their slots are still empty.
- * Called from the root layout; the caller swallows failures so a
- * notification hiccup can never block app startup.
+ * Schedules the daily reminders (check-in, fuel-up, activity log) when their
+ * slots are still empty. Called from the root layout; the caller swallows
+ * failures so a notification hiccup can never block app startup.
  */
 export async function ensureDefaultRemindersScheduledAsync(): Promise<void> {
   const identifiers = useAppStore.getState().notificationIdentifiers;
   if (identifiers.readinessCheckIn === undefined) await scheduleCheckInReminderAsync();
+  if (identifiers.fuelReminder === undefined) await scheduleFuelReminderAsync();
   if (identifiers.activityLog === undefined) await scheduleActivityLogReminderAsync();
 }

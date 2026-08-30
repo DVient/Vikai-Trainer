@@ -17,8 +17,13 @@ import { describe, expect, it } from "vitest";
  */
 
 const UI_ROOTS = ["app", "src"] as const;
+/** User-visible copy roots for the jargon scan (import lines stripped). */
+const COPY_ROOTS = ["app", "src/components", "src/lib", "src/services"] as const;
 
 const MEDICAL_TERM = /\b(injur\w*|diagnos\w*|rehab\w*|medical|clinic\w*|patholog\w*|prescrib\w*|treatment|symptom\w*|chronic|disease|inflammat\w*|tendon\w*|ligament\w*|dysfunction\w*|therap\w*|acute)\b/i;
+
+/** Brand spec: technical jargon never reaches the athlete-facing UI. */
+const UI_JARGON = /\b(autoregulation|physiological|regimen)\b/i;
 
 function listFilesRecursively(root: string): string[] {
   const entries: string[] = [];
@@ -57,6 +62,31 @@ describe("§6.2 audit: no medical terminology in user-facing source", () => {
   it("keeps the pain-handling copy non-medical by design", () => {
     const status = stripComments(readFileSync(join("src", "lib", "status.ts"), "utf8"));
     expect(status).toContain("An adult should check in with the athlete");
+  });
+});
+
+describe("§6.2 audit: no technical jargon in UI copy", () => {
+  it("uses youth-relatable language instead of engine terminology", () => {
+    const offenders: string[] = [];
+    for (const root of COPY_ROOTS) {
+      for (const file of listFilesRecursively(root)) {
+        const withoutImports = stripComments(readFileSync(file, "utf8"))
+          .split("\n")
+          .filter((line) => !/^\s*(import|export)\b/.test(line))
+          .join("\n");
+        const match = withoutImports.match(UI_JARGON);
+        if (match) offenders.push(`${file}: "${match[0]}"`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("brands the workout view and readiness in youth language", () => {
+    const workout = readFileSync(join("app", "workout.tsx"), "utf8");
+    expect(workout).toContain("Today's Game Plan");
+    expect(workout).toContain("Full Send");
+    const gauge = readFileSync(join("src", "components", "PowerGauge.tsx"), "utf8");
+    expect(gauge).toContain("Ready State");
   });
 });
 
@@ -103,10 +133,10 @@ describe("§6.2 audit: accessible touch targets (≥48×48px)", () => {
 
   it("keeps the known interactive minimums in place", () => {
     expect(readFileSync(join("src", "components", "OptionCard.tsx"), "utf8")).toContain(
-      "min-h-[56px]",
+      "min-h-[64px]",
     );
-    expect(readFileSync(join("app", "activity-log.tsx"), "utf8")).toContain("min-w-[48px]");
-    expect(readFileSync(join("app", "index.tsx"), "utf8")).toContain("min-h-[64px]");
+    expect(readFileSync(join("app", "practice-log.tsx"), "utf8")).toContain("min-w-[48px]");
+    expect(readFileSync(join("app", "index.tsx"), "utf8")).toContain("min-h-[72px]");
     expect(readFileSync(join("app", "checkin.tsx"), "utf8")).toContain("h-14");
   });
 });
@@ -125,6 +155,6 @@ describe("§6.2 audit: responsive layout guards", () => {
   });
 
   it("prefers percentage/fraction widths for multi-column rows", () => {
-    expect(readFileSync(join("app", "activity-log.tsx"), "utf8")).toContain("w-[31%]");
+    expect(readFileSync(join("app", "practice-log.tsx"), "utf8")).toContain("w-[31%]");
   });
 });
