@@ -9,10 +9,10 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
 ## PHASE 1: FOUNDATION & LOCAL DOMAIN TYPES
 *Goal: Establish domain types, local store foundations, and project environment without backend dependencies.*
 
-* [ ] **1.1 Project Initialization:**
+* [x] **1.1 Project Initialization:**
   * Initialize Expo project with Expo Router, TypeScript, and NativeWind[cite: 2].
   * Configure Vitest test runner environment[cite: 2].
-* [ ] **1.2 Domain Type Definitions (`src/types/index.ts`):**
+* [x] **1.2 Domain Type Definitions (`src/types/index.ts`):**
   * Implement `AthleteProfile`, `TrainingObjective`, `ScheduledEvent`, `ActivityLog`, `ReadinessInput`, `EngineResult`, and `TrainingRestrictions`[cite: 2].
 
 ---
@@ -20,10 +20,10 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
 ## PHASE 2: PURE AUTOREGULATION ENGINE & TESTS
 *Goal: Implement and test the pure mathematical engine without UI or DB dependencies[cite: 2].*
 
-* [ ] **2.1 Core Autoregulation Engine (`src/engine/autoregulation.ts`):**
+* [x] **2.1 Core Autoregulation Engine (`src/engine/autoregulation.ts`):**
   * Implement `evaluateAutoregulationEngine(input: EngineInput): EngineResult`[cite: 2].
   * Implement evaluation precedence rules: 1. Missing Check-in 2. Pain Concern Override 3. Imminent Game (<12h) & Upcoming Game (12–24h) 4. Recent Workload (RPE × Duration) 5. Sleep & Energy Anchors 6. Arithmetic Readiness Score[cite: 2].
-* [ ] **2.2 Engine Unit Test Suite (`tests/engine.test.ts`):**
+* [x] **2.2 Engine Unit Test Suite (`tests/engine.test.ts`):**
   * Write Vitest tests covering:
     * `PAIN_CONCERN` RED light trigger and adult attention flag[cite: 2].
     * Game protection windows (<12h, 12–24h, 24–36h)[cite: 2].
