@@ -13,9 +13,14 @@ export default function RootLayout() {
   useEffect(() => {
     // Notification pipeline setup (Phase 5): presentation behavior plus
     // first-run scheduling of the daily check-in / activity-log reminders.
-    // Failures are swallowed — a notification hiccup must never block startup.
-    configureNotificationHandler();
-    void ensureDefaultRemindersScheduledAsync().catch(() => undefined);
+    // Fully guarded: expo-notifications is partially unsupported on web and
+    // a notification hiccup must never block app startup on any platform.
+    try {
+      configureNotificationHandler();
+      void ensureDefaultRemindersScheduledAsync().catch(() => undefined);
+    } catch {
+      // Notifications unsupported on this platform — continue without them.
+    }
   }, []);
 
   return (
