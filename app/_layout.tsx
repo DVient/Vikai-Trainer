@@ -9,7 +9,9 @@ export default function RootLayout() {
       <StatusBar style="auto" />
       <Stack>
         <Stack.Screen name="index" options={{ title: "Vikai" }} />
-        {/* Phase 4 registers checkin, activity-log, and workout screens here. */}
+        <Stack.Screen name="checkin" options={{ title: "Daily check-in" }} />
+        <Stack.Screen name="activity-log" options={{ title: "Log activity" }} />
+        <Stack.Screen name="workout" options={{ title: "Today's workout" }} />
       </Stack>
     </>
   );

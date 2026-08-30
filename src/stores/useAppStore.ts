@@ -27,6 +27,7 @@ import {
   type TrainingObjective,
   type WorkoutLog,
 } from "../types";
+import { DEFAULT_ATHLETE_PROFILE } from "../config/defaults";
 
 /** Collision-resistant local identifier (no native crypto dependency). */
 function createLocalId(prefix: string): string {
@@ -42,7 +43,8 @@ type WorkoutLogDraft = Omit<WorkoutLog, "id" | "createdAt" | "updatedAt">;
 
 export interface VikaiAppState {
   /* ── State slices (SPEC §33) ── */
-  profile: AthleteProfile | null;
+  /** Initialized with the §1.2 default baseline; overridable in-app. */
+  profile: AthleteProfile;
   trainingObjective: TrainingObjective;
   readinessInputs: ReadinessInput[];
   activityLogs: ActivityLog[];
@@ -72,7 +74,7 @@ export interface VikaiAppState {
 export const useAppStore = create<VikaiAppState>()(
   persist(
     (set) => ({
-      profile: null,
+      profile: DEFAULT_ATHLETE_PROFILE,
       trainingObjective: DEFAULT_OBJECTIVE,
       readinessInputs: [],
       activityLogs: [],

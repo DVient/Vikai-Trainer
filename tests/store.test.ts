@@ -5,6 +5,7 @@ import {
   type AthleteProfile,
   type TrainingObjective,
 } from "../src/types";
+import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { useAppStore, type VikaiAppState } from "../src/stores/useAppStore";
 
 /**
@@ -24,7 +25,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 const INITIAL_SLICES = {
-  profile: null,
+  profile: DEFAULT_ATHLETE_PROFILE,
   trainingObjective: DEFAULT_OBJECTIVE,
   readinessInputs: [],
   activityLogs: [],
@@ -58,7 +59,7 @@ describe("initial state", () => {
   it("starts with the spec defaults and empty local collections", () => {
     const state = useAppStore.getState();
 
-    expect(state.profile).toBeNull();
+    expect(state.profile).toEqual(DEFAULT_ATHLETE_PROFILE);
     expect(state.trainingObjective).toEqual(DEFAULT_OBJECTIVE);
     expect(state.readinessInputs).toEqual([]);
     expect(state.activityLogs).toEqual([]);
