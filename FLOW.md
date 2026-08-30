@@ -76,9 +76,9 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
 ## PHASE 6: INTEGRATION, AUDIT & E2E VALIDATION
 *Goal: Verify end-to-end performance and spec compliance[cite: 2].*
 
-* [ ] **6.1 Integration Testing:**
+* [x] **6.1 Integration Testing:** (`tests/integration.test.ts` — real store actions + engine + generator + persistence; component tests in `tests/components.test.tsx` render real screens via react-native-web under jsdom)
   * Test full workflow: Daily Check-in → Engine Evaluation → Workout Scaling → Log Completion → Local Storage[cite: 2].
-* [ ] **6.2 Final Spec Audit:**
-  * Confirm no medical terminology is used in UI[cite: 2].
-  * Confirm non-destructive notification behavior[cite: 2].
-  * Verify full responsive layout on physical mobile viewports[cite: 2].
+* [x] **6.2 Final Spec Audit:** (`tests/spec-audit.test.ts` — automated scans, all green)
+  * Confirm no medical terminology is used in UI[cite: 2]. *(comment-stripped scan of app/ + src/; caught and fixed "diagnose" copy in check-in screen)*
+  * Confirm non-destructive notification behavior[cite: 2]. *(bulk-cancel ban + targeted-ID usage asserted; never-cancelAll test in `tests/notifications.test.ts`)*
+  * Verify full responsive layout on physical mobile viewports[cite: 2]. *(automated portion: touch-target ≥48px + no-oversized-fixed-width scans green; physical-device pass remains a manual checklist for the user — Expo Go / dev build)*

@@ -1,0 +1,267 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * Phase 6.1 — Integration tests (FLOW 6.1).
+ * Full workflow through REAL modules: store actions → engine evaluation →
+ * workout scaling → log completion → local storage persistence. Only the
+ * storage boundary (AsyncStorage) is mocked.
+ */
+
+const AsyncStorageMock = vi.hoisted(() => ({
+  getItem: vi.fn<(key: string) => Promise<string | null>>(async () => null),
+  setItem: vi.fn<(key: string, value: string) => Promise<void>>(async () => undefined),
+  removeItem: vi.fn<(key: string) => Promise<void>>(async () => undefined),
+}));
+
+vi.mock("@react-native-async-storage/async-storage", () => ({
+  default: AsyncStorageMock,
+}));
+
+import { toLocalDateString } from "../src/engine/autoregulation";
+import { applyRestrictionsToBasePlan } from "../src/engine/generator";
+import { deriveEngineView } from "../src/lib/engine-bridge";
+import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
+import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { useAppStore } from "../src/stores/useAppStore";
+import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
+import {
+  DEFAULT_OBJECTIVE,
+  type EnergyAnchor,
+  type JointStatus,
+  type ReadinessInput,
+  type SleepAnchor,
+} from "../src/types";
+
+const TIMEZONE = DEFAULT_ATHLETE_PROFILE.timezone;
+const today = () => toLocalDateString(new Date(), TIMEZONE);
+
+function makeCheckIn(
+  localDate: string,
+  anchors: { sleep: SleepAnchor; joint: JointStatus; energy: EnergyAnchor },
+): ReadinessInput {
+  const now = new Date().toISOString();
+  return {
+    id: `checkin-${localDate}`,
+    localDate,
+    timezone: TIMEZONE,
+    recordedAt: now,
+    createdAt: now,
+    updatedAt: now,
+    sleepAnchor: anchors.sleep,
+    jointStatus: anchors.joint,
+    energyAnchor: anchors.energy,
+  };
+}
+
+function resetStore(): void {
+  useAppStore.setState({
+    profile: DEFAULT_ATHLETE_PROFILE,
+    trainingObjective: DEFAULT_OBJECTIVE,
+    readinessInputs: [],
+    activityLogs: [],
+    scheduledEvents: [],
+    workoutLogs: [],
+    notificationIdentifiers: { scheduleReminders: {} },
+  });
+}
+
+function derive() {
+  return deriveEngineView(useAppStore.getState(), new Date());
+}
+
+function prescriptionOf(view: ReturnType<typeof derive>) {
+  return applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, view.result.restrictions);
+}
+
+function modificationMap(entries: ReturnType<typeof prescriptionOf>) {
+  return new Map(entries.map((entry) => [entry.component.id, entry.modification]));
+}
+
+beforeEach(() => {
+  AsyncStorageMock.setItem.mockClear();
+  resetStore();
+});
+
+describe("full workflow: check-in → engine → scaling → log → storage", () => {
+  it("blocks GREEN on a fresh install and shows the unscaled base plan", () => {
+    const view = derive();
+
+    expect(view.hasCheckedInToday).toBe(false);
+    expect(view.result.status).toBe("CHECKIN_REQUIRED");
+    expect(view.result.requiresAdultAttention).toBe(false);
+
+    const prescription = prescriptionOf(view);
+    expect(modificationMap(prescription)).toEqual(
+      new Map(DEFAULT_BASE_PLAN.map((component) => [component.id, "KEPT" as const])),
+    );
+  });
+
+  it("goes GREEN after a good check-in and stays at full volume", () => {
+    useAppStore.getState().saveDailyCheckIn({
+      localDate: today(),
+      timezone: TIMEZONE,
+      recordedAt: new Date().toISOString(),
+      sleepAnchor: "OVER_8_HRS",
+      jointStatus: "NO_CONCERN",
+      energyAnchor: "HIGH",
+    });
+
+    const view = derive();
+    expect(view.result.status).toBe("GREEN");
+    expect(view.result.reasons).toEqual(["NORMAL_READINESS"]);
+
+    const prescription = prescriptionOf(view);
+    const volumes = new Map(prescription.map((e) => [e.component.id, e.scaledVolume]));
+    expect(volumes.get("primary-lower-squat")).toBe(4);
+    expect(volumes.get("primary-upper-push")).toBe(4);
+  });
+
+  it("scales the workout for a game tomorrow and keeps the plan honest", () => {
+    useAppStore.getState().saveDailyCheckIn({
+      localDate: today(),
+      timezone: TIMEZONE,
+      recordedAt: new Date().toISOString(),
+      sleepAnchor: "OVER_8_HRS",
+      jointStatus: "NO_CONCERN",
+      energyAnchor: "HIGH",
+    });
+    useAppStore.getState().scheduleEvent({
+      eventType: "GAME",
+      startAt: new Date(Date.now() + 20 * 60 * 60 * 1000).toISOString(),
+    });
+
+    const view = derive();
+    expect(view.result.status).toBe("YELLOW");
+    expect(view.result.reasons).toEqual(["UPCOMING_GAME"]);
+    expect(view.result.restrictions.lowerBodyScale).toBe(0.5);
+    expect(view.result.restrictions.upperBodyScale).toBe(0.7);
+    expect(view.result.restrictions.plyometricsAllowed).toBe(true);
+    expect(view.result.restrictions.highImpactAllowed).toBe(false);
+
+    const byId = new Map(prescriptionOf(view).map((e) => [e.component.id, e]));
+    // Primary lifts scale by region (§23 round + minimum-volume floor).
+    expect(byId.get("primary-lower-squat")?.modification).toBe("REDUCED");
+    expect(byId.get("primary-lower-squat")?.scaledVolume).toBe(2); // round(4 × 0.5)
+    expect(byId.get("primary-upper-push")?.scaledVolume).toBe(3); // round(4 × 0.7)
+    // High-impact goals are removed (sprints + COD), plyometrics merely scale.
+    expect(byId.get("acceleration-sprints")?.modification).toBe("REMOVED");
+    expect(byId.get("cod-drills")?.modification).toBe("REMOVED");
+    // Max-effort jumping is high-impact (SPEC §19): removed under a game window.
+    expect(byId.get("explosive-jumps")?.modification).toBe("REMOVED");
+    // Optional accessories strip first when their region is reduced.
+    expect(byId.get("accessory-upper")?.modification).toBe("REMOVED");
+    expect(byId.get("accessory-core")?.modification).toBe("REMOVED");
+  });
+
+  it("completes the day: logged activity + workout log land in local storage", () => {
+    useAppStore.getState().saveDailyCheckIn({
+      localDate: today(),
+      timezone: TIMEZONE,
+      recordedAt: new Date().toISOString(),
+      sleepAnchor: "OVER_8_HRS",
+      jointStatus: "NO_CONCERN",
+      energyAnchor: "HIGH",
+    });
+    useAppStore.getState().scheduleEvent({
+      eventType: "GAME",
+      startAt: new Date(Date.now() + 20 * 60 * 60 * 1000).toISOString(),
+    });
+    useAppStore.getState().logActivity({
+      activityDate: today(),
+      timezone: TIMEZONE,
+      activityType: "TEAM_PRACTICE",
+      sessionRpe: 7,
+      durationMinutes: 60,
+      notes: "Practice felt manageable",
+    });
+
+    // 420 session load is under the 700 threshold — status unchanged.
+    const view = derive();
+    expect(view.result.reasons).toEqual(["UPCOMING_GAME"]);
+
+    useAppStore.getState().recordWorkoutLog({
+      activityDate: today(),
+      notes: "Followed the scaled plan",
+    });
+
+    const persisted = AsyncStorageMock.setItem.mock.calls.at(-1);
+    if (!persisted) throw new Error("expected a persistence write");
+    const parsed = JSON.parse(persisted[1]) as {
+      version: number;
+      state: {
+        readinessInputs: unknown[];
+        activityLogs: unknown[];
+        scheduledEvents: unknown[];
+        workoutLogs: unknown[];
+        notificationIdentifiers: { scheduleReminders: Record<string, string> };
+      };
+    };
+    expect(parsed.version).toBe(1);
+    expect(parsed.state.readinessInputs).toHaveLength(1);
+    expect(parsed.state.activityLogs).toHaveLength(1);
+    expect(parsed.state.scheduledEvents).toHaveLength(1);
+    expect(parsed.state.workoutLogs).toHaveLength(1);
+    expect(parsed.state.notificationIdentifiers).toEqual({ scheduleReminders: {} });
+  });
+});
+
+describe("pain override workflow", () => {
+  it("locks everything and demands adult attention when pain is reported", () => {
+    useAppStore.getState().saveDailyCheckIn({
+      localDate: today(),
+      timezone: TIMEZONE,
+      recordedAt: new Date().toISOString(),
+      sleepAnchor: "OVER_8_HRS",
+      jointStatus: "PAIN_CONCERN",
+      energyAnchor: "HIGH",
+      painLocation: "Right knee",
+    });
+
+    const view = derive();
+    expect(view.result.status).toBe("RED");
+    expect(view.result.reasons).toContain("PAIN_CONCERN");
+    expect(view.result.requiresAdultAttention).toBe(true);
+    expect(view.result.restrictions.lowerBodyScale).toBe(0);
+    expect(view.result.restrictions.upperBodyScale).toBe(0);
+    expect(view.result.restrictions.plyometricsAllowed).toBe(false);
+    expect(view.result.restrictions.highImpactAllowed).toBe(false);
+    // RED leaves the duration cap unset — all loading is locked at scale 0.
+    expect(view.result.restrictions.maxTrainingDurationMinutes).toBeUndefined();
+    expect(view.result.recoveryActions).toContain(
+      "High-impact and training activity should be paused until the athlete has appropriate guidance.",
+    );
+
+    const prescription = prescriptionOf(view);
+    expect(prescription).toHaveLength(DEFAULT_BASE_PLAN.length);
+    expect(prescription.every((entry) => entry.modification === "REMOVED")).toBe(true);
+  });
+});
+
+describe("stale data cannot unlock status (SPEC §27)", () => {
+  it("ignores yesterday's check-in: status falls back to CHECKIN_REQUIRED", () => {
+    const yesterday = toLocalDateString(new Date(Date.now() - 24 * 60 * 60 * 1000), TIMEZONE);
+    useAppStore.getState().saveDailyCheckIn({
+      localDate: yesterday,
+      timezone: TIMEZONE,
+      recordedAt: new Date().toISOString(),
+      sleepAnchor: "OVER_8_HRS",
+      jointStatus: "NO_CONCERN",
+      energyAnchor: "HIGH",
+    });
+
+    const view = derive();
+    expect(view.hasCheckedInToday).toBe(false);
+    expect(view.result.status).toBe("CHECKIN_REQUIRED");
+    // Not silently reduced either — the plan stays at unscaled baseline.
+    const prescription = prescriptionOf(view);
+    expect(prescription.every((entry) => entry.modification === "KEPT")).toBe(true);
+  });
+});
+
+describe("adult-attention copy contract", () => {
+  it("uses the exact non-medical callout everywhere it is required", () => {
+    expect(ADULT_ATTENTION_MESSAGE).toBe(
+      "An adult should check in with the athlete before any training today.",
+    );
+  });
+});

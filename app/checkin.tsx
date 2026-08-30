@@ -96,7 +96,7 @@ export default function CheckIn() {
         <View className="rounded-2xl bg-white p-4 gap-3">
           <Text className="text-sm font-bold text-slate-900">Tell us about the pain</Text>
           <Text className="text-xs text-slate-500">
-            This app does not diagnose anything — it only pauses training and alerts an adult.
+            Vikai does not assess anything — it only pauses training and alerts an adult.
           </Text>
           <TextInput
             value={painLocation}
