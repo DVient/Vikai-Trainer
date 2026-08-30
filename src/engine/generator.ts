@@ -28,11 +28,15 @@
  */
 
 import type {
+  ActivityLog,
+  ActivityType,
   BodyRegion,
+  ScheduledEvent,
   TrainingComponent,
   TrainingGoal,
   TrainingRestrictions,
 } from "../types";
+import { toLocalDateString } from "./autoregulation";
 
 /* ──────────────────────── §23 — Volume scaling rules ──────────────────── */
 
@@ -77,6 +81,55 @@ function bodyRegionOf(component: TrainingComponent): BodyRegion {
   return component.bodyRegion ?? "FULL";
 }
 
+/* ──────────────── §20 — Consecutive high-stress day handling ──────────── */
+
+/**
+ * Activity types classified as HIGH stress for §20 purposes (SPEC §19: hard
+ * team practices, games, strength/speed work, testing, unmonitored pickup
+ * play). Ambiguous "OTHER" is excluded to keep the rule predictable.
+ */
+const HIGH_STRESS_ACTIVITY_TYPES: readonly ActivityType[] = [
+  "TEAM_PRACTICE",
+  "GAME",
+  "STRENGTH_TRAINING",
+  "SPEED_TRAINING",
+  "PICKUP_BASKETBALL",
+  "FITNESS_TESTING",
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * §20 rule detection: have games, practices, or tournaments forced
+ * consecutive high-stress days (yesterday AND today, in the athlete's
+ * timezone)? Logged activities and scheduled games/practices both count.
+ */
+export function hasConsecutiveHighStressDays(
+  recentActivities: readonly ActivityLog[],
+  upcomingEvents: readonly ScheduledEvent[],
+  now: Date,
+  athleteTimezone: string,
+): boolean {
+  const today = toLocalDateString(now, athleteTimezone);
+  const yesterday = toLocalDateString(new Date(now.getTime() - DAY_MS), athleteTimezone);
+
+  const highStressOn = (day: string): boolean =>
+    recentActivities.some(
+      (activity) =>
+        activity.activityDate === day &&
+        HIGH_STRESS_ACTIVITY_TYPES.includes(activity.activityType),
+    ) ||
+    upcomingEvents.some((event) => {
+      if (event.eventType !== "GAME" && event.eventType !== "TEAM_PRACTICE") return false;
+      const kickoff = new Date(event.startAt);
+      return (
+        Number.isFinite(kickoff.getTime()) && toLocalDateString(kickoff, athleteTimezone) === day
+      );
+    });
+
+  return highStressOn(today) && highStressOn(yesterday);
+}
+
 /** Region scale: FULL components are governed by the stricter body region. */
 function regionScaleFor(region: BodyRegion, restrictions: TrainingRestrictions): number {
   if (region === "LOWER") return restrictions.lowerBodyScale;
@@ -99,6 +152,15 @@ function removed(
 
 /* ───────────────────── §22/§23 — The generation pipeline ──────────────── */
 
+export interface GeneratorOptions {
+  /**
+   * SPEC §20: when the schedule forces consecutive high-stress days, ALL
+   * optional training volume is stripped automatically (no compensating
+   * catch-up volume). Compute the flag with `hasConsecutiveHighStressDays`.
+   */
+  stripOptional?: boolean;
+}
+
 /**
  * Map engine restrictions onto a base plan. Hard removals (plyometrics, high
  * impact, blocked body regions) always win; surviving components are scaled
@@ -108,6 +170,7 @@ function removed(
 export function applyRestrictionsToBasePlan(
   basePlan: readonly TrainingComponent[],
   restrictions: TrainingRestrictions,
+  options: GeneratorOptions = {},
 ): ScaledComponent[] {
   const prescription: ScaledComponent[] = [];
 
@@ -119,6 +182,17 @@ export function applyRestrictionsToBasePlan(
     }
     if (!restrictions.highImpactAllowed && isHighImpactComponent(component)) {
       prescription.push(removed(component, "Removed: high-impact work is not allowed today."));
+      continue;
+    }
+
+    /* §20 — forced overlap: optional volume is stripped automatically. */
+    if (options.stripOptional === true && component.optional) {
+      prescription.push(
+        removed(
+          component,
+          "Removed: optional volume stripped for back-to-back high-stress days.",
+        ),
+      );
       continue;
     }
 

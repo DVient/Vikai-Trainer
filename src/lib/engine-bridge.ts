@@ -13,6 +13,7 @@
  */
 
 import { evaluateAutoregulationEngine, toLocalDateString } from "../engine/autoregulation";
+import { hasConsecutiveHighStressDays } from "../engine/generator";
 import {
   DEFAULT_ATHLETE_PROFILE,
 } from "../config/defaults";
@@ -42,6 +43,8 @@ export interface DerivedEngineView {
   today: string;
   /** True when a check-in recorded for `today` exists. */
   hasCheckedInToday: boolean;
+  /** SPEC §20: consecutive high-stress days ⇒ strip all optional volume. */
+  stripOptional: boolean;
 }
 
 /** Pure derivation: store slices + now ⇒ EngineInput + EngineResult. */
@@ -66,5 +69,11 @@ export function deriveEngineView(state: EngineSourceState, now: Date): DerivedEn
     result: evaluateAutoregulationEngine(input),
     today,
     hasCheckedInToday: todayCheckIn !== undefined,
+    stripOptional: hasConsecutiveHighStressDays(
+      state.activityLogs,
+      state.scheduledEvents,
+      now,
+      timezone,
+    ),
   };
 }

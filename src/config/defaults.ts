@@ -22,3 +22,28 @@ export const DEFAULT_ATHLETE_PROFILE: AthleteProfile = {
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
+
+/**
+ * §1.2 real-world constraint defaults that have no AthleteProfile slot.
+ * `seasonStart`/`firstGame` are the §24 training-phase boundary dates and
+ * feed season-phase selection when that extension is built.
+ */
+export interface AthleteSeasonConfig {
+  practicesPerWeek: number;
+  /** Local calendar dates, YYYY-MM-DD (SPEC §1.2 / §24). */
+  seasonStart: string;
+  firstGame: string;
+  /** 24h "HH:mm" local times (SPEC §1.2). */
+  schoolStartTime: string;
+  schoolEndTime: string;
+  commuteMinutes: number;
+}
+
+export const DEFAULT_SEASON_CONFIG: AthleteSeasonConfig = {
+  practicesPerWeek: 2,
+  seasonStart: "2026-09-14",
+  firstGame: "2026-10-15",
+  schoolStartTime: "09:00",
+  schoolEndTime: "15:30",
+  commuteMinutes: 40,
+};

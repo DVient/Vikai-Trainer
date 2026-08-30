@@ -16,6 +16,7 @@ import {
   ENGINE_STATUS_THEME,
 } from "../src/lib/status";
 import { BASE_PLAN_TITLES, DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { DEFAULT_SEASON_CONFIG } from "../src/config/defaults";
 import {
   DEFAULT_OBJECTIVE,
   type ActivityType,
@@ -118,6 +119,43 @@ describe("deriveEngineView (dashboard/workout data source)", () => {
       "EXPLOSIVENESS",
       "CHANGE_OF_DIRECTION",
     ]);
+  });
+
+  it("derives the §20 strip flag for consecutive high-stress days", () => {
+    const bothDays = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [makeReadiness("2026-01-02")],
+        activityLogs: [
+          { id: "a", activityDate: "2026-01-01", timezone: "UTC", activityType: "TEAM_PRACTICE", createdAt: "", updatedAt: "" },
+          { id: "b", activityDate: "2026-01-02", timezone: "UTC", activityType: "GAME", createdAt: "", updatedAt: "" },
+        ],
+      }),
+      NOW,
+    );
+
+    expect(bothDays.stripOptional).toBe(true);
+    expect(bothDays.result.status).toBe("GREEN"); // no other rule fires
+
+    // With the flag on, optionals are stripped even on an otherwise GREEN day.
+    const prescription = applyRestrictionsToBasePlan(
+      DEFAULT_BASE_PLAN,
+      bothDays.result.restrictions,
+      { stripOptional: bothDays.stripOptional },
+    );
+    const optionals = prescription.filter((entry) => entry.component.optional);
+    expect(optionals.length).toBeGreaterThan(0);
+    expect(optionals.every((entry) => entry.modification === "REMOVED")).toBe(true);
+
+    const oneDay = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [makeReadiness("2026-01-02")],
+        activityLogs: [
+          { id: "b", activityDate: "2026-01-02", timezone: "UTC", activityType: "GAME", createdAt: "", updatedAt: "" },
+        ],
+      }),
+      NOW,
+    );
+    expect(oneDay.stripOptional).toBe(false);
   });
 });
 
@@ -282,5 +320,18 @@ describe("status presentation coverage", () => {
   it("labels every activity type for the selector", () => {
     const types = Object.keys(ACTIVITY_TYPE_LABELS) as ActivityType[];
     expect(types).toHaveLength(9);
+  });
+});
+
+describe("§1.2 default season configuration", () => {
+  it("matches the spec baseline exactly", () => {
+    expect(DEFAULT_SEASON_CONFIG).toEqual({
+      practicesPerWeek: 2,
+      seasonStart: "2026-09-14",
+      firstGame: "2026-10-15",
+      schoolStartTime: "09:00",
+      schoolEndTime: "15:30",
+      commuteMinutes: 40,
+    });
   });
 });

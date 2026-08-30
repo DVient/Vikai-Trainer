@@ -19,8 +19,10 @@ import type { ScaledComponent } from "../src/engine/generator";
  * generator's output (AGENTS.md decoupling).
  */
 export default function Workout() {
-  const { result } = useEngineResult();
-  const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions);
+  const { result, stripOptional } = useEngineResult();
+  const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
+    stripOptional,
+  });
 
   return (
     <ScrollView className="flex-1 bg-slate-100" contentContainerClassName="gap-4 p-4">

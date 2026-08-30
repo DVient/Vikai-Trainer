@@ -318,6 +318,45 @@ describe("recent workload triggers (precedence 4, RPE × Duration)", () => {
 
     expect(result.reasons).toEqual(["HIGH_RECENT_WORKLOAD"]);
   });
+
+  it("triggers at the boundary from the top: RPE 10 × 70 minutes = 700 (SPEC §37)", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 70 })] }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toEqual(["HIGH_RECENT_WORKLOAD"]);
+  });
+
+  it("does not trigger just below the boundary at maximum RPE: 10 × 69 = 690", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 69 })] }),
+    );
+
+    expect(result.status).toBe("GREEN");
+  });
+
+  it("never triggers from minimum-RPE sessions alone: RPE 1 × 600 minutes = 600", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 1, durationMinutes: 600 })] }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
+
+  it("minimum-RPE max-duration sessions reach the cumulative threshold: 2 × 600 = 1200", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        recentActivities: [
+          makeActivity({ id: "a", sessionRpe: 1, durationMinutes: 600 }),
+          makeActivity({ id: "b", sessionRpe: 1, durationMinutes: 600 }),
+        ],
+      }),
+    );
+
+    expect(result.reasons).toEqual(["HIGH_RECENT_WORKLOAD"]);
+  });
 });
 
 describe("sleep & energy anchors and readiness scoring (precedence 5–6)", () => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateAutoregulationEngine } from "../src/engine/autoregulation";
 import {
   applyRestrictionsToBasePlan,
+  hasConsecutiveHighStressDays,
   scaleSets,
   type ScaledComponent,
 } from "../src/engine/generator";
@@ -257,6 +258,63 @@ describe("optional accessory stripping (SPEC §23 step 1)", () => {
     const byId = new Map(prescription.map((entry) => [entry.component.id, entry.modification]));
     expect(byId.get("optLower")).toBe("REMOVED");
     expect(byId.get("optUpper")).toBe("KEPT");
+  });
+});
+
+describe("§20 consecutive high-stress days", () => {
+  const NOW = new Date("2026-01-02T12:00:00.000Z");
+
+  it("detects overlap from logged activities on today and yesterday", () => {
+    expect(
+      hasConsecutiveHighStressDays(
+        [
+          { id: "a", activityDate: "2026-01-01", timezone: "UTC", activityType: "TEAM_PRACTICE", createdAt: "", updatedAt: "" },
+          { id: "b", activityDate: "2026-01-02", timezone: "UTC", activityType: "GAME", createdAt: "", updatedAt: "" },
+        ],
+        [],
+        NOW,
+        "UTC",
+      ),
+    ).toBe(true);
+  });
+
+  it("detects overlap from a scheduled game plus a logged practice", () => {
+    expect(
+      hasConsecutiveHighStressDays(
+        [{ id: "a", activityDate: "2026-01-01", timezone: "UTC", activityType: "TEAM_PRACTICE", createdAt: "", updatedAt: "" }],
+        [{ id: "g", eventType: "GAME", startAt: new Date(NOW.getTime() + 4 * 60 * 60 * 1000).toISOString(), createdAt: "", updatedAt: "" }],
+        NOW,
+        "UTC",
+      ),
+    ).toBe(true);
+  });
+
+  it("does not fire for a single high-stress day or low-stress days", () => {
+    expect(
+      hasConsecutiveHighStressDays(
+        [
+          { id: "a", activityDate: "2026-01-01", timezone: "UTC", activityType: "SKILL_WORK", createdAt: "", updatedAt: "" },
+          { id: "b", activityDate: "2026-01-02", timezone: "UTC", activityType: "GAME", createdAt: "", updatedAt: "" },
+        ],
+        [],
+        NOW,
+        "UTC",
+      ),
+    ).toBe(false);
+  });
+
+  it("strips ALL optional volume when stripOptional is set, even at scale 1.0", () => {
+    const plan = [
+      makeComponent({ id: "primary", optional: false }),
+      makeComponent({ id: "optional", optional: true, bodyRegion: "UPPER" }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, BASELINE, { stripOptional: true });
+
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+    expect(byId.get("primary")?.modification).toBe("KEPT");
+    expect(byId.get("optional")?.modification).toBe("REMOVED");
+    expect(byId.get("optional")?.modificationReason).toContain("back-to-back high-stress");
   });
 });
 

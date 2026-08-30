@@ -18,11 +18,13 @@ import { useAppStore } from "../src/stores/useAppStore";
  */
 export default function Index() {
   const router = useRouter();
-  const { result, today, hasCheckedInToday } = useEngineResult();
+  const { result, today, hasCheckedInToday, stripOptional } = useEngineResult();
   const scheduledEvents = useAppStore((state) => state.scheduledEvents);
 
   const now = new Date();
-  const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions);
+  const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
+    stripOptional,
+  });
   const kept = prescription.filter((entry) => entry.modification === "KEPT").length;
   const reduced = prescription.filter((entry) => entry.modification === "REDUCED").length;
   const removed = prescription.filter((entry) => entry.modification === "REMOVED").length;
