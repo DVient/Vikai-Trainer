@@ -36,10 +36,10 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
 ## PHASE 3: STATE MANAGEMENT & WORKOUT GENERATOR
 *Goal: Create volume scaling logic and Zustand stores for local persistence[cite: 2].*
 
-* [ ] **3.1 Volume Scaling Helpers (`src/engine/generator.ts`):**
+* [x] **3.1 Volume Scaling Helpers (`src/engine/generator.ts`):**
   * Implement `scaleSets(baseSets: number, scale: number): number`[cite: 2].
   * Implement drill trimming rules (strip optional accessories, then reduce accessory sets, then reduce primary volume)[cite: 2].
-* [ ] **3.2 Zustand App Store (`src/stores/useAppStore.ts`):**
+* [x] **3.2 Zustand App Store (`src/stores/useAppStore.ts`):**
   * Setup local state store with AsyncStorage/MMKV persistence[cite: 2, 3].
   * Implement action methods for local check-ins, activity logs, and schedule management[cite: 2].
 

@@ -269,6 +269,9 @@ export type TrainingPhase =
   | "TOURNAMENT"
   | "OFF_SEASON";
 
+/** Body-region classification for plan components (additive Phase 3 extension). */
+export type BodyRegion = "LOWER" | "UPPER" | "FULL";
+
 /** A single component of the base training plan (SPEC §21). */
 export interface TrainingComponent {
   id: string;
@@ -280,4 +283,25 @@ export interface TrainingComponent {
   /** Volume floor the generator never scales below. */
   minimumVolume?: number;
   optional: boolean;
+  /**
+   * Additive Phase-3 extension to SPEC §21: region tag the Workout Generator
+   * uses to map lower/upper restrictions onto components. Undefined ⇒ "FULL"
+   * (governed by both body-region scales).
+   */
+  bodyRegion?: BodyRegion;
+}
+
+/* ─────────────── §33 — Workout log (minimal Phase 3 shape) ─────────────── */
+
+/**
+ * Minimal workout-log entry for the §33 storage schema. Extended in later
+ * phases when completed-session details are captured.
+ */
+export interface WorkoutLog {
+  id: string;
+  /** Local calendar date the session belongs to, YYYY-MM-DD. */
+  activityDate: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
