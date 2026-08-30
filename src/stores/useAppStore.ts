@@ -22,6 +22,8 @@ import {
   DEFAULT_OBJECTIVE,
   type ActivityLog,
   type AthleteProfile,
+  type NotificationIdentifiers,
+  type NotificationSlot,
   type ReadinessInput,
   type ScheduledEvent,
   type TrainingObjective,
@@ -50,6 +52,8 @@ export interface VikaiAppState {
   activityLogs: ActivityLog[];
   scheduledEvents: ScheduledEvent[];
   workoutLogs: WorkoutLog[];
+  /** Per-notification identifier tracking (SPEC §35 / AGENTS.md guardrail). */
+  notificationIdentifiers: NotificationIdentifiers;
 
   /* ── Actions ── */
   /** Replaces the profile on confirmation (SPEC §32 overwrite semantics). */
@@ -69,6 +73,10 @@ export interface VikaiAppState {
   ) => void;
   removeScheduledEvent: (id: string) => void;
   recordWorkoutLog: (draft: WorkoutLogDraft) => WorkoutLog;
+  /** Tracks (or clears, with null) a scheduled notification identifier. */
+  storeNotificationId: (slot: NotificationSlot, id: string | null) => void;
+  /** Tracks (or clears, with null) a per-event SCHEDULE_REMINDER identifier. */
+  setScheduleReminderId: (eventId: string, id: string | null) => void;
 }
 
 export const useAppStore = create<VikaiAppState>()(
@@ -80,6 +88,7 @@ export const useAppStore = create<VikaiAppState>()(
       activityLogs: [],
       scheduledEvents: [],
       workoutLogs: [],
+      notificationIdentifiers: { scheduleReminders: {} },
 
       setProfile: (profile) => {
         set({ profile });
@@ -165,6 +174,26 @@ export const useAppStore = create<VikaiAppState>()(
         };
         set((state) => ({ workoutLogs: [...state.workoutLogs, record] }));
         return record;
+      },
+
+      storeNotificationId: (slot, id) => {
+        set((state) => {
+          const identifiers = { ...state.notificationIdentifiers };
+          if (id === null) delete identifiers[slot];
+          else identifiers[slot] = id;
+          return { notificationIdentifiers: identifiers };
+        });
+      },
+
+      setScheduleReminderId: (eventId, id) => {
+        set((state) => {
+          const scheduleReminders = { ...state.notificationIdentifiers.scheduleReminders };
+          if (id === null) delete scheduleReminders[eventId];
+          else scheduleReminders[eventId] = id;
+          return {
+            notificationIdentifiers: { ...state.notificationIdentifiers, scheduleReminders },
+          };
+        });
       },
     }),
     {

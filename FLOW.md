@@ -66,7 +66,7 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
 ## PHASE 5: LOCAL NOTIFICATIONS PIPELINE
 *Goal: Enable targeted local notifications[cite: 2].*
 
-* [ ] **5.1 Notification Pipeline (`src/services/notifications.ts`):**
+* [x] **5.1 Notification Pipeline (`src/services/notifications.ts`):**
   * Configure `expo-notifications` setup[cite: 2].
   * Store individual notification IDs in Zustand state[cite: 2].
   * Implement targeted reminder schedulers for check-ins and recovery[cite: 2].

@@ -31,6 +31,7 @@ const INITIAL_SLICES = {
   activityLogs: [],
   scheduledEvents: [],
   workoutLogs: [],
+  notificationIdentifiers: { scheduleReminders: {} },
 } satisfies Partial<VikaiAppState>;
 
 function resetStore(): void {
@@ -65,6 +66,7 @@ describe("initial state", () => {
     expect(state.activityLogs).toEqual([]);
     expect(state.scheduledEvents).toEqual([]);
     expect(state.workoutLogs).toEqual([]);
+    expect(state.notificationIdentifiers).toEqual({ scheduleReminders: {} });
   });
 });
 
@@ -205,6 +207,28 @@ describe("workout logs", () => {
 
     expect(log.id).toMatch(/^workout-/);
     expect(useAppStore.getState().workoutLogs).toHaveLength(1);
+  });
+});
+
+describe("notification identifier tracking (SPEC §35)", () => {
+  it("stores and clears app-level reminder slots", () => {
+    useAppStore.getState().storeNotificationId("readinessCheckIn", "notif-1");
+    expect(useAppStore.getState().notificationIdentifiers.readinessCheckIn).toBe("notif-1");
+
+    useAppStore.getState().storeNotificationId("readinessCheckIn", null);
+    expect(useAppStore.getState().notificationIdentifiers.readinessCheckIn).toBeUndefined();
+  });
+
+  it("tracks per-event schedule reminder identifiers", () => {
+    useAppStore.getState().setScheduleReminderId("event-1", "notif-2");
+    expect(
+      useAppStore.getState().notificationIdentifiers.scheduleReminders["event-1"],
+    ).toBe("notif-2");
+
+    useAppStore.getState().setScheduleReminderId("event-1", null);
+    expect(
+      useAppStore.getState().notificationIdentifiers.scheduleReminders["event-1"],
+    ).toBeUndefined();
   });
 });
 

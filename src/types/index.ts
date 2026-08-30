@@ -305,3 +305,28 @@ export interface WorkoutLog {
   createdAt: string;
   updatedAt: string;
 }
+
+/* ────────────────── §35 — Local notification identifiers ──────────────── */
+
+export type NotificationType =
+  | "READINESS_CHECKIN"
+  | "ACTIVITY_LOG"
+  | "RECOVERY_REMINDER"
+  | "SCHEDULE_REMINDER";
+
+/** App-level reminder slots: at most one live scheduled notification each. */
+export type NotificationSlot = "readinessCheckIn" | "activityLog" | "recoveryReminder";
+
+/**
+ * Scheduled-notification identifier tracking (SPEC §35, AGENTS.md guardrail).
+ * Every scheduled notification's string identifier is stored so reminders can
+ * be cancelled or replaced individually — the bulk
+ * `cancelAllScheduledNotificationsAsync()` is never used anywhere.
+ */
+export interface NotificationIdentifiers {
+  readinessCheckIn?: string;
+  activityLog?: string;
+  recoveryReminder?: string;
+  /** SCHEDULE_REMINDER per scheduled event, keyed by event id. */
+  scheduleReminders: Record<string, string>;
+}
