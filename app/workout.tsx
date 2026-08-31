@@ -8,6 +8,7 @@ import { toLocalDateString } from "../src/engine/autoregulation";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { buildSessionView } from "../src/lib/session";
+import { seasonPhaseFor } from "../src/plans/fall2026";
 import { powerBanner, powerLevel } from "../src/lib/power";
 import { tapHeavy, tapSuccess } from "../src/lib/haptics";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
@@ -39,6 +40,7 @@ export default function Workout() {
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
   const hasWorkoutLogToday = workoutLogs.some((entry) => entry.activityDate === localToday);
+  const seasonPhase = seasonPhaseFor(localToday);
 
   const finish = () => {
     tapHeavy();
@@ -48,7 +50,10 @@ export default function Workout() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-4 p-4">
+    <ScrollView
+      className="flex-1 bg-slate-900"
+      contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
+    >
       <PowerGauge
         percent={power.percent}
         tone={power.tone}
@@ -62,6 +67,18 @@ export default function Workout() {
       <StatusBanner status={result.status} reasons={result.reasons} />
 
       <Text className="text-center text-lg font-black text-slate-50">Today's Game Plan</Text>
+
+      {seasonPhase !== undefined ? (
+        <View className="rounded-xl border border-slate-700 bg-slate-800 p-3">
+          <Text className="text-xs font-bold uppercase tracking-widest text-green-300">
+            Fall 2026 · {seasonPhase.label}
+          </Text>
+          <Text className="mt-1 text-xs text-slate-400">{seasonPhase.focus}</Text>
+          {seasonPhase.note !== undefined ? (
+            <Text className="mt-1 text-xs font-semibold text-slate-300">{seasonPhase.note}</Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {hasCheckedInToday ? null : (
         <Text className="rounded-xl bg-slate-800 px-3 py-2 text-center text-xs text-slate-400">
@@ -95,6 +112,7 @@ export default function Workout() {
       <SessionChecklist
         view={session}
         finished={hasWorkoutLogToday}
+        localDate={localToday}
         onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
       />
 

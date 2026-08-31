@@ -1,6 +1,6 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { OptionCard } from "../src/components/OptionCard";
 import { Toast } from "../src/components/Toast";
@@ -100,7 +100,14 @@ export default function EventForm() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-4 p-4">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      className="flex-1 bg-slate-900"
+    >
+      <ScrollView
+        className="flex-1 bg-slate-900"
+        contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
+      >
       <Text className="text-sm text-slate-400">
         Games, practices, camps — anything that asks something of your legs.
       </Text>
@@ -200,6 +207,7 @@ export default function EventForm() {
       ) : null}
 
       <Toast message={toast} />
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

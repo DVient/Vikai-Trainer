@@ -31,6 +31,10 @@ const hapticsMock = vi.hoisted(() => ({
   NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
 }));
 
+const linkingOpenSpy = vi.hoisted(() =>
+  vi.fn<(url: string) => Promise<void>>(async () => undefined),
+);
+
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: AsyncStorageMock,
 }));
@@ -58,6 +62,8 @@ vi.mock("react-native", async () => {
     const { contentContainerClassName: _dropped, ...rest } = props;
     return react.createElement(RealScrollView, rest);
   };
+  // Hermetic video-link clicks: never open a real browser in tests.
+  mod.Linking = { openURL: linkingOpenSpy };
   return mod;
 });
 
@@ -127,6 +133,7 @@ beforeEach(() => {
   resetStore();
   routerMock.navigate.mockClear();
   routerMock.replace.mockClear();
+  linkingOpenSpy.mockClear();
 });
 
 afterEach(() => {
@@ -516,6 +523,69 @@ describe("game plan screen (app/workout)", () => {
     // Sprints, COD, jumps, and optionals are adjusted out for game prep.
     expect(screen.getByText("Adjusted out today")).toBeTruthy();
     expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
+  });
+});
+
+describe("exercise detail + video library (Fall 2026 plan)", () => {
+  // Saturday, September 12 2026 — in-season phase, primary strength day.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-12T14:00:00.000Z"));
+    resetStore();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("expands a block into the document's exercises with a working video link", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Workout />);
+
+    expect(screen.getByText("Fall 2026 · Team practice integration")).toBeTruthy();
+    expect(screen.getByText("Practice nights: Tuesday & Thursday.")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
+
+    expect(screen.getAllByText("Trap Bar Deadlift").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("3 × 5").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Dumbbell RDL")).toBeTruthy();
+    expect(screen.getByText(/Saturday is your primary strength day/)).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Watch form: Trap Bar Deadlift"));
+    expect(linkingOpenSpy).toHaveBeenCalledWith(
+      expect.stringContaining("youtube.com/results?search_query=trap+bar+deadlift"),
+    );
+  });
+
+  it("explains engine scaling inside the expanded block", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      scheduledEvents: [
+        { id: "g1", eventType: "GAME", startAt: new Date(Date.now() + 20 * 60 * 60 * 1000).toISOString(), createdAt: "", updatedAt: "" },
+      ],
+    });
+
+    render(<Workout />);
+
+    expect(screen.getByText("4 → 2 sets")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
+    expect(screen.getByText("Volume scaled — keep the weight, drop the extra sets.")).toBeTruthy();
+  });
+
+  it("keeps locked blocks studyable without making them checkable", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)] });
+
+    render(<Workout />);
+
+    expect(screen.getAllByText("Not part of today's plan")).toHaveLength(9);
+    fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
+    expect(screen.getByText("Not part of today's plan — study it anyway.")).toBeTruthy();
+    // The check-off is present but disabled — locked blocks can't be checked.
+    const lockedToggle = screen.getByLabelText("Toggle Squat pattern strength");
+    expect(lockedToggle.getAttribute("aria-disabled")).toBe("true");
   });
 });
 

@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { OptionCard } from "../src/components/OptionCard";
 import { Toast } from "../src/components/Toast";
@@ -87,7 +87,14 @@ export default function CheckIn() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-5 p-4">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      className="flex-1 bg-slate-900"
+    >
+      <ScrollView
+        className="flex-1 bg-slate-900"
+        contentContainerClassName="w-full max-w-md self-center gap-5 p-4"
+      >
       <SelectorGroup label="Tap 1 — Sleep 😴">
         {SLEEP_OPTIONS.map((option) => (
           <OptionCard
@@ -171,7 +178,8 @@ export default function CheckIn() {
       </Pressable>
 
       <Toast message={toast} />
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

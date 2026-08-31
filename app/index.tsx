@@ -69,7 +69,10 @@ export default function Index() {
     router.navigate("/practice-log");
   };
   return (
-    <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-4 p-4">
+    <ScrollView
+      className="flex-1 bg-slate-900"
+      contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
+    >
       <View className="flex-row items-center justify-between">
         <View>
           <Text className="text-3xl font-black text-slate-50">Vikai</Text>
@@ -142,6 +145,7 @@ export default function Index() {
         <SessionChecklist
           view={session}
           finished={hasWorkoutLogToday}
+          localDate={localToday}
           onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
         />
 

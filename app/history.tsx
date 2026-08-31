@@ -67,7 +67,10 @@ export default function History() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-4 p-4">
+    <ScrollView
+      className="flex-1 bg-slate-900"
+      contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
+    >
       <View className="flex-row items-center justify-between">
         <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
           Add your commitments — they shape the plan
