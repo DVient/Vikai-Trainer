@@ -121,6 +121,8 @@ export interface TimelineEntry {
   text: string;
   /** Present on scheduled events so rows can link to edit. */
   eventId?: string;
+  /** Total members when the event belongs to a recurring series (🔁 badge). */
+  seriesCount?: number;
   /** Millisecond sort key (entries without a timestamp sort last). */
   sortKey: number;
 }
@@ -144,6 +146,7 @@ export function dayTimeline(
       startAt: string;
       eventType: ScheduledEventType;
       title?: string;
+      seriesId?: string;
     }>;
     readiness: ReadonlyArray<{ localDate: string; recordedAt: string }>;
   },
@@ -183,6 +186,13 @@ export function dayTimeline(
     });
   }
 
+  const seriesCounts = new Map<string, number>();
+  for (const event of sources.events) {
+    if (event.seriesId !== undefined) {
+      seriesCounts.set(event.seriesId, (seriesCounts.get(event.seriesId) ?? 0) + 1);
+    }
+  }
+
   for (const event of sources.events) {
     if (eventDate(event.startAt, timezone) !== date) continue;
     const label = SCHEDULED_EVENT_LABELS[event.eventType] ?? "📅 Event";
@@ -191,6 +201,7 @@ export function dayTimeline(
       emoji: "📅",
       text: event.title ? `${label} — ${event.title}` : label,
       eventId: event.id,
+      seriesCount: event.seriesId !== undefined ? seriesCounts.get(event.seriesId) : undefined,
       sortKey: timestampOf(event.startAt),
     });
   }

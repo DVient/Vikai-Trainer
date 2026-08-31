@@ -41,10 +41,17 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 
 vi.mock("expo-haptics", () => hapticsMock);
 
-// ReminderStatusChip imports expo-notifications; keep web tests hermetic.
+// ReminderStatusChip + event-form reminder sync import expo-notifications;
+// keep web tests hermetic with a full service surface.
 vi.mock("expo-notifications", () => ({
   getPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: true })),
   requestPermissionsAsync: vi.fn(async () => ({ granted: true, canAskAgain: false })),
+  scheduleNotificationAsync: vi.fn(async () => "notif-id-1"),
+  cancelScheduledNotificationAsync: vi.fn(async () => undefined),
+  setNotificationChannelAsync: vi.fn(async () => undefined),
+  setNotificationHandler: vi.fn(() => undefined),
+  SchedulableTriggerInputTypes: { DAILY: "daily", DATE: "date" },
+  AndroidImportance: { DEFAULT: 5, HIGH: 6 },
 }));
 
 vi.mock("expo-router", () => ({
@@ -658,5 +665,86 @@ describe("event form (app/event-form)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Delete event" }));
     expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
+  });
+
+  it("creates a six-week two-day practice series in one submission", () => {
+    render(<EventForm />);
+
+    fireEvent.click(screen.getByText("Every week"));
+    // Pre-checked weekday comes from the (empty) date field; pick Tue + Thu.
+    fireEvent.click(screen.getByLabelText("Repeat on Tuesday"));
+    fireEvent.click(screen.getByLabelText("Repeat on Thursday"));
+    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
+      target: { value: "2100-09-12" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("18:00"), {
+      target: { value: "17:30" },
+    });
+    // Weeks input defaults to 6 — leave it.
+
+    // Live preview reflects the expansion before saving.
+    // 2100-09-12 is a Sunday → first Tue = Sep 14, last series day = Oct 21.
+    expect(screen.getByText(/Creates 12 events · Tue, Sep 14 – Thu, Oct 21/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    const events = useAppStore.getState().scheduledEvents;
+    expect(events).toHaveLength(12);
+    const seriesIds = new Set(events.map((event) => event.seriesId));
+    expect(seriesIds.size).toBe(1);
+    expect(events.every((event) => event.eventType === "TEAM_PRACTICE")).toBe(true);
+    const dates = events
+      .map((event) => event.startAt.slice(0, 10))
+      .sort();
+    expect(dates[0]).toBe("2100-09-14");
+    expect(dates[dates.length - 1]).toBe("2100-10-21");
+    // Every member keeps the same typed wall-clock time.
+    const timeParts = new Set(events.map((event) => event.startAt.slice(10)));
+    expect(timeParts.size).toBe(1);
+  });
+
+  it("deletes a whole series from a member's edit screen", () => {
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const oneOff = {
+      id: "solo-1",
+      eventType: "GAME" as const,
+      startAt: future,
+      createdAt: "",
+      updatedAt: "",
+    };
+    const series = ["m1", "m2", "m3"].map((id) => ({
+      id,
+      eventType: "TEAM_PRACTICE" as const,
+      startAt: future,
+      seriesId: "series-abc",
+      createdAt: "",
+      updatedAt: "",
+    }));
+    useAppStore.setState({ scheduledEvents: [oneOff, ...series] });
+    searchParamsMock.eventId = "m2";
+
+    render(<EventForm />);
+
+    expect(screen.getByText(/Part of a weekly series \(3 events total\)/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete series" }));
+
+    const remaining = useAppStore.getState().scheduledEvents;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.id).toBe("solo-1");
+  });
+
+  it("shows the repeat section only for new events and hides it when editing", () => {
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    useAppStore.setState({
+      scheduledEvents: [
+        { id: "g1", eventType: "GAME", startAt: future, createdAt: "", updatedAt: "" },
+      ],
+    });
+    searchParamsMock.eventId = "g1";
+
+    render(<EventForm />);
+
+    expect(screen.queryByText("Every week")).toBeNull();
+    expect(screen.queryByLabelText("Repeat on Tuesday")).toBeNull();
   });
 });

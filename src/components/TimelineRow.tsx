@@ -22,6 +22,11 @@ export function TimelineRow({
       </Text>
       <Text className="text-base">{entry.emoji}</Text>
       <Text className="flex-1 text-sm text-slate-200">{entry.text}</Text>
+      {entry.seriesCount !== undefined && entry.seriesCount > 1 ? (
+        <Text className="text-sm" accessibilityLabel={`Recurring, ${entry.seriesCount} events`}>
+          🔁
+        </Text>
+      ) : null}
       {entry.eventId !== undefined ? <Text className="text-sm text-slate-500">›</Text> : null}
     </View>
   );

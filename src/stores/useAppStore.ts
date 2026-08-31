@@ -73,11 +73,18 @@ export interface VikaiTrainerAppState {
   removeActivityLog: (id: string) => void;
   /** Adds a future/planned event (SPEC §9.1). */
   scheduleEvent: (draft: ScheduledEventDraft) => ScheduledEvent;
+  /**
+   * Adds several events as one recurring series (one shared seriesId, one
+   * persist write). Returns the created records in input order.
+   */
+  scheduleEventSeries: (drafts: ScheduledEventDraft[]) => ScheduledEvent[];
   updateScheduledEvent: (
     id: string,
     patch: Partial<Omit<ScheduledEvent, "id" | "createdAt">>,
   ) => void;
   removeScheduledEvent: (id: string) => void;
+  /** Removes every member of a recurring series; returns what was removed. */
+  removeEventSeries: (seriesId: string) => ScheduledEvent[];
   recordWorkoutLog: (draft: WorkoutLogDraft) => WorkoutLog;
   /** Checks off (or un-checks) one Game Plan component for a local date. */
   toggleComponentDone: (localDate: string, componentId: string, sets: number) => void;
@@ -89,7 +96,7 @@ export interface VikaiTrainerAppState {
 
 export const useAppStore = create<VikaiTrainerAppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       profile: DEFAULT_ATHLETE_PROFILE,
       trainingObjective: DEFAULT_OBJECTIVE,
       readinessInputs: [],
@@ -159,6 +166,21 @@ export const useAppStore = create<VikaiTrainerAppState>()(
         return record;
       },
 
+      scheduleEventSeries: (drafts) => {
+        if (drafts.length === 0) return [];
+        const now = new Date().toISOString();
+        const seriesId = createLocalId("series");
+        const records: ScheduledEvent[] = drafts.map((draft) => ({
+          ...draft,
+          id: createLocalId("event"),
+          seriesId,
+          createdAt: now,
+          updatedAt: now,
+        }));
+        set((state) => ({ scheduledEvents: [...state.scheduledEvents, ...records] }));
+        return records;
+      },
+
       updateScheduledEvent: (id, patch) => {
         set((state) => ({
           scheduledEvents: state.scheduledEvents.map((event) =>
@@ -171,6 +193,15 @@ export const useAppStore = create<VikaiTrainerAppState>()(
         set((state) => ({
           scheduledEvents: state.scheduledEvents.filter((event) => event.id !== id),
         }));
+      },
+
+      removeEventSeries: (seriesId) => {
+        const removed = get().scheduledEvents.filter((event) => event.seriesId === seriesId);
+        if (removed.length === 0) return [];
+        set((state) => ({
+          scheduledEvents: state.scheduledEvents.filter((event) => event.seriesId !== seriesId),
+        }));
+        return removed;
       },
 
       recordWorkoutLog: (draft) => {

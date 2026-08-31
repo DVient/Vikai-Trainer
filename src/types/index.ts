@@ -131,6 +131,12 @@ export interface ScheduledEvent {
   /** ISO datetime string. Optional. */
   endAt?: string;
   title?: string;
+  /**
+   * Present when the event was created as part of a recurring series
+   * (additive to the §33 schema). All members of one series share it;
+   * one-off events leave it undefined.
+   */
+  seriesId?: string;
   createdAt: string;
   updatedAt: string;
 }

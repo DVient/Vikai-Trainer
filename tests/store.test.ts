@@ -197,6 +197,53 @@ describe("scheduled events", () => {
 
     expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
   });
+
+  it("schedules a recurring series in one submission with a shared seriesId", () => {
+    const times = [
+      "2026-09-15", "2026-09-17", "2026-09-22", "2026-09-24",
+      "2026-09-29", "2026-10-01", "2026-10-06", "2026-10-08",
+      "2026-10-13", "2026-10-15", "2026-10-20", "2026-10-22",
+    ];
+    const drafts = times.map((date) => ({
+      eventType: "TEAM_PRACTICE" as const,
+      startAt: `${date}T18:00:00.000Z`,
+    }));
+    const created = useAppStore.getState().scheduleEventSeries(drafts);
+
+    expect(created).toHaveLength(12);
+    const ids = new Set(created.map((event) => event.id));
+    expect(ids.size).toBe(12);
+    // All members share exactly one seriesId; one-off events have none.
+    const seriesIds = new Set(created.map((event) => event.seriesId));
+    expect(seriesIds.size).toBe(1);
+    expect(created[0]?.seriesId).toMatch(/^series-/);
+    expect(useAppStore.getState().scheduledEvents).toHaveLength(12);
+  });
+
+  it("removes a whole series and leaves one-off events alone", () => {
+    const store = useAppStore.getState();
+    const oneOff = store.scheduleEvent({ eventType: "GAME", startAt: "2026-01-05T19:00:00.000Z" });
+    const created = store.scheduleEventSeries([
+      { eventType: "TEAM_PRACTICE", startAt: "2026-09-15T18:00:00.000Z" },
+      { eventType: "TEAM_PRACTICE", startAt: "2026-09-17T18:00:00.000Z" },
+      { eventType: "TEAM_PRACTICE", startAt: "2026-09-22T18:00:00.000Z" },
+    ]);
+    const seriesId = created[0]?.seriesId;
+    expect(seriesId).toBeDefined();
+
+    const removed = useAppStore.getState().removeEventSeries(seriesId as string);
+    expect(removed).toHaveLength(3);
+    expect(useAppStore.getState().scheduledEvents).toHaveLength(1);
+    expect(useAppStore.getState().scheduledEvents[0]?.id).toBe(oneOff.id);
+
+    // Unknown seriesId is a no-op.
+    expect(useAppStore.getState().removeEventSeries("series-ghost")).toEqual([]);
+  });
+
+  it("creates an empty series as a no-op", () => {
+    expect(useAppStore.getState().scheduleEventSeries([])).toEqual([]);
+    expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
+  });
 });
 
 describe("workout logs", () => {
