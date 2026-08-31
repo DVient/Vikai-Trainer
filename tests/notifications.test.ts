@@ -5,6 +5,8 @@ import {
   cancelScheduleReminderAsync,
   configureNotificationHandler,
   ensureDefaultRemindersScheduledAsync,
+  reminderBannerStatus,
+  reminderChipCopy,
   scheduleActivityLogReminderAsync,
   scheduleCheckInReminderAsync,
   scheduleFuelReminderAsync,
@@ -129,10 +131,30 @@ describe("setup (FLOW 5.1 expo-notifications configuration)", () => {
 
     platformMock.value = "android";
     await scheduleActivityLogReminderAsync();
+    // Heads-up delivery: HIGH importance + vibration for time-sensitive nudges.
     expect(notificationsMock.setNotificationChannelAsync).toHaveBeenCalledWith(
       "vikai-reminders",
-      expect.objectContaining({ name: "Vikai reminders" }),
+      expect.objectContaining({
+        name: "Vikai reminders",
+        importance: 6, // AndroidImportance.HIGH
+        enableVibrate: true,
+      }),
     );
+  });
+});
+
+describe("reminder status chip helpers (pure)", () => {
+  it("maps permission states to youth-friendly chip copy", () => {
+    expect(reminderBannerStatus(true, true)).toBe("granted");
+    expect(reminderBannerStatus(false, false)).toBe("denied");
+    expect(reminderBannerStatus(false, true)).toBe("undetermined");
+    expect(reminderBannerStatus(undefined, undefined)).toBe("undetermined");
+
+    expect(reminderChipCopy("granted").tone).toBe("on");
+    expect(reminderChipCopy("granted").label).toContain("Fuel Up 3:30 PM");
+    expect(reminderChipCopy("denied").tone).toBe("off");
+    expect(reminderChipCopy("denied").label).toContain("enable in Settings");
+    expect(reminderChipCopy("undetermined").label).toContain("Turn on reminders");
   });
 });
 

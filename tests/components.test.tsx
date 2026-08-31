@@ -41,6 +41,12 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 
 vi.mock("expo-haptics", () => hapticsMock);
 
+// ReminderStatusChip imports expo-notifications; keep web tests hermetic.
+vi.mock("expo-notifications", () => ({
+  getPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: true })),
+  requestPermissionsAsync: vi.fn(async () => ({ granted: true, canAskAgain: false })),
+}));
+
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
   useLocalSearchParams: () => searchParamsMock,

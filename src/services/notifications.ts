@@ -62,11 +62,37 @@ export async function ensureNotificationPermissionsAsync(): Promise<boolean> {
   return requested.granted;
 }
 
+/** Pure permission state → Home chip wording (youth copy, no jargon). */
+export type ReminderPermissionState = "granted" | "denied" | "undetermined";
+
+export function reminderBannerStatus(
+  granted: boolean | undefined,
+  canAskAgain: boolean | undefined,
+): ReminderPermissionState {
+  if (granted === true) return "granted";
+  if (granted === false && canAskAgain === false) return "denied";
+  return "undetermined";
+}
+
+export function reminderChipCopy(state: ReminderPermissionState): { label: string; tone: "on" | "off" } {
+  switch (state) {
+    case "granted":
+      return { label: "🔔 Reminders on — Fuel Up 3:30 PM", tone: "on" };
+    case "denied":
+      return { label: "🔔 Reminders off — enable in Settings", tone: "off" };
+    default:
+      return { label: "🔔 Turn on reminders", tone: "off" };
+  }
+}
+
 async function ensureAndroidChannelAsync(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
     name: "Vikai reminders",
-    importance: Notifications.AndroidImportance.DEFAULT,
+    // HIGH = heads-up banner + vibration for time-sensitive nudges
+    // (Fuel Up at 3:30 PM, pre-game reminders) — not a silent tray entry.
+    importance: Notifications.AndroidImportance.HIGH,
+    enableVibrate: true,
   });
 }
 

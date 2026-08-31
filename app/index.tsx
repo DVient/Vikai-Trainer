@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { DayStepper } from "../src/components/DayStepper";
 import { PowerGauge } from "../src/components/PowerGauge";
+import { ReminderStatusChip } from "../src/components/ReminderStatusChip";
 import { SessionChecklist } from "../src/components/SessionChecklist";
 import { StatusBanner } from "../src/components/StatusBanner";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
@@ -96,6 +97,8 @@ export default function Index() {
       />
 
       <StatusBanner status={result.status} reasons={result.reasons} />
+
+      <ReminderStatusChip />
 
       <Pressable
         accessibilityRole="button"
