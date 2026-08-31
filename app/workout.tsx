@@ -32,6 +32,7 @@ export default function Workout() {
   const toggleComponentDone = useAppStore((state) => state.toggleComponentDone);
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
+  const activityLogs = useAppStore((state) => state.activityLogs);
 
   const localToday = toLocalDateString(new Date(), profile.timezone);
   const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
@@ -40,6 +41,7 @@ export default function Workout() {
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
   const hasWorkoutLogToday = workoutLogs.some((entry) => entry.activityDate === localToday);
+  const hasActivityToday = activityLogs.some((entry) => entry.activityDate === localToday);
   const seasonPhase = seasonPhaseFor(localToday);
 
   const finish = () => {
@@ -98,9 +100,24 @@ export default function Workout() {
         </Text>
       </View>
 
+      {!hasWorkoutLogToday && !hasActivityToday ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Log activities before the workout"
+          onPress={() => router.navigate("/practice-log")}
+          className="min-h-[48px] rounded-xl border-2 border-yellow-500/50 bg-yellow-500/10 px-3 py-3"
+        >
+          <Text className="text-sm font-bold text-yellow-300">
+            Anything already on your legs today? Log it before you start — it
+            shapes today's volume 🔄
+          </Text>
+        </Pressable>
+      ) : null}
+
       {hasWorkoutLogToday ? (
         <Text className="rounded-xl bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
-          Session complete 🎉
+          Session complete 🎉 Log anything else you did today — it shapes your
+          next workout 🔄
         </Text>
       ) : (
         <Text className="text-xs text-slate-400">

@@ -13,6 +13,7 @@ import { nextUpcomingEvents, SCHEDULED_EVENT_LABELS } from "../src/lib/format";
 import { todaySteps } from "../src/lib/flow";
 import { buildSessionView } from "../src/lib/session";
 import { formatTimeOfDay } from "../src/lib/calendar";
+import { partitionActivities } from "../src/lib/activityTiming";
 import { checkInStreak, powerLevel } from "../src/lib/power";
 import { tapHeavy, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
@@ -48,13 +49,11 @@ export default function Index() {
   const streak = checkInStreak(readinessInputs, localToday);
 
   const hasWorkoutLogToday = workoutLogs.some((entry) => entry.activityDate === localToday);
-  const hasLoggedActivityToday = activityLogs.some(
-    (entry) => entry.activityDate === localToday,
-  );
+  const activityPartition = partitionActivities(activityLogs, workoutLogs, localToday);
   const steps = todaySteps({
     hasCheckedInToday,
     hasWorkoutLogToday,
-    hasLoggedActivityToday,
+    activityPartition,
   });
 
   const latestCheckIn = [...readinessInputs]

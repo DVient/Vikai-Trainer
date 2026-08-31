@@ -101,4 +101,31 @@ describe("buildSessionView — the checkable workout", () => {
     expect(view.rows).toEqual([]);
     expect(view.finishable).toBe(true);
   });
+
+  it("stays stable when the engine re-derives after the workout finished", () => {
+    // The whole session was completed at the original prescription...
+    const progress: Record<string, { componentId: string; sets: number; completedAt: string }> = {
+      a: { componentId: "a", sets: 4, completedAt: "x" },
+      b: { componentId: "b", sets: 4, completedAt: "y" },
+    };
+    const before = buildSessionView([scaled("a", "KEPT", 4), scaled("b", "KEPT", 4)], progress);
+
+    // ...then an evening activity re-derives harsher restrictions. The
+    // finished session is frozen: done rows keep credit, nothing re-opens.
+    const after = buildSessionView(
+      [scaled("a", "REDUCED", 2), scaled("b", "REMOVED", 0)],
+      progress,
+    );
+
+    expect(before.remainingCount).toBe(0);
+    expect(after.remainingCount).toBe(0);
+    expect(after.rows.find((row) => row.componentId === "a")).toMatchObject({
+      state: "done",
+      sets: 4,
+    });
+    expect(after.rows.find((row) => row.componentId === "b")).toMatchObject({
+      state: "done",
+      sets: 4,
+    });
+  });
 });

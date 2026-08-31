@@ -208,10 +208,11 @@ describe("home hub (app/index)", () => {
     expect(screen.getByText("Your day — 3 steps")).toBeTruthy();
     expect(screen.getByText("1. 3-Tap Check-In")).toBeTruthy();
     expect(screen.getByText("Unlock your power — under 5 sec")).toBeTruthy();
-    expect(screen.getByText("2. Complete your Game Plan")).toBeTruthy();
-    expect(screen.getByText("Unlock with your check-in")).toBeTruthy();
-    expect(screen.getByText("3. Log your activities")).toBeTruthy();
+    // Activities come BEFORE the Game Plan: they shape its volume.
+    expect(screen.getByText("2. Log your activities")).toBeTruthy();
     expect(screen.getByText("After your check-in")).toBeTruthy();
+    expect(screen.getByText("3. Complete your Game Plan")).toBeTruthy();
+    expect(screen.getByText("Unlock with your check-in")).toBeTruthy();
   });
 
   it("renders SHIELD with the whole plan adjusted out on pain concern", () => {
@@ -236,11 +237,11 @@ describe("home hub (app/index)", () => {
     fireEvent.click(screen.getByText("1. 3-Tap Check-In"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/checkin");
 
-    fireEvent.click(screen.getByText("2. Complete your Game Plan"));
-    expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
-
-    fireEvent.click(screen.getByText("3. Log your activities"));
+    fireEvent.click(screen.getByText("2. Log your activities"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+
+    fireEvent.click(screen.getByText("3. Complete your Game Plan"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
 
     fireEvent.click(screen.getByLabelText("Log an activity"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
@@ -317,7 +318,7 @@ describe("live session cockpit — check-offs and mid-session rescaling", () => 
 
     expect(useAppStore.getState().workoutLogs).toHaveLength(1);
     expect(useAppStore.getState().workoutLogs[0]?.activityDate).toBe(localDate(0));
-    expect(screen.getByText("Session complete 🎉")).toBeTruthy();
+    expect(screen.getByText(/Session complete 🎉/)).toBeTruthy();
   });
 });
 
@@ -459,7 +460,7 @@ describe("practice log (app/practice-log)", () => {
     expect(entries[0]?.sessionRpe).toBe(9);
     expect(entries[0]?.durationMinutes).toBe(45);
 
-    expect(screen.getByText("Today's log")).toBeTruthy();
+    expect(screen.getByText("Today's log (1 entry)")).toBeTruthy();
     // Label appears as the selected chip AND in the log row.
     expect(screen.getAllByText(ACTIVITY_TYPE_LABELS.TEAM_PRACTICE).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("9/10 · 45 min · load 405")).toBeTruthy();
@@ -599,6 +600,85 @@ describe("exercise detail + video library (Fall 2026 plan)", () => {
     // The check-off is present but disabled — locked blocks can't be checked.
     const lockedToggle = screen.getByLabelText("Toggle Squat pattern strength");
     expect(lockedToggle.getAttribute("aria-disabled")).toBe("true");
+  });
+});
+
+describe("workout-relative activity logging", () => {
+  it("prompts to log pre-workout activities before the session starts", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Workout />);
+
+    expect(screen.getByLabelText("Log activities before the workout")).toBeTruthy();
+
+    // Once anything is logged today, the prompt disappears.
+    act(() => {
+      useAppStore.getState().logActivity({
+        activityDate: localDate(0),
+        timezone: TIMEZONE,
+        activityType: "TEAM_PRACTICE",
+        sessionRpe: 6,
+        durationMinutes: 60,
+      });
+    });
+    expect(screen.queryByLabelText("Log activities before the workout")).toBeNull();
+  });
+
+  it("keeps the practice log open for several same-day entries", () => {
+    render(<PracticeLog />);
+
+    // Change the duration, save, and the form resets for the next entry.
+    fireEvent.change(screen.getByDisplayValue("60"), { target: { value: "45" } });
+    fireEvent.click(screen.getByText("Save activity"));
+
+    expect(screen.getByText("Logged ✓ — add another or head back")).toBeTruthy();
+    expect(screen.getByDisplayValue("60")).toBeTruthy(); // form reset
+    expect(screen.getByText("Today's log (1 entry)")).toBeTruthy();
+
+    fireEvent.change(screen.getByDisplayValue("60"), { target: { value: "45" } });
+    fireEvent.click(screen.getByText("Save activity"));
+    expect(screen.getByText("Today's log (2 entries)")).toBeTruthy();
+
+    // Explicit exit — no auto-navigation after save.
+    fireEvent.click(screen.getByLabelText("Done logging activities"));
+    expect(routerMock.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("attributes today's entries around the finished workout", () => {
+    const now = new Date();
+    const doneAt = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const beforeWorkout = new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString();
+    useAppStore.setState({
+      workoutLogs: [{ id: "w1", activityDate: localDate(0), createdAt: doneAt, updatedAt: doneAt }],
+      activityLogs: [
+        {
+          id: "a1",
+          activityDate: localDate(0),
+          createdAt: beforeWorkout,
+          updatedAt: beforeWorkout,
+          timezone: TIMEZONE,
+          activityType: "TEAM_PRACTICE",
+          sessionRpe: 7,
+          durationMinutes: 60,
+        },
+        {
+          id: "a2",
+          activityDate: localDate(0),
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          timezone: TIMEZONE,
+          activityType: "SKILL_WORK",
+          sessionRpe: 4,
+          durationMinutes: 30,
+        },
+      ],
+    });
+
+    render(<PracticeLog />);
+
+    expect(screen.getByText("Today's log (2 entries)")).toBeTruthy();
+    expect(screen.getByText("Before today's session — already shaped today")).toBeTruthy();
+    expect(screen.getByText("After today's session — shapes your next workout")).toBeTruthy();
   });
 });
 

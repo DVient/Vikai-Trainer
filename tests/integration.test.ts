@@ -357,4 +357,47 @@ describe("live session loop: check-offs, mid-session rescaling, finish", () => {
       ),
     ).toBe(true);
   });
+
+  it("carries a post-workout evening activity into the next workout's derivation", () => {
+    const day = today();
+    // Anchor at local noon of day D so D+1 derivation can't bucket oddly.
+    const noon = parseEventDateTime(day, "12:00", TIMEZONE);
+    if (!noon.ok) throw new Error("expected a valid noon anchor");
+    const noonD = new Date(noon.iso);
+    const nextDay = new Date(noonD.getTime() + 24 * 60 * 60 * 1000);
+
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(day, { sleep: "OVER_8_HRS", joint: "NO_CONCERN", energy: "HIGH" }),
+      ],
+    });
+
+    // Baseline on day D: good anchors, nothing logged → nothing adjusted.
+    const baseline = prescriptionOf(deriveEngineView(useAppStore.getState(), noonD));
+    expect(baseline.every((entry) => entry.modification === "KEPT")).toBe(true);
+
+    // A heavy session on day D (post-workout or not — the date window counts it).
+    useAppStore.getState().logActivity({
+      activityDate: day,
+      timezone: TIMEZONE,
+      activityType: "TEAM_PRACTICE",
+      sessionRpe: 9,
+      durationMinutes: 90, // load 810 ≥ highSessionLoad (700)
+    });
+
+    // Day D+1 check-in with the same good anchors — but the rolling 24h
+    // workload now includes yesterday's load, so the plan scales down.
+    useAppStore.setState({
+      readinessInputs: [
+        ...useAppStore.getState().readinessInputs,
+        makeCheckIn(toLocalDateString(nextDay, TIMEZONE), {
+          sleep: "OVER_8_HRS",
+          joint: "NO_CONCERN",
+          energy: "HIGH",
+        }),
+      ],
+    });
+    const next = prescriptionOf(deriveEngineView(useAppStore.getState(), nextDay));
+    expect(next.some((entry) => entry.modification !== "KEPT")).toBe(true);
+  });
 });

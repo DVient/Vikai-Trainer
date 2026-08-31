@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { OptionCard } from "../src/components/OptionCard";
 import { Toast } from "../src/components/Toast";
+import { partitionActivities } from "../src/lib/activityTiming";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import {
@@ -16,20 +17,25 @@ import type { ActivityType } from "../src/types";
 
 /**
  * Practice Log (design refresh): visual 1–10 effort slider (Chilling → All
- * Out) with haptic ticks, big quick-sport toggle chips, duration chips, and
- * today's logged activities. Session load (RPE × minutes) shown as an
- * internal workload number — never a medical indicator (SPEC §10).
+ * Out), big quick-sport toggle chips, duration chips, and today's logged
+ * activities. Built for several entries a day (morning practice + afternoon
+ * skill work): saving keeps the screen open with a fresh form; a Done button
+ * returns home. Entries carry a before/after-session badge once today's
+ * workout is done — post-workout logs shape the NEXT workout, today's
+ * session is frozen. Session load (RPE × minutes) shown as an internal
+ * workload number — never a medical indicator (SPEC §10).
  */
 
 const ACTIVITY_TYPES = Object.keys(ACTIVITY_TYPE_LABELS) as ActivityType[];
 const DURATION_CHIPS = [30, 45, 60, 90, 120] as const;
-const SAVED_TOAST = "Saved offline · Syncs when back online ✅";
+const SAVED_TOAST = "Logged ✓ — add another or head back";
 
 export default function PracticeLog() {
   const router = useRouter();
   const logActivity = useAppStore((state) => state.logActivity);
   const removeActivityLog = useAppStore((state) => state.removeActivityLog);
   const activityLogs = useAppStore((state) => state.activityLogs);
+  const workoutLogs = useAppStore((state) => state.workoutLogs);
   const profile = useAppStore((state) => state.profile);
 
   const [activityType, setActivityType] = useState<ActivityType>("TEAM_PRACTICE");
@@ -39,17 +45,11 @@ export default function PracticeLog() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const navigateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (navigateTimer.current !== null) clearTimeout(navigateTimer.current);
-    },
-    [],
-  );
-
   const now = new Date();
   const today = toLocalDateString(now, profile.timezone);
-  const todaysLogs = activityLogs.filter((entry) => entry.activityDate === today);
+  const { pre, post } = partitionActivities(activityLogs, workoutLogs, today);
+  const todaysLogs = [...pre, ...post];
+  const workoutDone = workoutLogs.some((entry) => entry.activityDate === today);
   const band = rpeBand(sessionRpe);
 
   const onSave = () => {
@@ -69,10 +69,14 @@ export default function PracticeLog() {
       notes: notes.trim() === "" ? undefined : notes.trim(),
     });
 
+    // Multi-entry friendly: reset the form, keep the screen open.
+    setActivityType("TEAM_PRACTICE");
+    setSessionRpe(5);
+    setDurationText("60");
+    setNotes("");
     setError(null);
     tapSuccess();
     setToast(SAVED_TOAST);
-    navigateTimer.current = setTimeout(() => router.replace("/"), 1200);
   };
 
   return (
@@ -207,36 +211,60 @@ export default function PracticeLog() {
       {todaysLogs.length > 0 ? (
         <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
           <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            Today's log
+            {todaysLogs.length === 1 ? "Today's log (1 entry)" : `Today's log (${todaysLogs.length} entries)`}
           </Text>
-          {todaysLogs.map((entry) => (
-            <View
-              key={entry.id}
-              className="mt-2 flex-row items-center justify-between"
-            >
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-slate-100">
-                  {ACTIVITY_TYPE_LABELS[entry.activityType]}
-                </Text>
-                <Text className="text-xs text-slate-400">
-                  {entry.sessionRpe ?? "?"}/10 · {entry.durationMinutes ?? "?"} min · load{" "}
-                  {(entry.sessionRpe ?? 0) * (entry.durationMinutes ?? 0)}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${ACTIVITY_TYPE_LABELS[entry.activityType]} entry`}
-                onPress={() => {
-                  tapLight();
-                  removeActivityLog(entry.id);
-                }}
-                className="h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
+          {todaysLogs.map((entry) => {
+            const after = post.some((logged) => logged.createdAt === entry.createdAt);
+            return (
+              <View
+                key={entry.id}
+                className="mt-2 flex-row items-center justify-between"
               >
-                <Text className="text-base font-bold text-slate-300">✕</Text>
-              </Pressable>
-            </View>
-          ))}
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-slate-100">
+                    {ACTIVITY_TYPE_LABELS[entry.activityType]}
+                  </Text>
+                  <Text className="text-xs text-slate-400">
+                    {entry.sessionRpe ?? "?"}/10 · {entry.durationMinutes ?? "?"} min · load{" "}
+                    {(entry.sessionRpe ?? 0) * (entry.durationMinutes ?? 0)}
+                  </Text>
+                  {workoutDone ? (
+                    <Text className="mt-0.5 text-xs font-semibold text-slate-500">
+                      {after
+                        ? "After today's session — shapes your next workout"
+                        : "Before today's session — already shaped today"}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${ACTIVITY_TYPE_LABELS[entry.activityType]} entry`}
+                  onPress={() => {
+                    tapLight();
+                    removeActivityLog(entry.id);
+                  }}
+                  className="h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
+                >
+                  <Text className="text-base font-bold text-slate-300">✕</Text>
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
+      ) : null}
+
+      {todaysLogs.length > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Done logging activities"
+          onPress={() => {
+            tapLight();
+            router.replace("/");
+          }}
+          className="h-14 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+        >
+          <Text className="text-base font-bold text-slate-100">Done — back to your day</Text>
+        </Pressable>
       ) : null}
 
       <Toast message={toast} />
