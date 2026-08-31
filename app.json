@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "Vikai Trainer",
-    "slug": "vikai",
+    "slug": "vikai-trainer",
     "version": "1.0.0",
-    "scheme": "vikai",
+    "scheme": "vikai-trainer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "icon": "./assets/icon.png",
@@ -13,7 +13,7 @@
       "backgroundColor": "#0F172A"
     },
     "android": {
-      "package": "com.kaivic.vikai",
+      "package": "com.kaivic.vikaitrainer",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
@@ -26,7 +26,7 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "com.kaivic.vikai"
+      "bundleIdentifier": "com.kaivic.vikaitrainer"
     },
     "web": {
       "bundler": "metro",

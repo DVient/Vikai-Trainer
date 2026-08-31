@@ -39,7 +39,7 @@ export const DEFAULT_FUEL_REMINDER_TIME: ReminderTime = { hour: 15, minute: 30 }
 /** SCHEDULE_REMINDER fires this many minutes before a game or practice. */
 export const SCHEDULE_REMINDER_LEAD_MINUTES = 120;
 
-const ANDROID_CHANNEL_ID = "vikai-reminders";
+const ANDROID_CHANNEL_ID = "vikai-trainer-reminders";
 
 /** Notification presentation setup (call once at app start). */
 export function configureNotificationHandler(): void {

@@ -70,7 +70,7 @@ eas build -p ios --profile production   # → TestFlight
 
 ## What's inside the app for this
 
-- `app.json` — Android/iOS identity (`com.kaivic.vikai`), notification
+- `app.json` — Android/iOS identity (`com.kaivic.vikaitrainer`), notification
   permissions (`POST_NOTIFICATIONS`, `USE_EXACT_ALARM` for exact 3:30 PM
   delivery, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`), branded icon/splash,
   green `#22C55E` notification accent.

@@ -44,7 +44,7 @@ type ActivityDraft = Omit<ActivityLog, "id" | "createdAt" | "updatedAt">;
 type ScheduledEventDraft = Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt">;
 type WorkoutLogDraft = Omit<WorkoutLog, "id" | "createdAt" | "updatedAt">;
 
-export interface VikaiAppState {
+export interface VikaiTrainerAppState {
   /* ── State slices (SPEC §33) ── */
   /** Initialized with the §1.2 default baseline; overridable in-app. */
   profile: AthleteProfile;
@@ -87,7 +87,7 @@ export interface VikaiAppState {
   setScheduleReminderId: (eventId: string, id: string | null) => void;
 }
 
-export const useAppStore = create<VikaiAppState>()(
+export const useAppStore = create<VikaiTrainerAppState>()(
   persist(
     (set) => ({
       profile: DEFAULT_ATHLETE_PROFILE,
@@ -220,7 +220,7 @@ export const useAppStore = create<VikaiAppState>()(
       },
     }),
     {
-      name: "vikai-local-store",
+      name: "vikai-trainer-local-store",
       version: 1,
       storage: createJSONStorage(() => AsyncStorage),
     },

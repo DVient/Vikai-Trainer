@@ -133,7 +133,7 @@ describe("setup (FLOW 5.1 expo-notifications configuration)", () => {
     await scheduleActivityLogReminderAsync();
     // Heads-up delivery: HIGH importance + vibration for time-sensitive nudges.
     expect(notificationsMock.setNotificationChannelAsync).toHaveBeenCalledWith(
-      "vikai-reminders",
+      "vikai-trainer-reminders",
       expect.objectContaining({
         name: "Vikai Trainer reminders",
         importance: 6, // AndroidImportance.HIGH

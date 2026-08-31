@@ -6,7 +6,7 @@ import {
   type TrainingObjective,
 } from "../src/types";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
-import { useAppStore, type VikaiAppState } from "../src/stores/useAppStore";
+import { useAppStore, type VikaiTrainerAppState } from "../src/stores/useAppStore";
 
 /**
  * Phase 3.2 — Zustand store tests with AsyncStorage mocked (node runtime).
@@ -33,7 +33,7 @@ const INITIAL_SLICES = {
   workoutLogs: [],
   workoutProgress: {},
   notificationIdentifiers: { scheduleReminders: {} },
-} satisfies Partial<VikaiAppState>;
+} satisfies Partial<VikaiTrainerAppState>;
 
 function resetStore(): void {
   useAppStore.setState(INITIAL_SLICES);
@@ -275,7 +275,7 @@ describe("local persistence (SPEC §31)", () => {
     const last = calls.at(-1);
     if (!last) throw new Error("expected a persisted store write");
     const [key, payload] = last;
-    expect(key).toBe("vikai-local-store");
+    expect(key).toBe("vikai-trainer-local-store");
 
     const persisted = JSON.parse(payload) as {
       state: { readinessInputs: Array<{ localDate: string }> };
