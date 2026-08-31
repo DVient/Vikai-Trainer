@@ -160,7 +160,7 @@ describe("home hub (app/index)", () => {
 
     render(<Index />);
 
-    expect(screen.getByText("Vikai")).toBeTruthy();
+    expect(screen.getByText("Vikai Trainer")).toBeTruthy();
     expect(screen.getByText("GO 🟢")).toBeTruthy();
     expect(screen.getByText("100%")).toBeTruthy();
     expect(screen.getByText("Full Send")).toBeTruthy();

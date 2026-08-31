@@ -76,7 +76,7 @@ export default function Index() {
     >
       <View className="flex-row items-center justify-between">
         <View>
-          <Text className="text-3xl font-black text-slate-50">Vikai</Text>
+          <Text className="text-3xl font-black text-slate-50">Vikai Trainer</Text>
           <Text className="mt-1 text-sm text-slate-400">Today · {today}</Text>
         </View>
         <Pressable

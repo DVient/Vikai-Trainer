@@ -88,7 +88,7 @@ export function reminderChipCopy(state: ReminderPermissionState): { label: strin
 async function ensureAndroidChannelAsync(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: "Vikai reminders",
+    name: "Vikai Trainer reminders",
     // HIGH = heads-up banner + vibration for time-sensitive nudges
     // (Fuel Up at 3:30 PM, pre-game reminders) — not a silent tray entry.
     importance: Notifications.AndroidImportance.HIGH,
@@ -135,7 +135,7 @@ export async function scheduleCheckInReminderAsync(
   return scheduleDailyReminderAsync(
     "readinessCheckIn",
     {
-      title: "Vikai daily check-in",
+      title: "Vikai Trainer daily check-in",
       body: "Take a minute: sleep, body feel, and energy.",
     },
     time,
@@ -244,7 +244,7 @@ export async function syncScheduleReminderAsync(
   const label = SCHEDULED_EVENT_LABELS[event.eventType];
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: "Vikai schedule reminder",
+      title: "Vikai Trainer schedule reminder",
       body: `${label} coming up${event.title ? ` — ${event.title}` : ""}.`,
     },
     trigger: {

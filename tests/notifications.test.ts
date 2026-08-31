@@ -135,7 +135,7 @@ describe("setup (FLOW 5.1 expo-notifications configuration)", () => {
     expect(notificationsMock.setNotificationChannelAsync).toHaveBeenCalledWith(
       "vikai-reminders",
       expect.objectContaining({
-        name: "Vikai reminders",
+        name: "Vikai Trainer reminders",
         importance: 6, // AndroidImportance.HIGH
         enableVibrate: true,
       }),
@@ -166,7 +166,7 @@ describe("READINESS_CHECKIN & ACTIVITY_LOG daily reminders", () => {
     expect(useAppStore.getState().notificationIdentifiers.readinessCheckIn).toBe("notif-id-1");
 
     const request = lastScheduleCall();
-    expect(request.content).toMatchObject({ title: "Vikai daily check-in" });
+    expect(request.content).toMatchObject({ title: "Vikai Trainer daily check-in" });
     expect(request.trigger).toMatchObject({ type: "daily", hour: 8, minute: 0 });
   });
 

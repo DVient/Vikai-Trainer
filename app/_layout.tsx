@@ -33,7 +33,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: "#0F172A" },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "Vikai" }} />
+        <Stack.Screen name="index" options={{ title: "Vikai Trainer" }} />
         <Stack.Screen
           name="checkin"
           options={{ title: "3-Tap Check-In", presentation: "modal" }}

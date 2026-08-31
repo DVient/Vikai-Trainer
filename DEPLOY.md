@@ -1,6 +1,6 @@
-# Install Vikai on a Phone (with Fueling Reminders)
+# Install Vikai Trainer on a Phone (with Fueling Reminders)
 
-Vikai's reminders — the 3:30 PM "Fuel Up 🍎", the 8:00 AM check-in, the 8:30 PM
+Vikai Trainer's reminders — the 3:30 PM "Fuel Up 🍎", the 8:00 AM check-in, the 8:30 PM
 "Log Today's Sweat 🏀", and pre-game reminders — are **scheduled local
 notifications**. The phone's own scheduler fires them even when the app is
 closed and there is no internet. No push server, no accounts-in-the-cloud:
@@ -18,7 +18,7 @@ that is deliberate (client-only architecture, SPEC §34).
    (`--tunnel` works across networks; drop it if the phone and laptop share
    Wi-Fi.)
 3. Scan the QR code with the phone camera (Android: from inside Expo Go).
-4. Vikai opens in Expo Go. On first launch, Android asks for **notification
+4. Vikai Trainer opens in Expo Go. On first launch, Android asks for **notification
    permission — tap Allow**.
 
 Good for: reviewing the app, testing the flow. The reminders carry Expo's
@@ -50,8 +50,8 @@ When the cloud build finishes (~10–20 min) it shows a QR code and link:
 3. Open the link on the phone and download the APK.
 4. Android will ask to allow **"Install unknown apps"** for the browser —
    allow it once, then install.
-5. Launch Vikai → allow **Notifications** when asked.
-6. Verify: with Vikai fully closed, wait for a reminder slot (3:30 PM
+5. Launch Vikai Trainer → allow **Notifications** when asked.
+6. Verify: with Vikai Trainer fully closed, wait for a reminder slot (3:30 PM
    "Fuel Up 🍎", 8:30 PM "Log Today's Sweat 🏀", or the morning check-in) —
    it should appear as a heads-up banner. The Home screen shows
    "🔔 Reminders on — Fuel Up 3:30 PM".
