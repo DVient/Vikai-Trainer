@@ -31,6 +31,7 @@ const INITIAL_SLICES = {
   activityLogs: [],
   scheduledEvents: [],
   workoutLogs: [],
+  gamePlanViewedOn: undefined,
   notificationIdentifiers: { scheduleReminders: {} },
 } satisfies Partial<VikaiAppState>;
 
@@ -229,6 +230,16 @@ describe("notification identifier tracking (SPEC §35)", () => {
     expect(
       useAppStore.getState().notificationIdentifiers.scheduleReminders["event-1"],
     ).toBeUndefined();
+  });
+});
+
+describe("game plan view tracking (guided flow)", () => {
+  it("marks and overwrites the local date the Game Plan was viewed", () => {
+    useAppStore.getState().markGamePlanViewed("2026-01-02");
+    expect(useAppStore.getState().gamePlanViewedOn).toBe("2026-01-02");
+
+    useAppStore.getState().markGamePlanViewed("2026-01-03");
+    expect(useAppStore.getState().gamePlanViewedOn).toBe("2026-01-03");
   });
 });
 

@@ -1,30 +1,42 @@
-import { ScrollView, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { PowerGauge } from "../src/components/PowerGauge";
 import { StatusBanner } from "../src/components/StatusBanner";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { powerBanner, powerLevel } from "../src/lib/power";
+import { tapHeavy } from "../src/lib/haptics";
 import {
   STRESS_LABELS,
   TRAINING_GOAL_LABELS,
 } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { BASE_PLAN_TITLES, DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { useAppStore } from "../src/stores/useAppStore";
 import type { ScaledComponent } from "../src/engine/generator";
 
 /**
- * Daily Game Plan (design refresh): intensity multiplier banner up top
+ * Daily Game Plan (guided flow, step 2): intensity multiplier banner up top
  * (e.g. "100% Full Send" / "60% Power Save"), restricted moves grayed out
- * with explicit lock badges. This screen never invents exercises — it
- * renders the generator's output (AGENTS.md decoupling).
+ * with explicit lock badges, and a bottom CTA that continues the sequence
+ * into the Practice Log. Viewing the plan marks it done for the stepper.
+ * This screen never invents exercises — it renders the generator's output
+ * (AGENTS.md decoupling).
  */
 export default function Workout() {
-  const { result, stripOptional } = useEngineResult();
+  const router = useRouter();
+  const { result, stripOptional, today } = useEngineResult();
+  const markGamePlanViewed = useAppStore((state) => state.markGamePlanViewed);
   const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
     stripOptional,
   });
   const power = powerLevel(result);
+
+  useEffect(() => {
+    markGamePlanViewed(today);
+  }, [markGamePlanViewed, today]);
 
   return (
     <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-4 p-4">
@@ -79,6 +91,19 @@ export default function Workout() {
           <ComponentRow key={entry.component.id} entry={entry} />
         ))}
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          tapHeavy();
+          router.navigate("/practice-log");
+        }}
+        className="mb-2 h-14 items-center justify-center rounded-xl bg-green-500"
+      >
+        <Text className="text-base font-black text-slate-950">
+          Done — Log your session 🏀
+        </Text>
+      </Pressable>
 
       <Text className="pb-4 text-center text-xs text-slate-500">
         High/low balance stays protected automatically.

@@ -61,6 +61,7 @@ function resetStore(): void {
     activityLogs: [],
     scheduledEvents: [],
     workoutLogs: [],
+    gamePlanViewedOn: undefined,
     notificationIdentifiers: { scheduleReminders: {} },
   });
 }

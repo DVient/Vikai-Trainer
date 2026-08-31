@@ -62,8 +62,10 @@ import Index from "../app/index";
 import CheckIn from "../app/checkin";
 import PracticeLog from "../app/practice-log";
 import Workout from "../app/workout";
+import History from "../app/history";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { toLocalDateString } from "../src/engine/autoregulation";
+import { monthLabel } from "../src/lib/calendar";
 import { ACTIVITY_TYPE_LABELS } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -110,6 +112,7 @@ function resetStore(): void {
     activityLogs: [],
     scheduledEvents: [],
     workoutLogs: [],
+    gamePlanViewedOn: undefined,
     notificationIdentifiers: { scheduleReminders: {} },
   });
 }
@@ -158,6 +161,17 @@ describe("home hub (app/index)", () => {
     expect(screen.getByText("No check-in yet")).toBeTruthy();
   });
 
+  it("guides the sequence: step 1 active, Game Plan locked until check-in", () => {
+    render(<Index />);
+
+    expect(screen.getByText("Your day — 3 steps")).toBeTruthy();
+    expect(screen.getByText("1. 3-Tap Check-In")).toBeTruthy();
+    expect(screen.getByText("Unlock your power — under 5 sec")).toBeTruthy();
+    expect(screen.getByText("2. Today's Game Plan")).toBeTruthy();
+    expect(screen.getByText("Unlock with your check-in")).toBeTruthy();
+    expect(screen.getByText("3. Log your session")).toBeTruthy();
+  });
+
   it("renders SHIELD with the verbatim adult-attention callout on pain concern", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)] });
 
@@ -170,19 +184,79 @@ describe("home hub (app/index)", () => {
     expect(screen.getByText("0 kept · 0 reduced · 9 removed")).toBeTruthy();
   });
 
-  it("navigates to game plan and check-in routes from the action cards", () => {
+  it("navigates every sequence entry point", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
     render(<Index />);
 
-    fireEvent.click(screen.getByText("Open Game Plan 🏀"));
+    fireEvent.click(screen.getByText("2. Today's Game Plan"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
 
-    fireEvent.click(screen.getByText("3-Tap Check-In"));
+    fireEvent.click(screen.getByText("1. 3-Tap Check-In"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/checkin");
 
-    fireEvent.click(screen.getByText("Practice Log"));
+    fireEvent.click(screen.getByText("3. Log your session"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+
+    fireEvent.click(screen.getByText("Calendar"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/history");
+
+    fireEvent.click(screen.getByText(/-day streak/));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/history");
+  });
+});
+
+describe("calendar (app/history)", () => {
+  it("renders the current month with the day's timestamped timeline", () => {
+    const todayKey = localDate(0);
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(todayKey, GOOD_ANCHORS)],
+      activityLogs: [
+        {
+          id: "a1",
+          activityDate: todayKey,
+          timezone: TIMEZONE,
+          activityType: "TEAM_PRACTICE",
+          sessionRpe: 9,
+          durationMinutes: 45,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      scheduledEvents: [
+        {
+          id: "g1",
+          eventType: "GAME",
+          startAt: new Date().toISOString(),
+          title: "Home opener",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<History />);
+
+    const year = Number(todayKey.slice(0, 4));
+    const month = Number(todayKey.slice(5, 7));
+    expect(screen.getByText(monthLabel(year, month))).toBeTruthy();
+    expect(screen.getByText("Ready State locked in")).toBeTruthy();
+    expect(screen.getAllByText(/load 405/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/🏆 Game — Home opener/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows the empty-state message for days without records", () => {
+    render(<History />);
+
+    // Jump to the previous month — nothing is logged there.
+    fireEvent.click(screen.getByLabelText("Previous month"));
+    const firstDay = screen.getAllByLabelText(/^Day \d{4}-/)[0];
+    if (!firstDay) throw new Error("expected calendar day cells");
+    fireEvent.click(firstDay);
+
+    expect(
+      screen.getByText("Nothing logged yet — your first session starts today."),
+    ).toBeTruthy();
   });
 });
 
@@ -208,9 +282,10 @@ describe("3-tap check-in (app/checkin)", () => {
     expect(saved?.energyAnchor).toBe("HIGH");
     expect(saved?.localDate).toBe(localDate(0));
 
-    // Offline toast confirms the local save; navigation follows shortly.
+    // Offline toast confirms the local save; the sequence continues
+    // straight into the Game Plan.
     expect(screen.getByText("Saved offline · Syncs when back online ✅")).toBeTruthy();
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith("/"), {
+    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith("/workout"), {
       timeout: 3000,
     });
   });
@@ -292,6 +367,18 @@ describe("game plan screen (app/workout)", () => {
     expect(screen.getAllByText("Plyos Paused 🚫")).toHaveLength(1);
     expect(screen.getAllByText("High-Impact Locked 🛡️")).toHaveLength(2);
     expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(2);
+  });
+
+  it("marks itself viewed for the stepper and continues into the Practice Log", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Workout />);
+
+    // Viewing the Game Plan is step 2 of the guided sequence.
+    expect(useAppStore.getState().gamePlanViewedOn).toBe(localDate(0));
+
+    fireEvent.click(screen.getByText("Done — Log your session 🏀"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
   });
 
   it("renders the game-plan multiplier, REDUCED sets, and lock badges", () => {

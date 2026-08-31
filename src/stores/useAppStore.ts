@@ -52,6 +52,8 @@ export interface VikaiAppState {
   activityLogs: ActivityLog[];
   scheduledEvents: ScheduledEvent[];
   workoutLogs: WorkoutLog[];
+  /** Local date (YYYY-MM-DD) the Game Plan was last opened — drives the stepper. */
+  gamePlanViewedOn?: string;
   /** Per-notification identifier tracking (SPEC §35 / AGENTS.md guardrail). */
   notificationIdentifiers: NotificationIdentifiers;
 
@@ -73,6 +75,8 @@ export interface VikaiAppState {
   ) => void;
   removeScheduledEvent: (id: string) => void;
   recordWorkoutLog: (draft: WorkoutLogDraft) => WorkoutLog;
+  /** Marks the Game Plan as viewed for a local date (stepper sequence). */
+  markGamePlanViewed: (localDate: string) => void;
   /** Tracks (or clears, with null) a scheduled notification identifier. */
   storeNotificationId: (slot: NotificationSlot, id: string | null) => void;
   /** Tracks (or clears, with null) a per-event SCHEDULE_REMINDER identifier. */
@@ -174,6 +178,10 @@ export const useAppStore = create<VikaiAppState>()(
         };
         set((state) => ({ workoutLogs: [...state.workoutLogs, record] }));
         return record;
+      },
+
+      markGamePlanViewed: (localDate) => {
+        set({ gamePlanViewedOn: localDate });
       },
 
       storeNotificationId: (slot, id) => {
