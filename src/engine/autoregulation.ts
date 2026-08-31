@@ -47,6 +47,7 @@ import type {
   JointStatus,
   RecentWorkload,
   ScheduledEvent,
+  ScheduledEventType,
   SleepAnchor,
   TrainingRestrictions,
 } from "../types";
@@ -206,6 +207,38 @@ function hasHighSessionLoad(
 
 /* ───────────────────── §17 — Game protection windows ──────────────────── */
 
+/**
+ * Competition commitments: any event the athlete walks into wanting to
+ * perform. All of them trigger the §17 protection windows — not just
+ * basketball games (an other-sport game or an ID session demands fresh
+ * legs just the same).
+ */
+export const COMPETITION_EVENT_TYPES: readonly ScheduledEventType[] = [
+  "GAME",
+  "OTHER_SPORTS_GAME",
+  "ID_SESSION",
+];
+
+/**
+ * Commitments that make a day high-stress for §20 back-to-back detection:
+ * every competition, plus heavy practice/training days (camps included).
+ */
+export const HIGH_STRESS_EVENT_TYPES: readonly ScheduledEventType[] = [
+  ...COMPETITION_EVENT_TYPES,
+  "TEAM_PRACTICE",
+  "STRENGTH_SESSION",
+  "SKILL_SESSION",
+  "BASKETBALL_CAMP",
+];
+
+export function isCompetitionEvent(eventType: ScheduledEventType): boolean {
+  return COMPETITION_EVENT_TYPES.includes(eventType);
+}
+
+export function isHighStressEvent(eventType: ScheduledEventType): boolean {
+  return HIGH_STRESS_EVENT_TYPES.includes(eventType);
+}
+
 function findGameWindows(
   upcomingEvents: readonly ScheduledEvent[],
   now: Date,
@@ -214,7 +247,7 @@ function findGameWindows(
   let imminent = false;
   let upcoming = false;
   for (const event of upcomingEvents) {
-    if (event.eventType !== "GAME") continue;
+    if (!isCompetitionEvent(event.eventType)) continue;
     const kickoff = new Date(event.startAt).getTime();
     if (Number.isNaN(kickoff)) continue; // unparseable date: never fabricate a window
     const msUntil = kickoff - now.getTime();

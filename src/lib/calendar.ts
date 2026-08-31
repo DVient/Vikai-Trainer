@@ -7,8 +7,9 @@
  * `toLocalDateString` date bucketing helper.
  */
 
-import { toLocalDateString } from "../engine/autoregulation";
+import { isCompetitionEvent, toLocalDateString } from "../engine/autoregulation";
 import { ACTIVITY_TYPE_LABELS, SCHEDULED_EVENT_LABELS } from "./format";
+import type { ScheduledEventType } from "../types";
 
 /* ───────────────────────────── Month matrix ───────────────────────────── */
 
@@ -63,14 +64,15 @@ export interface DayMark {
   activityCount: number;
   workoutCompleted: boolean;
   hasEvent: boolean;
-  isGame: boolean;
+  /** Any competition the athlete walks into wanting to perform. */
+  isCompetition: boolean;
 }
 
 export interface DayMarkSources {
   readiness: ReadonlyArray<{ localDate: string }>;
   activities: ReadonlyArray<{ activityDate: string }>;
   workoutLogs: ReadonlyArray<{ activityDate: string }>;
-  events: ReadonlyArray<{ startAt: string; eventType: string }>;
+  events: ReadonlyArray<{ startAt: string; eventType: ScheduledEventType }>;
 }
 
 /** Aggregates what happened (or is scheduled) on one calendar day. */
@@ -82,8 +84,9 @@ export function dayMarks(sources: DayMarkSources, date: string, timezone: string
     hasEvent: sources.events.some(
       (event) => eventDate(event.startAt, timezone) === date,
     ),
-    isGame: sources.events.some(
-      (event) => event.eventType === "GAME" && eventDate(event.startAt, timezone) === date,
+    isCompetition: sources.events.some(
+      (event) =>
+        isCompetitionEvent(event.eventType) && eventDate(event.startAt, timezone) === date,
     ),
   };
 }
@@ -116,6 +119,8 @@ export interface TimelineEntry {
   time: string;
   emoji: string;
   text: string;
+  /** Present on scheduled events so rows can link to edit. */
+  eventId?: string;
   /** Millisecond sort key (entries without a timestamp sort last). */
   sortKey: number;
 }
@@ -134,7 +139,12 @@ export function dayTimeline(
       durationMinutes?: number;
     }>;
     workoutLogs: ReadonlyArray<{ activityDate: string; createdAt?: string; notes?: string }>;
-    events: ReadonlyArray<{ startAt: string; eventType: string; title?: string }>;
+    events: ReadonlyArray<{
+      id: string;
+      startAt: string;
+      eventType: ScheduledEventType;
+      title?: string;
+    }>;
     readiness: ReadonlyArray<{ localDate: string; recordedAt: string }>;
   },
   date: string,
@@ -175,13 +185,12 @@ export function dayTimeline(
 
   for (const event of sources.events) {
     if (eventDate(event.startAt, timezone) !== date) continue;
-    const label = SCHEDULED_EVENT_LABELS[
-      event.eventType as keyof typeof SCHEDULED_EVENT_LABELS
-    ] ?? "📅 Event";
+    const label = SCHEDULED_EVENT_LABELS[event.eventType] ?? "📅 Event";
     entries.push({
       time: formatTimeOfDay(event.startAt, timezone),
       emoji: "📅",
       text: event.title ? `${label} — ${event.title}` : label,
+      eventId: event.id,
       sortKey: timestampOf(event.startAt),
     });
   }

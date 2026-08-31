@@ -31,7 +31,7 @@ const INITIAL_SLICES = {
   activityLogs: [],
   scheduledEvents: [],
   workoutLogs: [],
-  gamePlanViewedOn: undefined,
+  workoutProgress: {},
   notificationIdentifiers: { scheduleReminders: {} },
 } satisfies Partial<VikaiAppState>;
 
@@ -233,13 +233,28 @@ describe("notification identifier tracking (SPEC §35)", () => {
   });
 });
 
-describe("game plan view tracking (guided flow)", () => {
-  it("marks and overwrites the local date the Game Plan was viewed", () => {
-    useAppStore.getState().markGamePlanViewed("2026-01-02");
-    expect(useAppStore.getState().gamePlanViewedOn).toBe("2026-01-02");
+describe("workout progress — live session check-offs (guided flow)", () => {
+  it("checks a component off and freezes its sets", () => {
+    useAppStore.getState().toggleComponentDone("2026-01-02", "primary-lower-squat", 4);
+    const day = useAppStore.getState().workoutProgress["2026-01-02"];
 
-    useAppStore.getState().markGamePlanViewed("2026-01-03");
-    expect(useAppStore.getState().gamePlanViewedOn).toBe("2026-01-03");
+    expect(day?.["primary-lower-squat"]).toMatchObject({
+      componentId: "primary-lower-squat",
+      sets: 4,
+    });
+    expect(day?.["primary-lower-squat"]?.completedAt).toBeTruthy();
+  });
+
+  it("toggles back off, and days stay isolated", () => {
+    useAppStore.getState().toggleComponentDone("2026-01-02", "a", 3);
+    useAppStore.getState().toggleComponentDone("2026-01-03", "a", 2);
+
+    useAppStore.getState().toggleComponentDone("2026-01-02", "a", 3);
+    expect(useAppStore.getState().workoutProgress["2026-01-02"]?.a).toBeUndefined();
+    // The other day's check-off is untouched.
+    expect(useAppStore.getState().workoutProgress["2026-01-03"]?.a).toMatchObject({
+      sets: 2,
+    });
   });
 });
 

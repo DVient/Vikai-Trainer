@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { FC } from "react";
 
 /**
@@ -39,9 +39,12 @@ vi.mock("expo-haptics", () => hapticsMock);
 
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
+  useLocalSearchParams: () => searchParamsMock,
   Link: () => null,
   Stack: { Screen: () => null },
 }));
+
+const searchParamsMock = vi.hoisted(() => ({ eventId: undefined as string | undefined }));
 
 vi.mock("react-native", async () => {
   const rnw = await import("react-native-web");
@@ -63,9 +66,11 @@ import CheckIn from "../app/checkin";
 import PracticeLog from "../app/practice-log";
 import Workout from "../app/workout";
 import History from "../app/history";
+import EventForm from "../app/event-form";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import { monthLabel } from "../src/lib/calendar";
+import { prefillFromIso } from "../src/lib/eventForm";
 import { ACTIVITY_TYPE_LABELS } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -112,9 +117,10 @@ function resetStore(): void {
     activityLogs: [],
     scheduledEvents: [],
     workoutLogs: [],
-    gamePlanViewedOn: undefined,
+    workoutProgress: {},
     notificationIdentifiers: { scheduleReminders: {} },
   });
+  searchParamsMock.eventId = undefined;
 }
 
 beforeEach(() => {
@@ -128,7 +134,7 @@ afterEach(() => {
 });
 
 describe("home hub (app/index)", () => {
-  it("shows the GO status, full battery, and streak after a good check-in", () => {
+  it("shows the GO status, full battery, and the live workout after a good check-in", () => {
     useAppStore.setState({
       readinessInputs: [
         makeCheckIn(localDate(-1), GOOD_ANCHORS),
@@ -146,8 +152,10 @@ describe("home hub (app/index)", () => {
     expect(screen.getByText("100%")).toBeTruthy();
     expect(screen.getByText("Full Send")).toBeTruthy();
     expect(screen.getByText("🔥 2-day streak")).toBeTruthy();
-    expect(screen.getByText("9 kept · 0 reduced · 0 removed")).toBeTruthy();
-    expect(screen.getByText("Done for today ✓")).toBeTruthy();
+    // The workout lives on Home, ready to be checked off.
+    expect(screen.getByText("Today's Game Plan")).toBeTruthy();
+    expect(screen.getByText("0/9 checked off")).toBeTruthy();
+    expect(screen.getByText(/Check off each block as you go/)).toBeTruthy();
     expect(screen.queryByText(ADULT_ATTENTION_MESSAGE)).toBeNull();
   });
 
@@ -161,27 +169,43 @@ describe("home hub (app/index)", () => {
     expect(screen.getByText("No check-in yet")).toBeTruthy();
   });
 
-  it("guides the sequence: step 1 active, Game Plan locked until check-in", () => {
+  it("encourages the check-in and shows its timestamp once done", () => {
+    render(<Index />);
+
+    expect(screen.getByText("Check in first")).toBeTruthy();
+    expect(screen.getByText("Three taps. Unlocks today's plan.")).toBeTruthy();
+
+    act(() => {
+      useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+    });
+    expect(screen.getByText("Checked in")).toBeTruthy();
+    expect(screen.getByText(/update if anything changed/)).toBeTruthy();
+  });
+
+  it("guides the sequence: step 1 active, later steps locked until check-in", () => {
     render(<Index />);
 
     expect(screen.getByText("Your day — 3 steps")).toBeTruthy();
     expect(screen.getByText("1. 3-Tap Check-In")).toBeTruthy();
     expect(screen.getByText("Unlock your power — under 5 sec")).toBeTruthy();
-    expect(screen.getByText("2. Today's Game Plan")).toBeTruthy();
+    expect(screen.getByText("2. Complete your Game Plan")).toBeTruthy();
     expect(screen.getByText("Unlock with your check-in")).toBeTruthy();
-    expect(screen.getByText("3. Log your session")).toBeTruthy();
+    expect(screen.getByText("3. Log your activities")).toBeTruthy();
+    expect(screen.getByText("After your check-in")).toBeTruthy();
   });
 
-  it("renders SHIELD with the verbatim adult-attention callout on pain concern", () => {
+  it("renders SHIELD with the whole plan adjusted out on pain concern", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)] });
 
     render(<Index />);
 
     expect(screen.getByText("SHIELD 🔴")).toBeTruthy();
     expect(screen.getByText("0%")).toBeTruthy();
-    // Status banner + dedicated callout card.
     expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(2);
-    expect(screen.getByText("0 kept · 0 reduced · 9 removed")).toBeTruthy();
+    // All nine blocks sit in the adjusted-out group; nothing is checkable.
+    expect(screen.getByText("Adjusted out today")).toBeTruthy();
+    expect(screen.getAllByText("Not part of today's plan")).toHaveLength(9);
+    expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
   it("navigates every sequence entry point", () => {
@@ -189,20 +213,91 @@ describe("home hub (app/index)", () => {
 
     render(<Index />);
 
-    fireEvent.click(screen.getByText("2. Today's Game Plan"));
-    expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
-
     fireEvent.click(screen.getByText("1. 3-Tap Check-In"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/checkin");
 
-    fireEvent.click(screen.getByText("3. Log your session"));
+    fireEvent.click(screen.getByText("2. Complete your Game Plan"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
+
+    fireEvent.click(screen.getByText("3. Log your activities"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+
+    fireEvent.click(screen.getByLabelText("Log an activity"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+
+    fireEvent.click(screen.getByLabelText("Open full plan"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
 
     fireEvent.click(screen.getByText("Calendar"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/history");
 
     fireEvent.click(screen.getByText(/-day streak/));
     expect(routerMock.navigate).toHaveBeenCalledWith("/history");
+  });
+});
+
+describe("live session cockpit — check-offs and mid-session rescaling", () => {
+  it("checks off a component: persists progress and freezes the completed sets", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Index />);
+
+    fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
+
+    const day = useAppStore.getState().workoutProgress[localDate(0)];
+    expect(day?.["primary-lower-squat"]).toMatchObject({ sets: 4 });
+    expect(screen.getByText("1/9 checked off")).toBeTruthy();
+    expect(screen.getByText("You did 4 sets")).toBeTruthy();
+    // Finish only appears once NOTHING remains to check off.
+    expect(screen.queryByLabelText("Finish workout")).toBeNull();
+  });
+
+  it("re-scales remaining rows after an activity log lands mid-session", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Index />);
+
+    // Before: full volume.
+    expect(screen.getAllByText("4 sets").length).toBeGreaterThanOrEqual(1);
+
+    // A heavy practice log arrives mid-session (load 900 ≥ 700 threshold).
+    act(() => {
+      useAppStore.setState({
+        activityLogs: [
+          {
+            id: "mid-session",
+            activityDate: localDate(0),
+            timezone: TIMEZONE,
+            activityType: "TEAM_PRACTICE",
+            sessionRpe: 10,
+            durationMinutes: 90,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      });
+    });
+
+    // Remaining rows re-scale (lower body 4 × 0.6 = 2); the group appears.
+    expect(screen.getAllByText("4 → 2 sets").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Adjusted out today")).toBeTruthy();
+    // Finishing is available only when nothing remains.
+    expect(screen.queryByLabelText("Finish workout")).toBeNull();
+  });
+
+  it("finishes the workout: records the log and completes the loop", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)],
+    });
+
+    render(<Index />);
+
+    // RED day — everything adjusted out, so the session is finishable.
+    fireEvent.click(screen.getByLabelText("Finish workout"));
+
+    expect(useAppStore.getState().workoutLogs).toHaveLength(1);
+    expect(useAppStore.getState().workoutLogs[0]?.activityDate).toBe(localDate(0));
+    expect(screen.getByText("Session complete 🎉")).toBeTruthy();
   });
 });
 
@@ -243,6 +338,13 @@ describe("calendar (app/history)", () => {
     expect(screen.getByText("Ready State locked in")).toBeTruthy();
     expect(screen.getAllByText(/load 405/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/🏆 Game — Home opener/).length).toBeGreaterThanOrEqual(1);
+
+    // The add button and event rows both lead to the event form.
+    fireEvent.click(screen.getByLabelText("Add event"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/event-form");
+
+    fireEvent.click(screen.getByLabelText("Edit event: 🏆 Game — Home opener"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/event-form?eventId=g1");
   });
 
   it("shows the empty-state message for days without records", () => {
@@ -282,10 +384,10 @@ describe("3-tap check-in (app/checkin)", () => {
     expect(saved?.energyAnchor).toBe("HIGH");
     expect(saved?.localDate).toBe(localDate(0));
 
-    // Offline toast confirms the local save; the sequence continues
-    // straight into the Game Plan.
+    // Offline toast confirms the local save; Home (with the updated plan)
+    // takes over from there.
     expect(screen.getByText("Saved offline · Syncs when back online ✅")).toBeTruthy();
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith("/workout"), {
+    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith("/"), {
       timeout: 3000,
     });
   });
@@ -362,26 +464,41 @@ describe("game plan screen (app/workout)", () => {
     expect(screen.getByText("SHIELD 🔴")).toBeTruthy();
     expect(screen.getByText("0% Shielded 🛡️")).toBeTruthy();
     expect(screen.getAllByText("Not part of today's plan")).toHaveLength(9);
-    // 6 region locks + 1 plyo lock + 2 high-impact locks = all 9 explicit.
-    expect(screen.getAllByText("Locked for Joint Shielding 🛡️")).toHaveLength(6);
-    expect(screen.getAllByText("Plyos Paused 🚫")).toHaveLength(1);
-    expect(screen.getAllByText("High-Impact Locked 🛡️")).toHaveLength(2);
+    expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
     expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(2);
   });
 
-  it("marks itself viewed for the stepper and continues into the Practice Log", () => {
-    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+  it("shares check-off state with Home and finishes the session", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      workoutProgress: {
+        [localDate(0)]: {
+          "primary-lower-squat": {
+            componentId: "primary-lower-squat",
+            sets: 4,
+            completedAt: new Date().toISOString(),
+          },
+        },
+      },
+    });
 
     render(<Workout />);
 
-    // Viewing the Game Plan is step 2 of the guided sequence.
-    expect(useAppStore.getState().gamePlanViewedOn).toBe(localDate(0));
+    // Same frozen view as Home — one source of truth in the store.
+    expect(screen.getByText("You did 4 sets")).toBeTruthy();
 
-    fireEvent.click(screen.getByText("Done — Log your session 🏀"));
+    fireEvent.click(screen.getByLabelText("Toggle Upper push strength"));
+    expect(
+      useAppStore.getState().workoutProgress[localDate(0)]?.["primary-upper-push"],
+    ).toMatchObject({ sets: 4 });
+
+    // Full GREEN plan: after checking everything off, Finish appears — here
+    // we just prove the shared toggle + navigation CTA work.
+    fireEvent.click(screen.getByText("📝 Log an activity"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
   });
 
-  it("renders the game-plan multiplier, REDUCED sets, and lock badges", () => {
+  it("renders the game-plan multiplier, REDUCED sets, and the adjusted-out group", () => {
     useAppStore.setState({
       readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
       scheduledEvents: [
@@ -396,8 +513,74 @@ describe("game plan screen (app/workout)", () => {
     // Primary lower scales (4 × 0.5 = 2).
     expect(screen.getByText("4 → 2 sets")).toBeTruthy();
     expect(screen.getByText("4 → 3 sets")).toBeTruthy();
-    // Sprints, COD, and jumps are high-impact → locked; optionals skipped.
-    expect(screen.getAllByText("High-Impact Locked 🛡️").length).toBeGreaterThanOrEqual(3);
-    expect(screen.getAllByText("Optional — Skipped Today 😴").length).toBeGreaterThanOrEqual(2);
+    // Sprints, COD, jumps, and optionals are adjusted out for game prep.
+    expect(screen.getByText("Adjusted out today")).toBeTruthy();
+    expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
+  });
+});
+
+describe("event form (app/event-form)", () => {
+  it("adds a future competition to the calendar via the store", () => {
+    render(<EventForm />);
+
+    fireEvent.click(screen.getByText("🥅 Other sport game"));
+    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
+      target: { value: "2100-01-15" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("18:00"), {
+      target: { value: "18:00" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Home opener"), {
+      target: { value: "Away lacrosse match" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    const events = useAppStore.getState().scheduledEvents;
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventType).toBe("OTHER_SPORTS_GAME");
+    expect(events[0]?.title).toBe("Away lacrosse match");
+    // Far-future date: the exact instant depends on DST, so assert the date.
+    expect(events[0]?.startAt.startsWith("2100-01-15T")).toBe(true);
+  });
+
+  it("rejects a malformed date with a readable error", () => {
+    render(<EventForm />);
+
+    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
+      target: { value: "tomorrow" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    expect(screen.getByText("Use a date like 2026-01-15")).toBeTruthy();
+    expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
+  });
+
+  it("prefills for editing and removes on demand", () => {
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    useAppStore.setState({
+      scheduledEvents: [
+        {
+          id: "g1",
+          eventType: "GAME",
+          startAt: future,
+          title: "Home opener",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+    searchParamsMock.eventId = "g1";
+
+    render(<EventForm />);
+
+    expect(screen.getByText("Save changes")).toBeTruthy();
+    const dateInput = screen.getByPlaceholderText("2026-01-15") as HTMLInputElement;
+    const timeInput = screen.getByPlaceholderText("18:00") as HTMLInputElement;
+    const prefill = prefillFromIso(future, TIMEZONE);
+    expect(dateInput.value).toBe(prefill.dateText);
+    expect(timeInput.value).toBe(prefill.timeText);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete event" }));
+    expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
   });
 });

@@ -36,7 +36,7 @@ import type {
   TrainingGoal,
   TrainingRestrictions,
 } from "../types";
-import { toLocalDateString } from "./autoregulation";
+import { isHighStressEvent, toLocalDateString } from "./autoregulation";
 
 /* ──────────────────────── §23 — Volume scaling rules ──────────────────── */
 
@@ -120,7 +120,7 @@ export function hasConsecutiveHighStressDays(
         HIGH_STRESS_ACTIVITY_TYPES.includes(activity.activityType),
     ) ||
     upcomingEvents.some((event) => {
-      if (event.eventType !== "GAME" && event.eventType !== "TEAM_PRACTICE") return false;
+      if (!isHighStressEvent(event.eventType)) return false;
       const kickoff = new Date(event.startAt);
       return (
         Number.isFinite(kickoff.getTime()) && toLocalDateString(kickoff, athleteTimezone) === day

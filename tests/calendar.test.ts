@@ -50,9 +50,9 @@ describe("dayMarks — what happened on a day", () => {
     workoutLogs: [{ activityDate: "2026-01-01" }],
     events: [
       // 6:00 PM local on Jan 2 in New York (23:00 UTC).
-      { startAt: "2026-01-02T23:00:00.000Z", eventType: "GAME" },
+      { id: "e1", startAt: "2026-01-02T23:00:00.000Z", eventType: "GAME" as const },
       // 2:00 AM UTC on Jan 3 = still Jan 2 evening in New York.
-      { startAt: "2026-01-03T02:00:00.000Z", eventType: "TEAM_PRACTICE" },
+      { id: "e2", startAt: "2026-01-03T02:00:00.000Z", eventType: "TEAM_PRACTICE" as const },
     ],
   };
 
@@ -64,7 +64,7 @@ describe("dayMarks — what happened on a day", () => {
       activityCount: 2,
       workoutCompleted: false,
       hasEvent: true,
-      isGame: true,
+      isCompetition: true,
     });
   });
 
@@ -81,6 +81,36 @@ describe("dayMarks — what happened on a day", () => {
     const mark = dayMarks(sources, "2026-01-01", TZ);
     expect(mark.workoutCompleted).toBe(true);
     expect(mark.checkedIn).toBe(false);
+  });
+
+  it("treats every competition type as a competition day", () => {
+    for (const eventType of ["OTHER_SPORTS_GAME", "ID_SESSION"] as const) {
+      const mark = dayMarks(
+        {
+          readiness: [],
+          activities: [],
+          workoutLogs: [],
+          events: [{ startAt: "2026-01-02T23:00:00.000Z", eventType }],
+        },
+        "2026-01-02",
+        TZ,
+      );
+      expect(mark.isCompetition).toBe(true);
+    }
+
+    // Practices and camps are events, not competitions.
+    const practice = dayMarks(
+      {
+        readiness: [],
+        activities: [],
+        workoutLogs: [],
+        events: [{ startAt: "2026-01-02T23:00:00.000Z", eventType: "BASKETBALL_CAMP" }],
+      },
+      "2026-01-02",
+      TZ,
+    );
+    expect(practice.hasEvent).toBe(true);
+    expect(practice.isCompetition).toBe(false);
   });
 
   it("fills every real date of a month via monthMarks", () => {
@@ -112,7 +142,14 @@ describe("dayTimeline — timestamped history for one day", () => {
         notes: "Felt strong",
       },
     ],
-    events: [{ startAt: "2026-01-02T23:00:00.000Z", eventType: "GAME", title: "Home opener" }],
+    events: [
+      {
+        id: "game-1",
+        startAt: "2026-01-02T23:00:00.000Z",
+        eventType: "GAME" as const,
+        title: "Home opener",
+      },
+    ],
   };
 
   it("sorts the day's entries chronologically with formatted local times", () => {
@@ -126,6 +163,7 @@ describe("dayTimeline — timestamped history for one day", () => {
     ]);
     expect(timeline[2]?.text).toContain("Hoops (practice) · RPE 7 · 60 min · load 420");
     expect(timeline[3]?.text).toBe("🏆 Game — Home opener");
+    expect(timeline[3]?.eventId).toBe("game-1");
   });
 
   it("includes notes on completed sessions", () => {

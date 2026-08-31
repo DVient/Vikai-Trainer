@@ -22,6 +22,9 @@ export const SCHEDULED_EVENT_LABELS: Record<ScheduledEventType, string> = {
   SKILL_SESSION: "🎯 Skill session",
   SCHOOL: "🏫 School",
   OTHER: "✨ Other",
+  BASKETBALL_CAMP: "🏕️ Basketball camp",
+  ID_SESSION: "🪪 ID session",
+  OTHER_SPORTS_GAME: "🥅 Other sport game",
 };
 
 export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {

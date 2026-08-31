@@ -303,6 +303,52 @@ describe("§20 consecutive high-stress days", () => {
     ).toBe(false);
   });
 
+  it("counts camps, strength/skill sessions, and other-sport games as high-stress commitments", () => {
+    for (const eventType of [
+      "BASKETBALL_CAMP",
+      "STRENGTH_SESSION",
+      "SKILL_SESSION",
+      "OTHER_SPORTS_GAME",
+      "ID_SESSION",
+    ] as const) {
+      expect(
+        hasConsecutiveHighStressDays(
+          [{ id: "a", activityDate: "2026-01-01", timezone: "UTC", activityType: "TEAM_PRACTICE", createdAt: "", updatedAt: "" }],
+          [
+            {
+              id: `e-${eventType}`,
+              eventType,
+              startAt: new Date(NOW.getTime() + 4 * 60 * 60 * 1000).toISOString(),
+              createdAt: "",
+              updatedAt: "",
+            },
+          ],
+          NOW,
+          "UTC",
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("keeps school and other events out of the high-stress rule", () => {
+    expect(
+      hasConsecutiveHighStressDays(
+        [{ id: "a", activityDate: "2026-01-01", timezone: "UTC", activityType: "TEAM_PRACTICE", createdAt: "", updatedAt: "" }],
+        [
+          {
+            id: "e-school",
+            eventType: "SCHOOL",
+            startAt: new Date(NOW.getTime() + 4 * 60 * 60 * 1000).toISOString(),
+            createdAt: "",
+            updatedAt: "",
+          },
+        ],
+        NOW,
+        "UTC",
+      ),
+    ).toBe(false);
+  });
+
   it("strips ALL optional volume when stripOptional is set, even at scale 1.0", () => {
     const plan = [
       makeComponent({ id: "primary", optional: false }),

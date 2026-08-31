@@ -79,11 +79,11 @@ export default function CheckIn() {
         : {}),
     });
 
-    // Confirm physically, show the offline toast, then continue the
-    // sequence: straight into today's Game Plan.
+    // Confirm physically, show the offline toast, then return Home where
+    // the updated Game Plan is already on screen.
     tapSuccess();
     setToast(SAVED_TOAST);
-    navigateTimer.current = setTimeout(() => router.replace("/workout"), 1200);
+    navigateTimer.current = setTimeout(() => router.replace("/"), 1200);
   };
 
   return (

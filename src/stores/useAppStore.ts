@@ -22,6 +22,7 @@ import {
   DEFAULT_OBJECTIVE,
   type ActivityLog,
   type AthleteProfile,
+  type CompletedComponent,
   type NotificationIdentifiers,
   type NotificationSlot,
   type ReadinessInput,
@@ -52,8 +53,11 @@ export interface VikaiAppState {
   activityLogs: ActivityLog[];
   scheduledEvents: ScheduledEvent[];
   workoutLogs: WorkoutLog[];
-  /** Local date (YYYY-MM-DD) the Game Plan was last opened — drives the stepper. */
-  gamePlanViewedOn?: string;
+  /**
+   * Live-session check-offs, keyed by localDate then componentId (additive
+   * to the §33 schema). Completed sets are frozen at check-off time.
+   */
+  workoutProgress: Record<string, Record<string, CompletedComponent>>;
   /** Per-notification identifier tracking (SPEC §35 / AGENTS.md guardrail). */
   notificationIdentifiers: NotificationIdentifiers;
 
@@ -75,8 +79,8 @@ export interface VikaiAppState {
   ) => void;
   removeScheduledEvent: (id: string) => void;
   recordWorkoutLog: (draft: WorkoutLogDraft) => WorkoutLog;
-  /** Marks the Game Plan as viewed for a local date (stepper sequence). */
-  markGamePlanViewed: (localDate: string) => void;
+  /** Checks off (or un-checks) one Game Plan component for a local date. */
+  toggleComponentDone: (localDate: string, componentId: string, sets: number) => void;
   /** Tracks (or clears, with null) a scheduled notification identifier. */
   storeNotificationId: (slot: NotificationSlot, id: string | null) => void;
   /** Tracks (or clears, with null) a per-event SCHEDULE_REMINDER identifier. */
@@ -92,6 +96,7 @@ export const useAppStore = create<VikaiAppState>()(
       activityLogs: [],
       scheduledEvents: [],
       workoutLogs: [],
+      workoutProgress: {},
       notificationIdentifiers: { scheduleReminders: {} },
 
       setProfile: (profile) => {
@@ -180,8 +185,18 @@ export const useAppStore = create<VikaiAppState>()(
         return record;
       },
 
-      markGamePlanViewed: (localDate) => {
-        set({ gamePlanViewedOn: localDate });
+      toggleComponentDone: (localDate, componentId, sets) => {
+        set((state) => {
+          const dayProgress = { ...state.workoutProgress[localDate] };
+          if (dayProgress[componentId] !== undefined) {
+            delete dayProgress[componentId];
+          } else {
+            dayProgress[componentId] = { componentId, sets, completedAt: new Date().toISOString() };
+          }
+          return {
+            workoutProgress: { ...state.workoutProgress, [localDate]: dayProgress },
+          };
+        });
       },
 
       storeNotificationId: (slot, id) => {

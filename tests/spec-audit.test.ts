@@ -84,7 +84,8 @@ describe("§6.2 audit: no technical jargon in UI copy", () => {
   it("brands the workout view and readiness in youth language", () => {
     const workout = readFileSync(join("app", "workout.tsx"), "utf8");
     expect(workout).toContain("Today's Game Plan");
-    expect(workout).toContain("Full Send");
+    const power = readFileSync(join("src", "lib", "power.ts"), "utf8");
+    expect(power).toContain("Full Send");
     const gauge = readFileSync(join("src", "components", "PowerGauge.tsx"), "utf8");
     expect(gauge).toContain("Ready State");
   });

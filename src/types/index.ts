@@ -117,7 +117,10 @@ export type ScheduledEventType =
   | "STRENGTH_SESSION"
   | "SKILL_SESSION"
   | "SCHOOL"
-  | "OTHER";
+  | "OTHER"
+  | "BASKETBALL_CAMP"
+  | "ID_SESSION"
+  | "OTHER_SPORTS_GAME";
 
 /** Future/planned commitments. Distinct from completed `ActivityLog` (SPEC §9). */
 export interface ScheduledEvent {
@@ -133,6 +136,17 @@ export interface ScheduledEvent {
 }
 
 /* ──────────────── §9.2 / §10 — Completed Activity & Activity Log ──────── */
+
+/**
+ * One checked-off Game Plan component (live session cockpit). `sets` is the
+ * prescription at check-off time — completed work is frozen and never
+ * re-scaled by later logs (additive to the §33 schema).
+ */
+export interface CompletedComponent {
+  componentId: string;
+  sets: number;
+  completedAt: string;
+}
 
 export type ActivityType =
   | "TEAM_PRACTICE"

@@ -41,6 +41,10 @@ export default function RootLayout() {
         <Stack.Screen name="practice-log" options={{ title: "Practice Log" }} />
         <Stack.Screen name="workout" options={{ title: "Today's Game Plan" }} />
         <Stack.Screen name="history" options={{ title: "Calendar" }} />
+        <Stack.Screen
+          name="event-form"
+          options={{ title: "Add Event", presentation: "modal" }}
+        />
       </Stack>
     </>
   );

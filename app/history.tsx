@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
 import { CalendarGrid } from "../src/components/CalendarGrid";
 import { TimelineRow } from "../src/components/TimelineRow";
@@ -10,15 +11,18 @@ import {
   monthMarks,
   monthMatrix,
 } from "../src/lib/calendar";
+import { tapLight } from "../src/lib/haptics";
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
  * Calendar (design iteration): past and future at a glance. The month grid
  * marks check-ins, logged activity, completed sessions, and scheduled
- * games/practices; selecting a day shows its timestamped timeline. Past
- * comes from local records; the future comes from scheduled events.
+ * games/practices; selecting a day shows its timestamped timeline. Future
+ * event rows open the editor — athletes add their own commitments with the
+ * ＋ button.
  */
 export default function History() {
+  const router = useRouter();
   const profile = useAppStore((state) => state.profile);
   const readinessInputs = useAppStore((state) => state.readinessInputs);
   const activityLogs = useAppStore((state) => state.activityLogs);
@@ -64,6 +68,23 @@ export default function History() {
 
   return (
     <ScrollView className="flex-1 bg-slate-900" contentContainerClassName="gap-4 p-4">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          Add your commitments — they shape the plan
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add event"
+          onPress={() => {
+            tapLight();
+            router.navigate("/event-form");
+          }}
+          className="h-12 min-w-[48px] items-center justify-center rounded-lg bg-green-500 px-4"
+        >
+          <Text className="text-base font-black text-slate-950">＋ Add</Text>
+        </Pressable>
+      </View>
+
       <CalendarGrid
         year={cursor.year}
         month={cursor.month}
@@ -88,7 +109,11 @@ export default function History() {
         ) : (
           <View className="mt-2">
             {timeline.map((entry, index) => (
-              <TimelineRow key={`${entry.sortKey}-${index}`} entry={entry} />
+              <TimelineRow
+                key={`${entry.sortKey}-${index}`}
+                entry={entry}
+                onPressEvent={(eventId) => router.navigate(`/event-form?eventId=${eventId}`)}
+              />
             ))}
           </View>
         )}

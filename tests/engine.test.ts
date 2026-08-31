@@ -233,6 +233,53 @@ describe("game protection windows (precedence 3, SPEC §17)", () => {
     expect(result.status).toBe("GREEN");
     expect(result.reasons).toEqual(["NORMAL_READINESS"]);
   });
+
+  it("shields before any competition — other-sport games and ID sessions count as games", () => {
+    for (const eventType of ["OTHER_SPORTS_GAME", "ID_SESSION"] as const) {
+      const result = evaluateAutoregulationEngine(
+        makeInput({
+          upcomingEvents: [
+            {
+              id: `comp-${eventType}`,
+              eventType,
+              startAt: new Date(NOW.getTime() + 2 * HOUR_MS).toISOString(),
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        }),
+      );
+
+      expect(result.reasons).toEqual(["IMMINENT_GAME"]);
+      expect(result.status).toBe("RED");
+    }
+  });
+
+  it("keeps informational events (school, other) outside the game windows", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        upcomingEvents: [
+          {
+            id: "school-1",
+            eventType: "SCHOOL",
+            startAt: new Date(NOW.getTime() + 2 * HOUR_MS).toISOString(),
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "other-1",
+            eventType: "OTHER",
+            startAt: new Date(NOW.getTime() + 2 * HOUR_MS).toISOString(),
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
 });
 
 describe("recent workload triggers (precedence 4, RPE × Duration)", () => {

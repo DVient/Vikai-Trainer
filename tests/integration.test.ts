@@ -18,8 +18,10 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 import { toLocalDateString } from "../src/engine/autoregulation";
-import { applyRestrictionsToBasePlan } from "../src/engine/generator";
+import { applyRestrictionsToBasePlan, hasConsecutiveHighStressDays } from "../src/engine/generator";
 import { deriveEngineView } from "../src/lib/engine-bridge";
+import { parseEventDateTime } from "../src/lib/eventForm";
+import { buildSessionView } from "../src/lib/session";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -61,7 +63,7 @@ function resetStore(): void {
     activityLogs: [],
     scheduledEvents: [],
     workoutLogs: [],
-    gamePlanViewedOn: undefined,
+    workoutProgress: {},
     notificationIdentifiers: { scheduleReminders: {} },
   });
 }
@@ -264,5 +266,95 @@ describe("adult-attention copy contract", () => {
     expect(ADULT_ATTENTION_MESSAGE).toBe(
       "An adult should check in with the athlete before any training today.",
     );
+  });
+});
+
+describe("live session loop: check-offs, mid-session rescaling, finish", () => {
+  it("freezes completed sets, re-scales the rest after a mid-session log, then finishes", () => {
+    const day = today();
+
+    // 1. Good check-in → GREEN, full volume.
+    useAppStore.getState().saveDailyCheckIn({
+      localDate: day,
+      timezone: TIMEZONE,
+      recordedAt: new Date().toISOString(),
+      sleepAnchor: "OVER_8_HRS",
+      jointStatus: "NO_CONCERN",
+      energyAnchor: "HIGH",
+    });
+    let session = buildSessionView(prescriptionOf(derive()), useAppStore.getState().workoutProgress[day] ?? {});
+    expect(session.remainingCount).toBe(9);
+
+    // 2. Athlete checks off the squat (4 sets frozen).
+    useAppStore.getState().toggleComponentDone(day, "primary-lower-squat", 4);
+    session = buildSessionView(prescriptionOf(derive()), useAppStore.getState().workoutProgress[day] ?? {});
+    expect(session.doneCount).toBe(1);
+    expect(session.rows.find((row) => row.componentId === "primary-lower-squat")).toMatchObject({
+      state: "done",
+      sets: 4,
+    });
+
+    // 3. A heavy practice lands mid-session → engine re-scales the rest.
+    useAppStore.getState().logActivity({
+      activityDate: day,
+      timezone: TIMEZONE,
+      activityType: "TEAM_PRACTICE",
+      sessionRpe: 10,
+      durationMinutes: 90,
+    });
+    const midSession = buildSessionView(prescriptionOf(derive()), useAppStore.getState().workoutProgress[day] ?? {});
+    // Completed work keeps credit even though the engine would scale it now.
+    expect(midSession.rows.find((row) => row.componentId === "primary-lower-squat")).toMatchObject({
+      state: "done",
+      sets: 4,
+    });
+    // Remaining upper-body volume is reduced (4 × 0.7 = 3), not frozen at 4.
+    expect(midSession.rows.find((row) => row.componentId === "primary-upper-push")).toMatchObject({
+      state: "remaining",
+      sets: 3,
+    });
+    expect(midSession.finishable).toBe(false);
+
+    // 4. Athlete checks off everything that remains and finishes.
+    const remaining = midSession.rows.filter((row) => row.state === "remaining");
+    for (const row of remaining) {
+      useAppStore.getState().toggleComponentDone(day, row.componentId, row.sets);
+    }
+    const complete = buildSessionView(prescriptionOf(derive()), useAppStore.getState().workoutProgress[day] ?? {});
+    expect(complete.finishable).toBe(true);
+
+    useAppStore.getState().recordWorkoutLog({ activityDate: day });
+    expect(useAppStore.getState().workoutLogs).toHaveLength(1);
+    expect(useAppStore.getState().workoutLogs[0]?.activityDate).toBe(day);
+  });
+
+  it("adds a camp to the schedule and the engine counts it as a high-stress day", () => {
+    const yesterday = toLocalDateString(new Date(Date.now() - 24 * 60 * 60 * 1000), TIMEZONE);
+
+    // Practice yesterday + a scheduled camp today = two high-stress days.
+    // 09:00 local today always buckets to today's date, whatever the clock.
+    useAppStore.getState().logActivity({
+      activityDate: yesterday,
+      timezone: TIMEZONE,
+      activityType: "TEAM_PRACTICE",
+      sessionRpe: 8,
+      durationMinutes: 60,
+    });
+    const campStart = parseEventDateTime(today(), "09:00", TIMEZONE);
+    if (!campStart.ok) throw new Error("expected a valid camp start");
+    useAppStore.getState().scheduleEvent({
+      eventType: "BASKETBALL_CAMP",
+      startAt: campStart.iso,
+    });
+
+    const state = useAppStore.getState();
+    expect(
+      hasConsecutiveHighStressDays(
+        state.activityLogs,
+        state.scheduledEvents,
+        new Date(),
+        TIMEZONE,
+      ),
+    ).toBe(true);
   });
 });
