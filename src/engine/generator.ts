@@ -159,13 +159,25 @@ export interface GeneratorOptions {
    * catch-up volume). Compute the flag with `hasConsecutiveHighStressDays`.
    */
   stripOptional?: boolean;
+  /**
+   * The athlete's primary training goals (additive). When provided, volume
+   * reductions land on the LEAST goal-relevant work first: non-goal
+   * secondary components take an extra 0.5× cut before goal-primary blocks
+   * lose anything beyond the region scale. Goal-primary and priority-1
+   * components always keep the plain region scale. Omitted ⇒ uniform
+   * region scaling (previous behavior).
+   */
+  primaryGoals?: readonly TrainingGoal[];
 }
 
 /**
  * Map engine restrictions onto a base plan. Hard removals (plyometrics, high
  * impact, blocked body regions) always win; surviving components are scaled
- * by their region's scale; optional accessories are stripped first whenever
- * their region requires volume reduction (SPEC §23 step 1).
+ * by their region's scale — with goal-aware redistribution when the athlete's
+ * primary goals are provided (non-goal secondaries are cut deeper first).
+ * Optional accessories are stripped before any set reduction (SPEC §23 step 1).
+ * A duration cap, when the engine set one, is enforced by dropping the least
+ * goal-relevant components until the plan fits.
  */
 export function applyRestrictionsToBasePlan(
   basePlan: readonly TrainingComponent[],
@@ -181,8 +193,16 @@ export function applyRestrictionsToBasePlan(
       continue;
     }
     if (!restrictions.highImpactAllowed && isHighImpactComponent(component)) {
-      prescription.push(removed(component, "Removed: high-impact work is not allowed today."));
-      continue;
+      /*
+       * Plyometric-classified components answer only to the plyometrics
+       * flag (SPEC §17: the 12–24h pre-game primer allows reduced
+       * plyometrics) — the blanket high-impact rule never deletes them.
+       * Conditioning-style high impact (sprints, COD) stays governed here.
+       */
+      if (!isPlyometricComponent(component)) {
+        prescription.push(removed(component, "Removed: high-impact work is not allowed today."));
+        continue;
+      }
     }
 
     /* §20 — forced overlap: optional volume is stripped automatically. */
@@ -218,7 +238,8 @@ export function applyRestrictionsToBasePlan(
       continue;
     }
 
-    const scaled = scaleSets(component.baseVolume, scale);
+    const effectiveScale = goalAwareScale(component, scale, options.primaryGoals);
+    const scaled = scaleSets(component.baseVolume, effectiveScale);
     const volume =
       component.minimumVolume !== undefined ? Math.max(component.minimumVolume, scaled) : scaled;
 
@@ -227,7 +248,7 @@ export function applyRestrictionsToBasePlan(
         component,
         modification: "REDUCED",
         scaledVolume: volume,
-        modificationReason: `Reduced: volume scaled to ${scale}× for today's readiness.`,
+        modificationReason: `Reduced: volume scaled to ${effectiveScale}× for today's readiness.`,
       });
       continue;
     }
@@ -235,5 +256,79 @@ export function applyRestrictionsToBasePlan(
     prescription.push({ component, modification: "KEPT", scaledVolume: volume });
   }
 
-  return prescription;
+  return enforceDurationCap(prescription, restrictions.maxTrainingDurationMinutes, options);
+}
+
+/**
+ * Goal-aware effective scale (additive): on a reduced day, non-goal secondary
+ * components absorb the cut first (extra 0.5×), goal-primary and priority-1
+ * blocks keep the plain region scale. No goals provided ⇒ unchanged scale.
+ */
+function goalAwareScale(
+  component: TrainingComponent,
+  regionScale: number,
+  primaryGoals: readonly TrainingGoal[] | undefined,
+): number {
+  if (regionScale >= 1) return regionScale;
+  if (primaryGoals === undefined || primaryGoals.length === 0) return regionScale;
+  const goalPrimary = primaryGoals.includes(component.type) || component.priority === 1;
+  if (goalPrimary) return regionScale;
+  return regionScale * 0.5;
+}
+
+/* ──────────────── §18 — Duration cap enforcement (safety net) ──────────── */
+
+/** Estimated minutes a prescription entry now occupies (0 when unknown). */
+function estimatedMinutesOf(entry: ScaledComponent): number {
+  const estimate = entry.component.estimatedMinutes;
+  if (estimate === undefined || entry.component.baseVolume <= 0) return 0;
+  return (estimate / entry.component.baseVolume) * entry.scaledVolume;
+}
+
+/**
+ * Enforces the engine's `maxTrainingDurationMinutes` by dropping the LEAST
+ * goal-relevant components first (non-goal → higher priority number → longer
+ * estimate). Recovery work and priority-1 primaries are never dropped; when
+ * only those remain the overflow is accepted (with minimum volumes the RED
+ * template always fits).
+ */
+function enforceDurationCap(
+  prescription: readonly ScaledComponent[],
+  cap: number | undefined,
+  options: GeneratorOptions,
+): ScaledComponent[] {
+  if (cap === undefined) return [...prescription];
+
+  const goals = options.primaryGoals ?? [];
+  const isDroppable = (entry: ScaledComponent): boolean =>
+    entry.modification !== "REMOVED" &&
+    entry.component.type !== "RECOVERY" &&
+    entry.component.priority > 1;
+
+  let current = [...prescription];
+  const totalMinutes = (): number =>
+    current
+      .filter((entry) => entry.modification !== "REMOVED")
+      .reduce((sum, entry) => sum + estimatedMinutesOf(entry), 0);
+
+  while (totalMinutes() > cap) {
+    const victim = current
+      .filter(isDroppable)
+      .sort((a, b) => {
+        const aGoal = goals.includes(a.component.type) || a.component.priority === 1;
+        const bGoal = goals.includes(b.component.type) || b.component.priority === 1;
+        if (aGoal !== bGoal) return aGoal ? 1 : -1; // non-goal first
+        if (a.component.priority !== b.component.priority) {
+          return b.component.priority - a.component.priority; // lower priority first
+        }
+        return estimatedMinutesOf(b) - estimatedMinutesOf(a); // longer first
+      })[0];
+    if (victim === undefined) break; // only primaries/recovery remain — accept overflow
+    current = current.map((entry) =>
+      entry.component.id === victim.component.id
+        ? removed(victim.component, "Removed: session cap for today's recovery.")
+        : entry,
+    );
+  }
+  return current;
 }

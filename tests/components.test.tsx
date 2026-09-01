@@ -531,10 +531,11 @@ describe("game plan screen (app/workout)", () => {
 
     expect(screen.getByText("MODULATE 🟡")).toBeTruthy();
     expect(screen.getByText("50% Power Save 🌙")).toBeTruthy();
-    // Primary lower scales (4 × 0.5 = 2).
-    expect(screen.getByText("4 → 2 sets")).toBeTruthy();
+    // Primary lower scales (4 × 0.5 = 2) — and the allowed primer-day
+    // jump mechanics scale the same way (4 × 0.5 = 2), per SPEC §17.
+    expect(screen.getAllByText("4 → 2 sets").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("4 → 3 sets")).toBeTruthy();
-    // Sprints, COD, jumps, and optionals are adjusted out for game prep.
+    // Sprints, COD, and optionals are adjusted out for game prep.
     expect(screen.getByText("Adjusted out today")).toBeTruthy();
     expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
   });
@@ -584,7 +585,7 @@ describe("exercise detail + video library (Fall 2026 plan)", () => {
 
     render(<Workout />);
 
-    expect(screen.getByText("4 → 2 sets")).toBeTruthy();
+    expect(screen.getAllByText("4 → 2 sets").length).toBeGreaterThanOrEqual(1);
     fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
     expect(screen.getByText("Volume scaled — keep the weight, drop the extra sets.")).toBeTruthy();
   });

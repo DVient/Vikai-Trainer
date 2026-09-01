@@ -309,6 +309,12 @@ export interface TrainingComponent {
    * (governed by both body-region scales).
    */
   bodyRegion?: BodyRegion;
+  /**
+   * Planning estimate of minutes for the FULL base volume (additive). The
+   * generator uses it to enforce `maxTrainingDurationMinutes` — it never
+   * reaches the UI as a duration promise.
+   */
+  estimatedMinutes?: number;
 }
 
 /* ─────────────── §33 — Workout log (minimal Phase 3 shape) ─────────────── */

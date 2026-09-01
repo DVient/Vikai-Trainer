@@ -107,6 +107,32 @@ describe("hard removals (safety before volume math, SPEC §23 step 6)", () => {
     expect(modificationsOf(prescription)).toEqual(["REMOVED", "REMOVED"]);
   });
 
+  it("lets allowed plyometrics survive the high-impact rule (SPEC §17 primer)", () => {
+    // Primer day: the engine allows reduced plyometrics but bans high-impact
+    // conditioning. Jump mechanics survive REDUCED; sprints are removed.
+    const plan = [
+      makeComponent({ id: "jumps", type: "EXPLOSIVENESS", stress: "HIGH", baseVolume: 4 }),
+      makeComponent({ id: "sprints", type: "SPEED", stress: "HIGH", baseVolume: 3 }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(
+      plan,
+      makeRestrictions({
+        lowerBodyScale: 0.5,
+        plyometricsAllowed: true,
+        highImpactAllowed: false,
+      }),
+    );
+
+    expect(prescription.find((entry) => entry.component.id === "jumps")).toMatchObject({
+      modification: "REDUCED",
+      scaledVolume: 2,
+    });
+    expect(prescription.find((entry) => entry.component.id === "sprints")?.modification).toBe(
+      "REMOVED",
+    );
+  });
+
   it("keeps low-stress explosive technique work when only plyos are disallowed", () => {
     const plan = [
       makeComponent({ id: "speed", type: "SPEED", stress: "HIGH" }),
@@ -377,5 +403,123 @@ describe("pure function determinism", () => {
 
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
+  });
+});
+
+describe("goal-aware volume redistribution", () => {
+  const goalPlan = [
+    makeComponent({ id: "squat", type: "STRENGTH", priority: 1, baseVolume: 4 }),
+    makeComponent({ id: "sprints", type: "SPEED", priority: 2, baseVolume: 3 }),
+    makeComponent({ id: "cod", type: "CHANGE_OF_DIRECTION", priority: 3, baseVolume: 3 }),
+  ];
+
+  it("cuts non-goal secondaries deeper before goal-primary blocks", () => {
+    // Lower scale 0.6 with a STRENGTH-first objective: squat keeps the plain
+    // region scale (4 × 0.6 → 2); sprints (non-goal) take the extra 0.5×
+    // (3 × 0.3 → 1); COD is a goal → plain scale (3 × 0.6 → 2).
+    const prescription = applyRestrictionsToBasePlan(goalPlan, makeRestrictions({ lowerBodyScale: 0.6 }), {
+      primaryGoals: ["STRENGTH", "CHANGE_OF_DIRECTION"],
+    });
+
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+    expect(byId.get("squat")).toMatchObject({ modification: "REDUCED", scaledVolume: 2 });
+    expect(byId.get("cod")).toMatchObject({ modification: "REDUCED", scaledVolume: 2 });
+    expect(byId.get("sprints")).toMatchObject({ modification: "REDUCED", scaledVolume: 1 });
+  });
+
+  it("never increases volume anywhere versus uniform scaling", () => {
+    const uniform = applyRestrictionsToBasePlan(goalPlan, makeRestrictions({ lowerBodyScale: 0.6 }));
+    const goalAware = applyRestrictionsToBasePlan(goalPlan, makeRestrictions({ lowerBodyScale: 0.6 }), {
+      primaryGoals: ["STRENGTH"],
+    });
+    for (const [index, entry] of goalAware.entries()) {
+      expect(entry.scaledVolume).toBeLessThanOrEqual(uniform[index]?.scaledVolume ?? 0);
+    }
+  });
+
+  it("flips protection when the objective names different goals", () => {
+    // SPEED-first athlete: sprints keep the region scale, the squat takes
+    // the priority-1 pass plus goal treatment — protection is objective-driven.
+    const prescription = applyRestrictionsToBasePlan(goalPlan, makeRestrictions({ lowerBodyScale: 0.6 }), {
+      primaryGoals: ["SPEED"],
+    });
+
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+    expect(byId.get("sprints")).toMatchObject({ scaledVolume: 2 });
+    expect(byId.get("cod")?.scaledVolume).toBeLessThan(
+      applyRestrictionsToBasePlan(goalPlan, makeRestrictions({ lowerBodyScale: 0.6 })).find(
+        (entry) => entry.component.id === "cod",
+      )?.scaledVolume ?? 0,
+    );
+    // Priority-1 primaries are always protected regardless of goal overlap.
+    expect(byId.get("squat")).toMatchObject({ scaledVolume: 2 });
+  });
+
+  it("keeps uniform scaling when no goals are provided (backward compatible)", () => {
+    const prescription = applyRestrictionsToBasePlan(goalPlan, makeRestrictions({ lowerBodyScale: 0.6 }));
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+    expect(byId.get("squat")?.scaledVolume).toBe(2);
+    expect(byId.get("sprints")?.scaledVolume).toBe(2);
+  });
+});
+
+describe("duration cap enforcement (maxTrainingDurationMinutes)", () => {
+  const cappedPlan = [
+    makeComponent({ id: "primary", priority: 1, baseVolume: 4, estimatedMinutes: 16 }),
+    makeComponent({ id: "secondary", type: "SPEED", priority: 2, baseVolume: 3, estimatedMinutes: 9 }),
+    makeComponent({
+      id: "extra",
+      type: "SPEED",
+      priority: 3,
+      baseVolume: 3,
+      estimatedMinutes: 9,
+    }),
+    makeComponent({ id: "recovery", type: "RECOVERY", priority: 6, baseVolume: 1, estimatedMinutes: 5 }),
+  ];
+
+  it("drops the least goal-relevant components until the plan fits the cap", () => {
+    // Full plan: 16 + 9 + 9 + 5 = 39 min. Cap 30 → the priority-3 non-goal
+    // component goes first: 30 ≤ 30 ✓ (asserted fully in the next test).
+    const prescription = applyRestrictionsToBasePlan(
+      cappedPlan,
+      { ...makeRestrictions(), maxTrainingDurationMinutes: 30 },
+      { primaryGoals: ["STRENGTH"] },
+    );
+    expect(prescription.find((entry) => entry.component.id === "extra")?.modification).toBe(
+      "REMOVED",
+    );
+  });
+
+  it("enforces the cap through the restrictions field", () => {
+    const restrictions = makeRestrictions();
+    const restrictionsWithCap: TrainingRestrictions = { ...restrictions, maxTrainingDurationMinutes: 30 };
+    const prescription = applyRestrictionsToBasePlan(
+      cappedPlan,
+      restrictionsWithCap,
+      { primaryGoals: ["STRENGTH"] },
+    );
+
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+    expect(byId.get("extra")?.modification).toBe("REMOVED");
+    expect(byId.get("extra")?.modificationReason).toContain("session cap");
+    expect(byId.get("secondary")?.modification).toBe("KEPT");
+    expect(byId.get("primary")?.modification).toBe("KEPT");
+    expect(byId.get("recovery")?.modification).toBe("KEPT");
+  });
+
+  it("never drops priority-1 primaries or recovery work", () => {
+    const tightPlan = [
+      makeComponent({ id: "primary", priority: 1, baseVolume: 4, estimatedMinutes: 40 }),
+      makeComponent({ id: "recovery", type: "RECOVERY", priority: 6, baseVolume: 1, estimatedMinutes: 5 }),
+    ];
+    const restrictionsWithCap: TrainingRestrictions = {
+      ...makeRestrictions(),
+      maxTrainingDurationMinutes: 10,
+    };
+
+    const prescription = applyRestrictionsToBasePlan(tightPlan, restrictionsWithCap);
+
+    // Nothing droppable remains — overflow is accepted, nothing removed.
+    expect(modificationsOf(prescription)).toEqual(["KEPT", "KEPT"]);
   });
 });

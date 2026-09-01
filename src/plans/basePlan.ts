@@ -22,6 +22,7 @@ export const DEFAULT_BASE_PLAN = [
     minimumVolume: 2,
     optional: false,
     bodyRegion: "LOWER",
+    estimatedMinutes: 16,
   },
   {
     id: "primary-upper-push",
@@ -32,6 +33,7 @@ export const DEFAULT_BASE_PLAN = [
     minimumVolume: 2,
     optional: false,
     bodyRegion: "UPPER",
+    estimatedMinutes: 16,
   },
   {
     id: "explosive-jumps",
@@ -42,6 +44,7 @@ export const DEFAULT_BASE_PLAN = [
     minimumVolume: 2,
     optional: false,
     bodyRegion: "LOWER",
+    estimatedMinutes: 10,
   },
   {
     id: "acceleration-sprints",
@@ -52,6 +55,7 @@ export const DEFAULT_BASE_PLAN = [
     minimumVolume: 1,
     optional: false,
     bodyRegion: "FULL",
+    estimatedMinutes: 8,
   },
   {
     id: "cod-drills",
@@ -62,6 +66,7 @@ export const DEFAULT_BASE_PLAN = [
     minimumVolume: 1,
     optional: false,
     bodyRegion: "FULL",
+    estimatedMinutes: 8,
   },
   {
     id: "skill-ballhandling",
@@ -71,6 +76,7 @@ export const DEFAULT_BASE_PLAN = [
     baseVolume: 3,
     optional: false,
     bodyRegion: "FULL",
+    estimatedMinutes: 12,
   },
   {
     id: "accessory-upper",
@@ -80,6 +86,7 @@ export const DEFAULT_BASE_PLAN = [
     baseVolume: 3,
     optional: true,
     bodyRegion: "UPPER",
+    estimatedMinutes: 10,
   },
   {
     id: "accessory-core",
@@ -89,6 +96,7 @@ export const DEFAULT_BASE_PLAN = [
     baseVolume: 2,
     optional: true,
     bodyRegion: "FULL",
+    estimatedMinutes: 6,
   },
   {
     id: "mobility-recovery",
@@ -98,6 +106,7 @@ export const DEFAULT_BASE_PLAN = [
     baseVolume: 1,
     optional: false,
     bodyRegion: "FULL",
+    estimatedMinutes: 5,
   },
 ] as const satisfies readonly TrainingComponent[];
 

@@ -146,11 +146,12 @@ describe("full workflow: check-in → engine → scaling → log → storage", (
     expect(byId.get("primary-lower-squat")?.modification).toBe("REDUCED");
     expect(byId.get("primary-lower-squat")?.scaledVolume).toBe(2); // round(4 × 0.5)
     expect(byId.get("primary-upper-push")?.scaledVolume).toBe(3); // round(4 × 0.7)
-    // High-impact goals are removed (sprints + COD), plyometrics merely scale.
+    // High-impact conditioning is removed (sprints + COD), while the allowed
+    // primer-day plyometrics survive REDUCED (SPEC §17: reduced neural primer).
     expect(byId.get("acceleration-sprints")?.modification).toBe("REMOVED");
     expect(byId.get("cod-drills")?.modification).toBe("REMOVED");
-    // Max-effort jumping is high-impact (SPEC §19): removed under a game window.
-    expect(byId.get("explosive-jumps")?.modification).toBe("REMOVED");
+    expect(byId.get("explosive-jumps")?.modification).toBe("REDUCED");
+    expect(byId.get("explosive-jumps")?.scaledVolume).toBe(2); // round(4 × 0.5)
     // Optional accessories strip first when their region is reduced.
     expect(byId.get("accessory-upper")?.modification).toBe("REMOVED");
     expect(byId.get("accessory-core")?.modification).toBe("REMOVED");
@@ -399,5 +400,49 @@ describe("live session loop: check-offs, mid-session rescaling, finish", () => {
     });
     const next = prescriptionOf(deriveEngineView(useAppStore.getState(), nextDay));
     expect(next.some((entry) => entry.modification !== "KEPT")).toBe(true);
+  });
+
+  it("lets the training objective decide which volume is cut first", () => {
+    const day = today();
+    // Primer day (game in 20h): lower 0.5 / upper 0.7, plyos allowed — jump
+    // mechanics survive, so goal-driven redistribution is observable.
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(day, { sleep: "OVER_8_HRS", joint: "NO_CONCERN", energy: "HIGH" }),
+      ],
+      scheduledEvents: [
+        {
+          id: "g1",
+          eventType: "GAME",
+          startAt: new Date(Date.now() + 20 * 60 * 60 * 1000).toISOString(),
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    const apply = () =>
+      applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, derive().result.restrictions, {
+        primaryGoals: useAppStore.getState().trainingObjective.primaryGoals,
+      });
+    const byIdOf = (list: ReturnType<typeof apply>) =>
+      new Map(list.map((entry) => [entry.component.id, entry]));
+
+    // Default objective (STRENGTH, EXPLOSIVENESS, COD): the jump block is a
+    // goal-primary component → keeps the plain primer scale (4 × 0.5 → 2).
+    const defaultView = byIdOf(apply());
+    expect(defaultView.get("explosive-jumps")?.scaledVolume).toBe(2);
+
+    // A SPEED-first objective drops EXPLOSIVENESS from the protected set:
+    // the jump block takes the extra 0.5× cut (effective scale 0.25×), held
+    // at 2 sets only by its minimum-volume maintenance floor.
+    useAppStore.getState().setTrainingObjective({
+      ...DEFAULT_OBJECTIVE,
+      primaryGoals: ["SPEED"],
+    });
+    const speedView = byIdOf(apply());
+    expect(speedView.get("explosive-jumps")?.modificationReason).toContain("0.25×");
+    expect(speedView.get("explosive-jumps")?.scaledVolume).toBe(2); // min-volume floor
+    expect(speedView.get("primary-lower-squat")?.scaledVolume).toBe(2);
   });
 });

@@ -37,6 +37,7 @@ export default function Workout() {
   const localToday = toLocalDateString(new Date(), profile.timezone);
   const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
     stripOptional,
+    primaryGoals: trainingObjective.primaryGoals,
   });
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
@@ -96,7 +97,8 @@ export default function Workout() {
           {trainingObjective.primaryGoals.map((goal) => TRAINING_GOAL_LABELS[goal]).join(" · ")}
         </Text>
         <Text className="mt-1 text-xs text-slate-400">
-          Quality over volume — the plan protects the high/low balance.
+          Quality over volume — the plan protects the high/low balance. On
+          lighter days, your focus areas keep their work longest.
         </Text>
       </View>
 

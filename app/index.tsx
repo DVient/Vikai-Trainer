@@ -38,11 +38,13 @@ export default function Index() {
   const toggleComponentDone = useAppStore((state) => state.toggleComponentDone);
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
   const profile = useAppStore((state) => state.profile);
+  const trainingObjective = useAppStore((state) => state.trainingObjective);
 
   const now = new Date();
   const localToday = toLocalDateString(now, profile.timezone);
   const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
     stripOptional,
+    primaryGoals: trainingObjective.primaryGoals,
   });
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
