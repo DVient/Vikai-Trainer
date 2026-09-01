@@ -35,6 +35,12 @@ const linkingOpenSpy = vi.hoisted(() =>
   vi.fn<(url: string) => Promise<void>>(async () => undefined),
 );
 
+// expo-notifications surface used by the reminder pipeline under test.
+const notificationsSpy = vi.hoisted(() => ({
+  schedule: vi.fn<(request: unknown) => Promise<string>>(async () => "notif-id-1"),
+  cancel: vi.fn<(id: string) => Promise<void>>(async () => undefined),
+}));
+
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: AsyncStorageMock,
 }));
@@ -46,8 +52,8 @@ vi.mock("expo-haptics", () => hapticsMock);
 vi.mock("expo-notifications", () => ({
   getPermissionsAsync: vi.fn(async () => ({ granted: false, canAskAgain: true })),
   requestPermissionsAsync: vi.fn(async () => ({ granted: true, canAskAgain: false })),
-  scheduleNotificationAsync: vi.fn(async () => "notif-id-1"),
-  cancelScheduledNotificationAsync: vi.fn(async () => undefined),
+  scheduleNotificationAsync: notificationsSpy.schedule,
+  cancelScheduledNotificationAsync: notificationsSpy.cancel,
   setNotificationChannelAsync: vi.fn(async () => undefined),
   setNotificationHandler: vi.fn(() => undefined),
   SchedulableTriggerInputTypes: { DAILY: "daily", DATE: "date" },
@@ -147,6 +153,8 @@ beforeEach(() => {
   routerMock.navigate.mockClear();
   routerMock.replace.mockClear();
   linkingOpenSpy.mockClear();
+  notificationsSpy.schedule.mockClear();
+  notificationsSpy.cancel.mockClear();
 });
 
 afterEach(() => {
@@ -680,6 +688,99 @@ describe("workout-relative activity logging", () => {
     expect(screen.getByText("Today's log (2 entries)")).toBeTruthy();
     expect(screen.getByText("Before today's session — already shaped today")).toBeTruthy();
     expect(screen.getByText("After today's session — shapes your next workout")).toBeTruthy();
+  });
+});
+
+describe("editable entries: scheduled list, reschedule resync, activity edit", () => {
+  it("lists upcoming commitments on the Calendar and opens the editor from one list", () => {
+    const future = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    useAppStore.setState({
+      scheduledEvents: [
+        {
+          id: "p1",
+          eventType: "TEAM_PRACTICE",
+          startAt: future,
+          title: "Fall block",
+          seriesId: "series-1",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<History />);
+
+    // One list, regardless of which day the grid shows.
+    expect(screen.getByText("Scheduled — tap to change time or day")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Edit event: 🏀 Team practice"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/event-form?eventId=p1");
+  });
+
+  it("moves the reminder when a future event is rescheduled", async () => {
+    const future = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    useAppStore.setState({
+      scheduledEvents: [
+        {
+          id: "p1",
+          eventType: "TEAM_PRACTICE",
+          startAt: future.toISOString(),
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      // A reminder for the OLD time is already armed and tracked.
+      notificationIdentifiers: { scheduleReminders: { p1: "old-notif-id" } },
+    });
+    searchParamsMock.eventId = "p1";
+
+    render(<EventForm />);
+
+    const newDay = new Date(Date.now() + 96 * 60 * 60 * 1000);
+    const prefill = prefillFromIso(newDay.toISOString(), TIMEZONE);
+    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
+      target: { value: prefill.dateText },
+    });
+    fireEvent.change(screen.getByPlaceholderText("18:00"), {
+      target: { value: prefill.timeText },
+    });
+    // The reminder resync is fire-and-forget async — wait for it to land.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+    });
+    await waitFor(() => expect(notificationsSpy.schedule).toHaveBeenCalled());
+
+    const events = useAppStore.getState().scheduledEvents;
+    expect(events).toHaveLength(1);
+    expect(events[0]?.startAt.startsWith(newDay.toISOString().slice(0, 10))).toBe(true);
+    // The reminder re-arms at the new instant (stale one cancelled first).
+    expect(notificationsSpy.cancel).toHaveBeenCalled();
+    expect(notificationsSpy.schedule).toHaveBeenCalled();
+    expect(notificationsSpy.schedule.mock.calls[0]?.[0]).toMatchObject({
+      content: { title: "Vikai Trainer schedule reminder" },
+    });
+  });
+
+  it("edits today's activity entries in place without duplicating", () => {
+    render(<PracticeLog />);
+
+    fireEvent.change(screen.getByDisplayValue("60"), { target: { value: "45" } });
+    fireEvent.click(screen.getByText("Save activity"));
+    const first = useAppStore.getState().activityLogs[0];
+
+    // Tap ✎ on the saved entry → form prefills → save updates the record.
+    fireEvent.click(screen.getByLabelText(/Edit 🏀 Hoops \(practice\) entry/));
+    expect(screen.getByText("Save changes")).toBeTruthy();
+    expect(screen.getByDisplayValue("45")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Effort 9 of 10"));
+    fireEvent.change(screen.getByDisplayValue("45"), { target: { value: "75" } });
+    fireEvent.click(screen.getByText("Save changes"));
+
+    const entries = useAppStore.getState().activityLogs;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ id: first?.id, sessionRpe: 9, durationMinutes: 75 });
+    // Edit mode exits; the add-form is back.
+    expect(screen.getByText("Save activity")).toBeTruthy();
   });
 });
 

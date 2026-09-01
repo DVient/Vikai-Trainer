@@ -70,6 +70,11 @@ export interface VikaiTrainerAppState {
   saveDailyCheckIn: (draft: ReadinessDraft) => ReadinessInput;
   /** Appends a completed activity log (SPEC §10). */
   logActivity: (draft: ActivityDraft) => ActivityLog;
+  /** Corrects a logged activity in place (same-day entry edits). */
+  updateActivityLog: (
+    id: string,
+    patch: Partial<Omit<ActivityLog, "id" | "createdAt">>,
+  ) => void;
   removeActivityLog: (id: string) => void;
   /** Adds a future/planned event (SPEC §9.1). */
   scheduleEvent: (draft: ScheduledEventDraft) => ScheduledEvent;
@@ -151,6 +156,14 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       removeActivityLog: (id) => {
         set((state) => ({
           activityLogs: state.activityLogs.filter((entry) => entry.id !== id),
+        }));
+      },
+
+      updateActivityLog: (id, patch) => {
+        set((state) => ({
+          activityLogs: state.activityLogs.map((entry) =>
+            entry.id === id ? { ...entry, ...patch, updatedAt: new Date().toISOString() } : entry,
+          ),
         }));
       },
 

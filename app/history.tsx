@@ -10,16 +10,20 @@ import {
   formatDateLong,
   monthMarks,
   monthMatrix,
+  upcomingEventRows,
 } from "../src/lib/calendar";
 import { tapLight } from "../src/lib/haptics";
+import { SCHEDULED_EVENT_LABELS } from "../src/lib/format";
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
  * Calendar (design iteration): past and future at a glance. The month grid
  * marks check-ins, logged activity, completed sessions, and scheduled
- * games/practices; selecting a day shows its timestamped timeline. Future
- * event rows open the editor — athletes add their own commitments with the
- * ＋ button.
+ * games/practices; selecting a day shows its timestamped timeline. The
+ * Scheduled list gathers every future commitment in one place — when team
+ * practice times change, athletes fix them here instead of hunting for the
+ * old day on the grid. Future rows open the editor; athletes add their own
+ * commitments with the ＋ button.
  */
 export default function History() {
   const router = useRouter();
@@ -57,6 +61,10 @@ export default function History() {
   const timeline = useMemo(
     () => dayTimeline(sources, selected, profile.timezone),
     [sources, selected, profile.timezone],
+  );
+  const scheduled = useMemo(
+    () => upcomingEventRows(scheduledEvents, now, profile.timezone),
+    [scheduledEvents, now, profile.timezone],
   );
 
   const shiftMonth = (delta: number) => {
@@ -99,6 +107,44 @@ export default function History() {
         onPrevMonth={() => shiftMonth(-1)}
         onNextMonth={() => shiftMonth(1)}
       />
+
+      <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
+        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          Scheduled — tap to change time or day
+        </Text>
+        {scheduled.length === 0 ? (
+          <Text className="mt-2 text-sm text-slate-400">
+            Nothing scheduled yet — tap ＋ Add to plan your season.
+          </Text>
+        ) : (
+          <View className="mt-1">
+            {scheduled.map(({ event, when }) => (
+              <Pressable
+                key={event.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit event: ${SCHEDULED_EVENT_LABELS[event.eventType]}`}
+                onPress={() => {
+                  tapLight();
+                  router.navigate(`/event-form?eventId=${event.id}`);
+                }}
+                className="min-h-[48px] flex-row items-center gap-3 py-2"
+              >
+                <Text className="text-base">📅</Text>
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-slate-100">
+                    {event.title
+                      ? `${SCHEDULED_EVENT_LABELS[event.eventType]} — ${event.title}`
+                      : SCHEDULED_EVENT_LABELS[event.eventType]}
+                  </Text>
+                  <Text className="text-xs text-slate-400">{when}</Text>
+                </View>
+                {event.seriesId !== undefined ? <Text className="text-sm">🔁</Text> : null}
+                <Text className="text-sm text-slate-500">›</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
 
       <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
         <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">

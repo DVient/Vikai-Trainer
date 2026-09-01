@@ -33,6 +33,7 @@ const SAVED_TOAST = "Logged ✓ — add another or head back";
 export default function PracticeLog() {
   const router = useRouter();
   const logActivity = useAppStore((state) => state.logActivity);
+  const updateActivityLog = useAppStore((state) => state.updateActivityLog);
   const removeActivityLog = useAppStore((state) => state.removeActivityLog);
   const activityLogs = useAppStore((state) => state.activityLogs);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
@@ -42,6 +43,7 @@ export default function PracticeLog() {
   const [sessionRpe, setSessionRpe] = useState(5);
   const [durationText, setDurationText] = useState("60");
   const [notes, setNotes] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -52,6 +54,28 @@ export default function PracticeLog() {
   const workoutDone = workoutLogs.some((entry) => entry.activityDate === today);
   const band = rpeBand(sessionRpe);
 
+  const startEdit = (entryId: string) => {
+    const entry = activityLogs.find((candidate) => candidate.id === entryId);
+    if (entry === undefined) return;
+    tapLight();
+    setEditingId(entry.id);
+    setActivityType(entry.activityType);
+    setSessionRpe(entry.sessionRpe ?? 5);
+    setDurationText(String(entry.durationMinutes ?? 60));
+    setNotes(entry.notes ?? "");
+    setError(null);
+  };
+
+  const cancelEdit = () => {
+    tapLight();
+    setEditingId(null);
+    setActivityType("TEAM_PRACTICE");
+    setSessionRpe(5);
+    setDurationText("60");
+    setNotes("");
+    setError(null);
+  };
+
   const onSave = () => {
     const durationMinutes = Number.parseInt(durationText, 10);
     const validationError = validateActivityDraft(sessionRpe, durationMinutes);
@@ -60,16 +84,24 @@ export default function PracticeLog() {
       return;
     }
 
-    logActivity({
-      activityDate: today,
-      timezone: profile.timezone,
+    const draft = {
       activityType,
       sessionRpe,
       durationMinutes,
       notes: notes.trim() === "" ? undefined : notes.trim(),
-    });
+    };
+    if (editingId !== null) {
+      updateActivityLog(editingId, draft);
+    } else {
+      logActivity({
+        activityDate: today,
+        timezone: profile.timezone,
+        ...draft,
+      });
+    }
 
     // Multi-entry friendly: reset the form, keep the screen open.
+    setEditingId(null);
     setActivityType("TEAM_PRACTICE");
     setSessionRpe(5);
     setDurationText("60");
@@ -205,8 +237,21 @@ export default function PracticeLog() {
         }}
         className="h-14 items-center justify-center rounded-xl bg-green-500"
       >
-        <Text className="text-base font-black text-slate-950">Save activity</Text>
+        <Text className="text-base font-black text-slate-950">
+          {editingId !== null ? "Save changes" : "Save activity"}
+        </Text>
       </Pressable>
+
+      {editingId !== null ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cancel edit"
+          onPress={cancelEdit}
+          className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+        >
+          <Text className="text-sm font-bold text-slate-300">Cancel — back to adding</Text>
+        </Pressable>
+      ) : null}
 
       {todaysLogs.length > 0 ? (
         <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
@@ -238,12 +283,20 @@ export default function PracticeLog() {
                 </View>
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel={`Edit ${ACTIVITY_TYPE_LABELS[entry.activityType]} entry`}
+                  onPress={() => startEdit(entry.id)}
+                  className="h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
+                >
+                  <Text className="text-base font-bold text-slate-300">✎</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel={`Remove ${ACTIVITY_TYPE_LABELS[entry.activityType]} entry`}
                   onPress={() => {
                     tapLight();
                     removeActivityLog(entry.id);
                   }}
-                  className="h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
+                  className="ml-2 h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
                 >
                   <Text className="text-base font-bold text-slate-300">✕</Text>
                 </Pressable>

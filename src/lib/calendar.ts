@@ -9,7 +9,7 @@
 
 import { isCompetitionEvent, toLocalDateString } from "../engine/autoregulation";
 import { ACTIVITY_TYPE_LABELS, SCHEDULED_EVENT_LABELS } from "./format";
-import type { ScheduledEventType } from "../types";
+import type { ScheduledEvent, ScheduledEventType } from "../types";
 
 /* ───────────────────────────── Month matrix ───────────────────────────── */
 
@@ -236,4 +236,39 @@ export function formatDateLong(date: string): string {
     day: "numeric",
     timeZone: "UTC",
   }).format(parsed);
+}
+
+/* ─────────────────── Scheduled commitments manage list ────────────────── */
+
+export interface UpcomingEventRow {
+  event: Pick<ScheduledEvent, "id" | "eventType" | "startAt" | "title" | "seriesId">;
+  /** "Fri, Jan 2 · 6:30 PM" — the athlete-facing schedule line. */
+  when: string;
+}
+
+/**
+ * All future commitments soonest-first for the Calendar's manage list —
+ * the place to fix a moved team practice without hunting for its day on
+ * the grid. Pure: no storage, no clock (now is injected).
+ */
+export function upcomingEventRows(
+  events: ReadonlyArray<
+    Pick<ScheduledEvent, "id" | "eventType" | "startAt" | "title" | "seriesId">
+  >,
+  now: Date,
+  timezone: string,
+  limit = 20,
+): UpcomingEventRow[] {
+  return events
+    .map((event) => ({ event, kickoff: new Date(event.startAt).getTime() }))
+    .filter((entry) => Number.isFinite(entry.kickoff) && entry.kickoff > now.getTime())
+    .sort((a, b) => a.kickoff - b.kickoff)
+    .slice(0, limit)
+    .map(({ event }) => {
+      const localDate = eventDate(event.startAt, timezone);
+      const dateLabel = localDate === "" ? "—" : formatDateLong(localDate);
+      const timeLabel = formatTimeOfDay(event.startAt, timezone);
+      const time = timeLabel === "" ? "" : ` · ${timeLabel}`;
+      return { event, when: `${dateLabel}${time}` };
+    });
 }

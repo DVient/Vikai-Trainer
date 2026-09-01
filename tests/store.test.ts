@@ -170,6 +170,34 @@ describe("activity logs", () => {
     useAppStore.getState().removeActivityLog(log.id);
     expect(useAppStore.getState().activityLogs).toHaveLength(0);
   });
+
+  it("updates a logged activity in place without duplicating", () => {
+    const log = useAppStore.getState().logActivity({
+      activityDate: "2026-01-02",
+      timezone: "UTC",
+      activityType: "TEAM_PRACTICE",
+      sessionRpe: 7,
+      durationMinutes: 60,
+    });
+
+    useAppStore.getState().updateActivityLog(log.id, {
+      sessionRpe: 9,
+      durationMinutes: 90,
+      notes: "Harder than it felt",
+    });
+
+    const entries = useAppStore.getState().activityLogs;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ id: log.id, sessionRpe: 9, durationMinutes: 90 });
+    // createdAt is untouched; updatedAt was bumped by the patch.
+    expect(entries[0]?.createdAt).toBe(log.createdAt);
+    expect((entries[0]?.updatedAt ?? "") >= log.updatedAt).toBe(true);
+  });
+
+  it("ignores activity updates for unknown ids", () => {
+    useAppStore.getState().updateActivityLog("does-not-exist", { sessionRpe: 3 });
+    expect(useAppStore.getState().activityLogs).toHaveLength(0);
+  });
 });
 
 describe("scheduled events", () => {

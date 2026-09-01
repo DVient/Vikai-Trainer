@@ -181,11 +181,21 @@ export default function EventForm() {
       }
       syncReminders(scheduleEventSeries(drafts));
     } else if (existing) {
+      const updated: ScheduledEvent = {
+        ...existing,
+        eventType,
+        startAt: parsed.iso,
+        ...(titleText !== undefined ? { title: titleText } : {}),
+        updatedAt: new Date().toISOString(),
+      };
       updateScheduledEvent(existing.id, {
         eventType,
         startAt: parsed.iso,
         title: titleText,
       });
+      // Rescheduled times must move the reminder too — drop the stale one
+      // and re-arm at the new instant (update-safe, fire-and-forget).
+      void syncScheduleReminderAsync(updated).catch(() => undefined);
     } else {
       const record = scheduleEvent({ eventType, startAt: parsed.iso, title: titleText });
       syncReminders([record]);

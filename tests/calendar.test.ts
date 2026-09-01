@@ -8,6 +8,7 @@ import {
   monthLabel,
   monthMarks,
   monthMatrix,
+  upcomingEventRows,
 } from "../src/lib/calendar";
 
 const TZ = "America/New_York";
@@ -190,5 +191,51 @@ describe("time formatting", () => {
     expect(formatDateLong("2026-01-02")).toContain("Jan");
     expect(formatDateLong("2026-01-02")).toContain("2");
     expect(formatDateLong("2026-01-02")).toContain("Fri");
+  });
+});
+
+describe("upcomingEventRows — the scheduled commitments manage list", () => {
+  const now = new Date("2026-09-12T14:00:00.000Z");
+  const events = [
+    {
+      id: "far",
+      eventType: "GAME" as const,
+      startAt: "2026-10-15T23:00:00.000Z",
+      seriesId: undefined,
+    },
+    {
+      id: "near",
+      eventType: "TEAM_PRACTICE" as const,
+      startAt: "2026-09-15T22:00:00.000Z",
+      title: "Fall block",
+      seriesId: "series-1",
+    },
+    {
+      id: "past",
+      eventType: "GAME" as const,
+      startAt: "2026-09-01T22:00:00.000Z",
+      seriesId: undefined,
+    },
+    {
+      id: "broken",
+      eventType: "OTHER" as const,
+      startAt: "not-a-date",
+      seriesId: undefined,
+    },
+  ];
+
+  it("lists future events soonest-first, skipping past and unparseable ones", () => {
+    const rows = upcomingEventRows(events, now, TZ);
+    expect(rows.map((row) => row.event.id)).toEqual(["near", "far"]);
+    expect(rows[0]?.when).toContain("Sep 15");
+    expect(rows[0]?.when).toContain("6:00 PM");
+  });
+
+  it("respects the limit", () => {
+    expect(upcomingEventRows(events, now, TZ, 1)).toHaveLength(1);
+  });
+
+  it("returns an empty list for quiet schedules", () => {
+    expect(upcomingEventRows([], now, TZ)).toEqual([]);
   });
 });

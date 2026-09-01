@@ -15,7 +15,7 @@ import { buildSessionView } from "../src/lib/session";
 import { formatTimeOfDay } from "../src/lib/calendar";
 import { partitionActivities } from "../src/lib/activityTiming";
 import { checkInStreak, powerLevel } from "../src/lib/power";
-import { tapHeavy, tapSuccess } from "../src/lib/haptics";
+import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -204,12 +204,24 @@ export default function Index() {
             Upcoming
           </Text>
           {upcoming.map((view) => (
-            <View key={view.event.id} className="mt-2 flex-row items-center justify-between">
+            <Pressable
+              key={view.event.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit event: ${SCHEDULED_EVENT_LABELS[view.event.eventType]}`}
+              onPress={() => {
+                tapLight();
+                router.navigate(`/event-form?eventId=${view.event.id}`);
+              }}
+              className="min-h-[48px] mt-1 flex-row items-center justify-between"
+            >
               <Text className="text-sm font-semibold text-slate-100">
                 {SCHEDULED_EVENT_LABELS[view.event.eventType]}
               </Text>
-              <Text className="text-sm text-slate-400">{view.countdown}</Text>
-            </View>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-sm text-slate-400">{view.countdown}</Text>
+                <Text className="text-sm text-slate-500">›</Text>
+              </View>
+            </Pressable>
           ))}
         </View>
       ) : null}
