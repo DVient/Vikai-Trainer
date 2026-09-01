@@ -144,4 +144,21 @@ describe("partitionActivities — pre vs post workout attribution", () => {
     // The 16:30 log came after the FIRST completion → post-workout.
     expect(post).toHaveLength(1);
   });
+
+  it("attributes late-evening logs across the UTC midnight boundary as post-workout", () => {
+    // Local date 2026-01-02 in an Americas timezone: the 11:30 PM activity
+    // and 3:00 PM workout are the same LOCAL day, but the 11:30 PM instant
+    // lands on the NEXT UTC date. Instant comparison must win.
+    const lateEvening = [
+      { activityDate: day, createdAt: "2026-01-03T04:30:00.000Z" }, // 11:30 PM local
+      { activityDate: day, createdAt: "2026-01-02T19:00:00.000Z" }, // 2:00 PM local
+    ];
+    const eveningWorkout = [{ activityDate: day, createdAt: "2026-01-02T20:00:00.000Z" }]; // 3:00 PM
+
+    const { pre, post } = partitionActivities(lateEvening, eveningWorkout, day);
+    expect(pre).toHaveLength(1);
+    expect(pre[0]?.createdAt).toBe("2026-01-02T19:00:00.000Z");
+    expect(post).toHaveLength(1);
+    expect(post[0]?.createdAt).toBe("2026-01-03T04:30:00.000Z");
+  });
 });

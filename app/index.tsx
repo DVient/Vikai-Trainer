@@ -148,7 +148,6 @@ export default function Index() {
 
         <SessionChecklist
           view={session}
-          finished={hasWorkoutLogToday}
           localDate={localToday}
           onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
         />

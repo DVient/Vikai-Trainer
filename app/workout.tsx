@@ -130,7 +130,6 @@ export default function Workout() {
 
       <SessionChecklist
         view={session}
-        finished={hasWorkoutLogToday}
         localDate={localToday}
         onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
       />

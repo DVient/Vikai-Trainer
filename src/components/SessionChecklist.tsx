@@ -11,22 +11,22 @@ import { ExerciseDetailList } from "./ExerciseDetailList";
  * The checkable Game Plan list (live session cockpit) — shared by the Home
  * hub and the /workout detail screen so check-off state is identical
  * everywhere. Remaining rows carry the engine's CURRENT scaled volume;
- * checking one freezes what was actually done. Engine-removed rows render
- * dimmed in their own group and never need an action. Every row expands to
- * "See the work": the real exercises, prescriptions, cues, and video links
- * from the season plan (the engine still owns all scaling decisions).
+ * checking one freezes what was actually done, and a second tap undoes a
+ * mistaken check-off (before or after finishing — the workout log itself
+ * stays immutable). Engine-removed rows render dimmed in their own group
+ * and never need an action. Every row expands to "See the work": the real
+ * exercises, prescriptions, cues, and video links from the season plan
+ * (the engine still owns all scaling decisions).
  */
 
 interface SessionChecklistProps {
   view: SessionView;
-  /** Dim the checkboxes while the workout log is recorded (read-only recap). */
-  finished: boolean;
   /** Local date used to resolve the season plan's exercise detail. */
   localDate: string;
   onToggle: (componentId: string, sets: number) => void;
 }
 
-export function SessionChecklist({ view, finished, localDate, onToggle }: SessionChecklistProps) {
+export function SessionChecklist({ view, localDate, onToggle }: SessionChecklistProps) {
   const remaining = view.rows.filter((row) => row.state === "remaining");
   const done = view.rows.filter((row) => row.state === "done");
   const skipped = view.rows.filter((row) => row.state === "skipped");
@@ -38,7 +38,7 @@ export function SessionChecklist({ view, finished, localDate, onToggle }: Sessio
           key={row.componentId}
           row={row}
           localDate={localDate}
-          onToggle={finished ? undefined : onToggle}
+          onToggle={onToggle}
         />
       ))}
       {done.length > 0 ? (
@@ -48,7 +48,7 @@ export function SessionChecklist({ view, finished, localDate, onToggle }: Sessio
               key={row.componentId}
               row={row}
               localDate={localDate}
-              onToggle={finished ? undefined : onToggle}
+              onToggle={onToggle}
             />
           ))}
         </View>
@@ -91,6 +91,7 @@ function ChecklistRow({
         accessibilityRole={locked ? undefined : "checkbox"}
         accessibilityState={locked ? undefined : { checked: done }}
         accessibilityLabel={`Toggle ${title}`}
+        accessibilityHint={done ? "Activate to undo this block" : undefined}
         disabled={locked}
         onPress={() => {
           if (onToggle === undefined) return;
@@ -211,7 +212,9 @@ function ExpandableWork({
 
 function setsText(row: SessionRow): string {
   if (row.state === "skipped") return "Not part of today's plan";
-  if (row.state === "done") return `You did ${row.sets} ${row.sets === 1 ? "set" : "sets"}`;
+  if (row.state === "done") {
+    return `You did ${row.sets} ${row.sets === 1 ? "set" : "sets"} · tap to undo`;
+  }
   if (row.modification === "REDUCED") return `${row.baseSets} → ${row.sets} sets`;
   return `${row.sets} ${row.sets === 1 ? "set" : "sets"}`;
 }

@@ -37,7 +37,13 @@ export function isPostWorkoutActivity(
   doneAt: string | undefined,
 ): boolean {
   if (doneAt === undefined || activity.createdAt === undefined) return false;
-  if (activity.activityDate !== doneAt.slice(0, 10)) return false;
+  /*
+   * Same-local-day is guaranteed by construction: `partitionActivities`
+   * filters both sides to the caller's local date, and the local date is
+   * NOT the UTC slice of these ISO instants (they can straddle UTC
+   * midnight in the athlete's evening). Instant comparison is the
+   * timezone-correct attribution.
+   */
   return activity.createdAt > doneAt;
 }
 

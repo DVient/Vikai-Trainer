@@ -276,9 +276,66 @@ describe("live session cockpit — check-offs and mid-session rescaling", () => 
     const day = useAppStore.getState().workoutProgress[localDate(0)];
     expect(day?.["primary-lower-squat"]).toMatchObject({ sets: 4 });
     expect(screen.getByText("1/9 checked off")).toBeTruthy();
-    expect(screen.getByText("You did 4 sets")).toBeTruthy();
+    expect(screen.getByText("You did 4 sets · tap to undo")).toBeTruthy();
     // Finish only appears once NOTHING remains to check off.
     expect(screen.queryByLabelText("Finish workout")).toBeNull();
+  });
+
+  it("undoes a mistaken check-off and re-checks at the current volume", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Index />);
+
+    // Mistake: check the squat, then undo it via the advertised affordance.
+    fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
+    expect(screen.getByText("You did 4 sets · tap to undo")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
+    expect(screen.getAllByText("4 sets").length).toBeGreaterThanOrEqual(1);
+    expect(useAppStore.getState().workoutProgress[localDate(0)]?.["primary-lower-squat"]).toBeUndefined();
+
+    // Re-check: the block freezes again (still at the current scaled volume).
+    fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
+    expect(useAppStore.getState().workoutProgress[localDate(0)]?.["primary-lower-squat"]).toMatchObject({
+      sets: 4,
+    });
+  });
+
+  it("allows correcting check-offs after the session is finished", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)] });
+
+    render(<Index />);
+
+    // RED day — everything adjusted out, so the session is finishable.
+    fireEvent.click(screen.getByLabelText("Finish workout"));
+    expect(screen.getByText(/Session complete 🎉/)).toBeTruthy();
+
+    // GREEN flow correction: a finished session where the athlete notices a
+    // mistaken check-off. Seed a good-day prescription with the squat done.
+    act(() => {
+      useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+      useAppStore.setState({
+        workoutProgress: {
+          [localDate(0)]: {
+            "primary-lower-squat": {
+              componentId: "primary-lower-squat",
+              sets: 4,
+              completedAt: new Date().toISOString(),
+            },
+          },
+        },
+      });
+    });
+
+    // The workout log exists, yet the mistaken check-off can still be undone.
+    expect(screen.getByText("You did 4 sets · tap to undo")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
+    expect(
+      useAppStore.getState().workoutProgress[localDate(0)]?.["primary-lower-squat"],
+    ).toBeUndefined();
+    expect(screen.getAllByText("4 sets").length).toBeGreaterThanOrEqual(1);
+    // The log itself is untouched — one record, still complete.
+    expect(useAppStore.getState().workoutLogs).toHaveLength(1);
+    expect(screen.getByText(/Session complete 🎉/)).toBeTruthy();
   });
 
   it("re-scales remaining rows after an activity log lands mid-session", () => {
@@ -514,7 +571,7 @@ describe("game plan screen (app/workout)", () => {
     render(<Workout />);
 
     // Same frozen view as Home — one source of truth in the store.
-    expect(screen.getByText("You did 4 sets")).toBeTruthy();
+    expect(screen.getByText("You did 4 sets · tap to undo")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Toggle Upper push strength"));
     expect(

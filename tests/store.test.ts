@@ -331,6 +331,20 @@ describe("workout progress — live session check-offs (guided flow)", () => {
       sets: 2,
     });
   });
+
+  it("re-records a re-checked block with the current volume and a fresh timestamp", () => {
+    useAppStore.getState().toggleComponentDone("2026-01-02", "a", 3);
+    const first = useAppStore.getState().workoutProgress["2026-01-02"]?.a;
+
+    // Mistaken check-off → undo → re-check with the engine's current volume.
+    useAppStore.getState().toggleComponentDone("2026-01-02", "a", 3);
+    useAppStore.getState().toggleComponentDone("2026-01-02", "a", 2);
+    const second = useAppStore.getState().workoutProgress["2026-01-02"]?.a;
+
+    expect(second).toMatchObject({ componentId: "a", sets: 2 });
+    expect(second?.completedAt ?? "").toBeTruthy();
+    expect((second?.completedAt ?? "") >= (first?.completedAt ?? "")).toBe(true);
+  });
 });
 
 describe("local persistence (SPEC §31)", () => {
