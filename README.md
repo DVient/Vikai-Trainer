@@ -69,6 +69,42 @@ pnpm start          # Expo dev server
 | `pnpm test`        | Full Vitest suite (thread pool) |
 | `pnpm run test:watch` | Vitest in watch mode         |
 
+## Install on your Android phone
+
+### Quick look — Expo Go (no setup)
+
+1. Install **Expo Go** from the Play Store.
+2. Run `pnpm start` on the PC and scan the QR code with the phone (same Wi-Fi).
+3. The app runs live; code changes appear on reload.
+
+Limits: the app only runs while the dev server runs, and Android notifications are restricted inside Expo Go.
+
+### Install properly + future updates over the air (EAS)
+
+One free Expo account (expo.dev), then:
+
+```bash
+pnpm exec eas login                        # interactive — your account
+pnpm exec eas init                         # links this repo (writes projectId into app.json)
+pnpm exec eas build -p android --profile preview   # cloud build → APK
+```
+
+`eas build` prints a QR code / download link: open it on the phone, allow
+"install unknown apps" for the sideload, and install. The app then runs fully
+standalone — local data, notifications, everything.
+
+**Future updates:** after committing code changes,
+
+```bash
+pnpm exec eas update -p android --channel preview
+```
+
+publishes the new bundle; the installed app downloads it on its next launch —
+no reinstall. Only changes to native modules need a new APK build (rerun the
+`eas build` command above). This works because the app ships with
+`expo-updates`, a `preview` channel, and an `appVersion` runtime policy —
+any JS-level change ships over the air.
+
 ## Testing
 
 The engine and plan domain are pure functions, so the core rules (RPE boundaries, game-proximity windows, restriction scaling, plan determinism) are covered by fast unit tests; screens are covered with React Native Testing Library — check-off flows, rescaling after mid-session logs, the plan builder reveal, and the completion loop.
