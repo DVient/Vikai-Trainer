@@ -87,6 +87,7 @@ vi.mock("react-native", async () => {
 });
 
 import Index from "../app/index";
+import About from "../app/about";
 import CheckIn from "../app/checkin";
 import PracticeLog from "../app/practice-log";
 import Workout from "../app/workout";
@@ -838,6 +839,54 @@ describe("editable entries: scheduled list, reschedule resync, activity edit", (
     expect(entries[0]).toMatchObject({ id: first?.id, sessionRpe: 9, durationMinutes: 75 });
     // Edit mode exits; the add-form is back.
     expect(screen.getByText("Save activity")).toBeTruthy();
+  });
+});
+
+describe("about screen — the teen-friendly app tour", () => {
+  it("opens from Home in one tap", () => {
+    render(<Index />);
+
+    fireEvent.click(screen.getByLabelText("How this app works"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/about");
+  });
+
+  it("outlines the purpose, flow, levels, features, and rules in plain language", () => {
+    render(<About />);
+
+    // Hero — the purpose.
+    expect(screen.getByText("Your pocket training coach 🏀")).toBeTruthy();
+    expect(
+      screen.getByText(/builds your workout day around YOU/),
+    ).toBeTruthy();
+
+    // The three-step flow mirrors the Home steppers.
+    expect(screen.getByText("Your day in three taps")).toBeTruthy();
+    expect(screen.getByText(/Check in — sleep, body feel, energy/)).toBeTruthy();
+    expect(screen.getByText(/BEFORE your workout shapes today/)).toBeTruthy();
+    expect(screen.getByText(/Tap again to undo/)).toBeTruthy();
+
+    // The three power levels, using the app's own vocabulary.
+    expect(screen.getByText("How the plan adapts")).toBeTruthy();
+    expect(screen.getByText(/Full Send 🔥 — you're charged/)).toBeTruthy();
+    expect(screen.getByText(/Power Save 🌙 — short sleep/)).toBeTruthy();
+    expect(screen.getByText(/SHIELD 🔴 — your body says stop/)).toBeTruthy();
+    expect(screen.getByText(/Keep the weight, drop the extra sets/)).toBeTruthy();
+
+    // The feature tour covers everything built so far.
+    expect(screen.getByText("What's inside")).toBeTruthy();
+    expect(screen.getByText(/Ready State — the battery/)).toBeTruthy();
+    expect(screen.getByText(/Game Plan — today's plan with live check-offs/)).toBeTruthy();
+    expect(screen.getByText(/Practice Log — record what you did/)).toBeTruthy();
+    expect(screen.getByText(/Calendar — your past and future/)).toBeTruthy();
+    expect(screen.getByText(/Reminders — fuel-up and check-in nudges/)).toBeTruthy();
+
+    // The rules: safety + privacy in teen language.
+    expect(screen.getByText("The rules it lives by")).toBeTruthy();
+    expect(screen.getByText(/Pain is a stop sign — never a push-through/)).toBeTruthy();
+    expect(screen.getByText(/Everything stays on your phone/)).toBeTruthy();
+
+    // Footer.
+    expect(screen.getByText(/play long — not just hard/)).toBeTruthy();
   });
 });
 

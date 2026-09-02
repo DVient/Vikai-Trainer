@@ -239,6 +239,23 @@ export default function Index() {
         <Text className="text-xl text-slate-500">›</Text>
       </Pressable>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="How this app works"
+        onPress={() => {
+          tapLight();
+          router.navigate("/about");
+        }}
+        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+      >
+        <Text className="text-3xl">💡</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-slate-50">How this app works</Text>
+          <Text className="text-sm text-slate-400">What Vikai Trainer does for you</Text>
+        </View>
+        <Text className="text-xl text-slate-500">›</Text>
+      </Pressable>
+
       {result.requiresAdultAttention ? (
         <View className="rounded-2xl border-2 border-red-500/40 bg-slate-800 p-4">
           <Text className="text-sm font-semibold text-red-300">{ADULT_ATTENTION_MESSAGE}</Text>
