@@ -19,7 +19,7 @@ import {
   milestoneDrillById,
 } from "../src/plans/milestones";
 import { BASE_PLAN_TITLES } from "../src/plans/basePlan";
-import { libraryBlockById } from "../src/plans/library";
+import { libraryBlockById, SKILL_OPTIONS } from "../src/plans/library";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -56,6 +56,7 @@ export default function Plan() {
 
   const [selectedPersona, setSelectedPersona] = useState<PersonaId | null>(null);
   const [customGoals, setCustomGoals] = useState<TrainingGoal[]>([]);
+  const [customSkills, setCustomSkills] = useState<string[]>([]);
   const [buildMode, setBuildMode] = useState<"preset" | "custom" | null>(null);
   const [weeks, setWeeks] = useState(8);
   const [rebuilding, setRebuilding] = useState(false);
@@ -71,11 +72,16 @@ export default function Plan() {
       setError("Choose Preset or Customized, then pick your focus to build your plan.");
       return;
     }
+    if (buildMode === "custom" && customSkills.length === 0) {
+      setError("Customized plans need 1–3 basketball skills. Pick at least one.");
+      return;
+    }
     tapHeavy();
     tapSuccess();
     buildTrainingPlan({
       personaId: selectedPersona ?? undefined,
       primaryGoals: customGoals.length > 0 ? customGoals : undefined,
+      skillIds: buildMode === "custom" && customSkills.length > 0 ? customSkills : undefined,
       periodWeeks: weeks,
       startDate: today,
     });
@@ -94,15 +100,26 @@ export default function Plan() {
     );
   };
 
+  const toggleCustomSkill = (skillId: string) => {
+    tapLight();
+    setCustomSkills((current) =>
+      current.includes(skillId)
+        ? current.filter((entry) => entry !== skillId)
+        : current.length >= 3
+          ? current // 1–3 skills — a fourth tap does nothing
+          : [...current, skillId],
+    );
+  };
+
   const chooseMode = (mode: "preset" | "custom") => {
     tapLight();
     setBuildMode(mode);
     // Only one path's selections can be live at a time.
     if (mode === "custom") {
       setSelectedPersona(null);
-      setCustomGoals((current) => (current.length > 0 ? current : []));
     } else {
       setCustomGoals([]);
+      setCustomSkills([]);
     }
   };
 
@@ -133,40 +150,22 @@ export default function Plan() {
         </View>
 
         <Text className="text-sm font-bold text-slate-100">1 · How do you want to build it?</Text>
-        <View className="gap-2">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Preset plan"
-            accessibilityState={{ selected: buildMode === "preset" }}
-            onPress={() => chooseMode("preset")}
-            className={`min-h-[64px] rounded-2xl border-2 p-3 ${
-              buildMode === "preset"
-                ? "border-green-500 bg-green-500/20"
-                : "border-slate-700 bg-slate-800"
-            }`}
-          >
-            <Text className="text-base font-bold text-slate-50">Preset plan 🏋️</Text>
-            <Text className="mt-0.5 text-xs text-slate-400">
-              Pick a ready-made focus, and the app builds around it.
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Customized plan"
-            accessibilityState={{ selected: buildMode === "custom" }}
-            onPress={() => chooseMode("custom")}
-            className={`min-h-[64px] rounded-2xl border-2 p-3 ${
-              buildMode === "custom"
-                ? "border-green-500 bg-green-500/20"
-                : "border-slate-700 bg-slate-800"
-            }`}
-          >
-            <Text className="text-base font-bold text-slate-50">Customized plan 🎯</Text>
-            <Text className="mt-0.5 text-xs text-slate-400">
-              Choose your own focus areas — up to 3.
-            </Text>
-          </Pressable>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Preset plan"
+          accessibilityState={{ selected: buildMode === "preset" }}
+          onPress={() => chooseMode("preset")}
+          className={`min-h-[64px] rounded-2xl border-2 p-3 ${
+            buildMode === "preset"
+              ? "border-green-500 bg-green-500/20"
+              : "border-slate-700 bg-slate-800"
+          }`}
+        >
+          <Text className="text-base font-bold text-slate-50">Preset plan 🏋️</Text>
+          <Text className="mt-0.5 text-xs text-slate-400">
+            Pick a ready-made focus, and the app builds around it.
+          </Text>
+        </Pressable>
 
         {buildMode === "preset" ? (
           <View className="gap-2">
@@ -199,6 +198,23 @@ export default function Plan() {
             })}
           </View>
         ) : null}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Customized plan"
+          accessibilityState={{ selected: buildMode === "custom" }}
+          onPress={() => chooseMode("custom")}
+          className={`min-h-[64px] rounded-2xl border-2 p-3 ${
+            buildMode === "custom"
+              ? "border-green-500 bg-green-500/20"
+              : "border-slate-700 bg-slate-800"
+          }`}
+        >
+          <Text className="text-base font-bold text-slate-50">Customized plan 🎯</Text>
+          <Text className="mt-0.5 text-xs text-slate-400">
+            Choose your own focus areas — up to 3 — plus 1–3 basketball skills.
+          </Text>
+        </Pressable>
 
         {buildMode === "custom" ? (
           <>
@@ -235,6 +251,39 @@ export default function Plan() {
                 {customGoals.length} of 3 picked — tap a goal again to remove it.
               </Text>
             ) : null}
+
+            <Text className="text-sm font-bold text-slate-100">
+              Pick your skills (1–3)
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {SKILL_OPTIONS.map((skill) => {
+                const selected = customSkills.includes(skill.id);
+                return (
+                  <Pressable
+                    key={skill.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Skill ${skill.label}`}
+                    accessibilityState={{ selected }}
+                    onPress={() => toggleCustomSkill(skill.id)}
+                    className={`h-12 rounded-full border-2 px-4 ${
+                      selected ? "border-green-500 bg-green-500/20" : "border-slate-700 bg-slate-800"
+                    }`}
+                  >
+                    <Text
+                      className={`h-12 text-sm font-bold leading-12 ${
+                        selected ? "text-green-300" : "text-slate-300"
+                      }`}
+                    >
+                      {skill.emoji} {skill.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text className="text-xs text-slate-400">
+              {customSkills.length} of 3 picked — customized plans need at
+              least one skill.
+            </Text>
           </>
         ) : null}
 
@@ -481,16 +530,22 @@ export default function Plan() {
           tapLight();
           setRebuilding(true);
           // Pre-fill the form with what the saved plan used, revealed in
-          // the matching mode.
+          // the matching mode. Skills come back from the plan's SKILL blocks.
+          const savedSkills = plan.components
+            .map((component) => component.id)
+            .filter((id) => libraryBlockById(id)?.kind === "SKILL")
+            .slice(0, 3);
           if (plan.personaId !== undefined) {
             setBuildMode("preset");
             setSelectedPersona(plan.personaId);
             setCustomGoals([]);
+            setCustomSkills([]);
             setWeeks(plan.periodWeeks);
           } else {
             setBuildMode("custom");
             setSelectedPersona(null);
             setCustomGoals(plan.primaryGoals.slice(0, 3));
+            setCustomSkills(savedSkills);
             setWeeks(plan.periodWeeks);
           }
         }}

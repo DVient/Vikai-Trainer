@@ -22,6 +22,7 @@ const routerMock = vi.hoisted(() => ({
   navigate: vi.fn<(route: string) => void>(),
   replace: vi.fn<(route: string) => void>(),
   back: vi.fn<() => void>(),
+  canGoBack: vi.fn<() => boolean>(() => true),
 }));
 
 const hapticsMock = vi.hoisted(() => ({
@@ -105,6 +106,7 @@ import PracticeLog from "../app/practice-log";
 import Workout from "../app/workout";
 import History from "../app/history";
 import EventForm from "../app/event-form";
+import { HeaderBack } from "../src/components/HeaderBack";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import { monthLabel } from "../src/lib/calendar";
@@ -167,6 +169,9 @@ beforeEach(() => {
   resetStore();
   routerMock.navigate.mockClear();
   routerMock.replace.mockClear();
+  routerMock.back.mockClear();
+  routerMock.canGoBack.mockClear();
+  routerMock.canGoBack.mockReturnValue(true);
   linkingOpenSpy.mockClear();
   stackScreenOptionsSpy.mockClear();
   notificationsSpy.schedule.mockClear();
@@ -910,6 +915,8 @@ describe("about screen — the teen-friendly app tour", () => {
     expect(screen.getByText("What's inside")).toBeTruthy();
     expect(screen.getByText(/Ready State — the battery/)).toBeTruthy();
     expect(screen.getByText(/Game Plan — today's plan with live check-offs/)).toBeTruthy();
+    expect(screen.getByText(/My Plan — build a plan around your goal/)).toBeTruthy();
+    expect(screen.getByText(/Personal milestones — every plan brings its benchmark drills/)).toBeTruthy();
     expect(screen.getByText(/Practice Log — record what you did/)).toBeTruthy();
     expect(screen.getByText(/Calendar — your past and future/)).toBeTruthy();
     expect(screen.getByText(/Reminders — fuel-up and check-in nudges/)).toBeTruthy();
@@ -954,7 +961,7 @@ describe("my plan — build, milestones, completion loop", () => {
     expect(screen.getByText("Standing jump touch")).toBeTruthy();
   });
 
-  it("supports the custom-goals path with up to 3 picks", () => {
+  it("supports the custom-goals path with up to 3 picks and a required skill", () => {
     render(<Plan />);
 
     fireEvent.click(screen.getByLabelText("Customized plan"));
@@ -965,13 +972,42 @@ describe("my plan — build, milestones, completion loop", () => {
     fireEvent.click(screen.getByLabelText("Goal Explosive"));
     expect(screen.getByText("3 of 3 picked — tap a goal again to remove it.")).toBeTruthy();
 
+    // Skills are required: building without one is blocked with guidance.
+    fireEvent.click(screen.getByLabelText("Build my plan"));
+    expect(useAppStore.getState().activePlan).toBeNull();
+    expect(screen.getByText(/Customized plans need 1–3 basketball skills/)).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Skill Shooting"));
     fireEvent.click(screen.getByLabelText("Build my plan"));
 
-    expect(useAppStore.getState().activePlan?.primaryGoals).toEqual([
-      "SPEED",
-      "ACCELERATION",
-      "STRENGTH",
-    ]);
+    const plan = useAppStore.getState().activePlan;
+    expect(plan?.primaryGoals).toEqual(["SPEED", "ACCELERATION", "STRENGTH"]);
+    // The chosen skill leads the built plan.
+    expect(plan?.components[0]?.id).toBe("skill-shooting");
+  });
+
+  it("caps skill picks at three with a live counter", () => {
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Customized plan"));
+    fireEvent.click(screen.getByLabelText("Skill Shooting"));
+    fireEvent.click(screen.getByLabelText("Skill Ball-handling"));
+    fireEvent.click(screen.getByLabelText("Skill Finishing"));
+    fireEvent.click(screen.getByLabelText("Skill Passing & reads"));
+
+    expect(screen.getByText("3 of 3 picked — customized plans need at least one skill.")).toBeTruthy();
+  });
+
+  it("expanding the preset personas pushes the Customized card down", () => {
+    render(<Plan />);
+
+    const customized = screen.getByText("Customized plan 🎯");
+    fireEvent.click(screen.getByLabelText("Preset plan"));
+    const firstPersona = screen.getByLabelText("Focus: Jump higher");
+
+    // DOM order: the persona list now sits BEFORE the Customized card.
+    const position = customized.compareDocumentPosition(firstPersona);
+    expect(position & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it("switching build modes clears the other path's selection", () => {
@@ -1017,16 +1053,28 @@ describe("my plan — build, milestones, completion loop", () => {
         primaryGoals: ["SPEED", "ACCELERATION"],
         personaId: undefined,
         startScale: 1,
-        components: [],
+        components: [
+          {
+            id: "skill-shooting",
+            type: "EXPLOSIVENESS",
+            stress: "LOW",
+            priority: 1,
+            baseVolume: 3,
+            optional: false,
+            bodyRegion: "FULL",
+            estimatedMinutes: 12,
+          },
+        ],
       },
     });
 
     render(<Plan />);
 
     fireEvent.click(screen.getByLabelText("Rebuild plan"));
-    // Custom mode revealed with the saved goals seeded (capped at 3).
+    // Custom mode revealed with the saved goals AND skills seeded (cap 3).
     expect(screen.getByText("Pick your focus (up to 3)")).toBeTruthy();
     expect(screen.getByText("2 of 3 picked — tap a goal again to remove it.")).toBeTruthy();
+    expect(screen.getByText("1 of 3 picked — customized plans need at least one skill.")).toBeTruthy();
     expect(screen.getByText("6 weeks")).toBeTruthy();
   });
 
@@ -1139,6 +1187,26 @@ describe("my plan — build, milestones, completion loop", () => {
     // from the default template is nowhere in today's prescription.
     expect(screen.getByText(/Building · Week 1 of 8/)).toBeTruthy();
     expect(screen.queryByLabelText("Toggle Squat pattern strength")).toBeNull();
+  });
+});
+
+describe("header back control — every sub-page can be exited", () => {
+  it("goes back one level when history exists", () => {
+    routerMock.canGoBack.mockReturnValue(true);
+    render(<HeaderBack />);
+
+    fireEvent.click(screen.getByLabelText("Go back"));
+    expect(routerMock.back).toHaveBeenCalled();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Home when there is no history (fresh deep-load)", () => {
+    routerMock.canGoBack.mockReturnValue(false);
+    render(<HeaderBack />);
+
+    fireEvent.click(screen.getByLabelText("Go back"));
+    expect(routerMock.replace).toHaveBeenCalledWith("/");
+    expect(routerMock.back).not.toHaveBeenCalled();
   });
 });
 

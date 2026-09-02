@@ -43,6 +43,11 @@ export interface PlanBuilderInput {
   personaId?: PersonaId;
   /** Advanced path: explicit goals override the persona's preset. */
   primaryGoals?: TrainingGoal[];
+  /**
+   * Customized path: basketball-skill block ids (SKILL kind) picked by the
+   * athlete. Up to 3 are honored; they lead the plan's priorities.
+   */
+  skillIds?: string[];
   periodWeeks: number;
   startDate: string;
   history: PlanHistorySnapshot;
@@ -130,20 +135,32 @@ export function buildPlan(input: PlanBuilderInput): BuiltPlan {
     (a, b) => b.score - a.score,
   );
 
-  const selectedIds: string[] = [];
+  // Athlete-chosen skills lead the plan: validated SKILL blocks, first 3.
+  const MAX_SKILLS = 3;
+  const chosenSkills: string[] = [];
+  for (const skillId of input.skillIds ?? []) {
+    const block = libraryBlockById(skillId);
+    if (block === undefined || block.kind !== "SKILL") continue;
+    if (chosenSkills.includes(skillId)) continue;
+    chosenSkills.push(skillId);
+    if (chosenSkills.length >= MAX_SKILLS) break;
+  }
+
+  const selectedIds: string[] = [...chosenSkills];
   let recoveryTaken = false;
-  let skillCount = 0;
+  let skillCount = chosenSkills.length;
   for (const { componentId } of scored) {
     const block = libraryBlockById(componentId);
     if (block === undefined) continue;
+    if (selectedIds.includes(componentId)) continue;
     // Exactly one recovery block per plan.
     if (block.kind === "RECOVERY") {
       if (recoveryTaken) continue;
       recoveryTaken = true;
     }
-    // At most two skill blocks; skills-first personas still get one first.
+    // Skill cap counts athlete picks first; auto-fill respects it.
     if (block.kind === "SKILL") {
-      if (skillCount >= 2) continue;
+      if (skillCount >= MAX_SKILLS) continue;
       skillCount += 1;
     }
     selectedIds.push(componentId);
@@ -166,8 +183,8 @@ export function buildPlan(input: PlanBuilderInput): BuiltPlan {
     );
     return {
       ...base,
-      // Priority 1..n: goal-matched blocks were selected first, so
-      // selection order IS the protection order.
+      // Priority 1..n: athlete-chosen skills first, then goal-matched
+      // blocks — selection order IS the protection order.
       priority: index + 1,
       baseVolume: scaledVolume,
     };

@@ -45,12 +45,12 @@ describe("buildPlan — persona-driven selection", () => {
     expect(priorities).toEqual(priorities.map((_, index) => index + 1));
   });
 
-  it("keeps exactly one recovery block and at most two skill blocks", () => {
+  it("keeps exactly one recovery block and at most three skill blocks", () => {
     for (const persona of PERSONAS) {
       const plan = buildPlan(makeInput({ personaId: persona.id }));
       const kinds = plan.components.map((component) => libraryBlockById(component.id)?.kind);
       expect(kinds.filter((kind) => kind === "RECOVERY")).toHaveLength(1);
-      expect(kinds.filter((kind) => kind === "SKILL").length).toBeLessThanOrEqual(2);
+      expect(kinds.filter((kind) => kind === "SKILL").length).toBeLessThanOrEqual(3);
       expect(kinds).toContain("RECOVERY");
     }
   });
@@ -193,6 +193,65 @@ describe("exercise rotation — plans stay unique", () => {
       return blockVariant(plan, day, "primary-lower-squat");
     });
     expect(new Set(weeks).size).toBeGreaterThan(1);
+  });
+});
+
+describe("customized skills — explicit skill injection", () => {
+  it("athlete-chosen skills lead the plan with priorities 1..k", () => {
+    const plan = buildPlan(
+      makeInput({
+        primaryGoals: ["STRENGTH"],
+        skillIds: ["skill-shooting", "skill-ballhandling"],
+      }),
+    );
+
+    const ids = plan.components.map((component) => component.id);
+    expect(ids.slice(0, 2)).toEqual(["skill-shooting", "skill-ballhandling"]);
+    expect(plan.components[0]?.priority).toBe(1);
+    expect(plan.components[1]?.priority).toBe(2);
+    // Goal-matched strength work still follows.
+    expect(ids).toContain("primary-lower-squat");
+  });
+
+  it("honors up to 3 skill picks and auto-fills no additional skills", () => {
+    const plan = buildPlan(
+      makeInput({
+        primaryGoals: ["STRENGTH", "EXPLOSIVENESS"],
+        skillIds: [
+          "skill-shooting",
+          "skill-ballhandling",
+          "skill-finishing",
+          "skill-passing-reads", // 4th pick is ignored
+        ],
+      }),
+    );
+
+    const skillIds = plan.components
+      .map((component) => component.id)
+      .filter((id) => libraryBlockById(id)?.kind === "SKILL");
+    expect(skillIds).toHaveLength(3);
+    expect(skillIds).toEqual(["skill-shooting", "skill-ballhandling", "skill-finishing"]);
+  });
+
+  it("ignores unknown ids and non-skill blocks in skillIds", () => {
+    const plan = buildPlan(
+      makeInput({
+        primaryGoals: ["STRENGTH"],
+        skillIds: ["does-not-exist", "primary-lower-squat", "skill-finishing"],
+      }),
+    );
+
+    expect(plan.components[0]?.id).toBe("skill-finishing");
+    expect(plan.components.filter((component) => component.id === "primary-lower-squat").length)
+      .toBe(1); // squat appears once — as goal-matched work, not a "skill"
+  });
+
+  it("stays idempotent with skillIds", () => {
+    const input = makeInput({
+      primaryGoals: ["SPEED"],
+      skillIds: ["skill-ballhandling"],
+    });
+    expect(buildPlan(input).components).toEqual(buildPlan(input).components);
   });
 });
 

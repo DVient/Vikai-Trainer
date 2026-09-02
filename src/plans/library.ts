@@ -289,6 +289,25 @@ export function libraryBlockById(componentId: string): LibraryBlock | undefined 
   return BLOCK_LIBRARY.find((block) => block.component.id === componentId);
 }
 
+/** A basketball-skill family the athlete can pick in a customized plan. */
+export interface SkillOption {
+  /** SKILL block id in BLOCK_LIBRARY. */
+  id: string;
+  label: string;
+  emoji: string;
+}
+
+/**
+ * The basketball-skill choices for the customized plan path (pick 1–3).
+ * Verified against BLOCK_LIBRARY: every id resolves to a SKILL block.
+ */
+export const SKILL_OPTIONS: readonly SkillOption[] = [
+  { id: "skill-ballhandling", label: "Ball-handling", emoji: "🏀" },
+  { id: "skill-shooting", label: "Shooting", emoji: "🎯" },
+  { id: "skill-finishing", label: "Finishing", emoji: "🚀" },
+  { id: "skill-passing-reads", label: "Passing & reads", emoji: "👀" },
+];
+
 /**
  * Built-plan exercise detail for one block: the rotated variant's exercises
  * plus the staple. Deterministic on (blockId, variant).

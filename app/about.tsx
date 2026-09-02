@@ -4,8 +4,8 @@ import { ScrollView, Text, View } from "react-native";
  * "How this app works" — the athlete-facing tour of everything built into
  * Vikai Trainer, written for a teenager: short sentences, the app's own
  * vocabulary (Full Send / Power Save / SHIELD / Game Plan / Ready State),
- * zero engine or clinical terminology. Pure static content — no state,
- * no navigation; the stack header provides the way back.
+ * zero engine or clinical terminology. Pure static content — no state;
+ * the stack header's back control provides the way out.
  */
 
 interface Section {
@@ -41,6 +41,8 @@ const FEATURES: Section = {
   items: [
     "🔋 Ready State — the battery on Home shows your charge for today.",
     "📋 Game Plan — today's plan with live check-offs, undo, and 'See the work' for every exercise, including videos.",
+    "🎯 My Plan — build a plan around your goal: a preset focus or your own mix of up to 3 focus areas plus 1–3 basketball skills. Choose 4–12 weeks; the app builds it, ramps it up, eases off every fourth week, and tapers the finish.",
+    "🏆 Personal milestones — every plan brings its benchmark drills. Log your results and watch your bests climb.",
     "📝 Practice Log — record what you did around training, before or after.",
     "📅 Calendar — your past and future at a glance. Add games and practices, change times when plans move, and build a whole practice series in one go.",
     "🔔 Reminders — fuel-up and check-in nudges, plus a heads-up before each event you schedule.",

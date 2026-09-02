@@ -8,6 +8,7 @@ import {
   configureNotificationHandler,
   ensureDefaultRemindersScheduledAsync,
 } from "../src/services/notifications";
+import { HeaderBack } from "../src/components/HeaderBack";
 
 export default function RootLayout() {
   useEffect(() => {
@@ -34,19 +35,46 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ title: "Vikai Trainer" }} />
+        {/* Every sub-page carries a back control that works even with no
+            history (fresh deep-load): it falls back to navigating Home. */}
         <Stack.Screen
           name="checkin"
-          options={{ title: "3-Tap Check-In", presentation: "modal" }}
+          options={{
+            title: "3-Tap Check-In",
+            presentation: "modal",
+            headerBackVisible: false,
+            headerLeft: () => <HeaderBack />,
+          }}
         />
-        <Stack.Screen name="practice-log" options={{ title: "Practice Log" }} />
-        <Stack.Screen name="workout" options={{ title: "Today's Game Plan" }} />
-        <Stack.Screen name="history" options={{ title: "Calendar" }} />
+        <Stack.Screen
+          name="practice-log"
+          options={{ title: "Practice Log", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+        />
+        <Stack.Screen
+          name="workout"
+          options={{ title: "Today's Game Plan", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+        />
+        <Stack.Screen
+          name="history"
+          options={{ title: "Calendar", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+        />
         <Stack.Screen
           name="event-form"
-          options={{ title: "Add Event", presentation: "modal" }}
+          options={{
+            title: "Add Event",
+            presentation: "modal",
+            headerBackVisible: false,
+            headerLeft: () => <HeaderBack />,
+          }}
         />
-        <Stack.Screen name="about" options={{ title: "About Vikai Trainer" }} />
-        <Stack.Screen name="plan" options={{ title: "My Plan" }} />
+        <Stack.Screen
+          name="about"
+          options={{ title: "About Vikai Trainer", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+        />
+        <Stack.Screen
+          name="plan"
+          options={{ title: "My Plan", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+        />
       </Stack>
     </>
   );

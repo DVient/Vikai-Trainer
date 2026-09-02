@@ -389,6 +389,18 @@ describe("plan builder — store integration", () => {
     const plan = useAppStore.getState().buildTrainingPlan({ personaId: "GET_STRONGER", periodWeeks: 4 });
     expect(plan.startScale).toBeGreaterThan(0.75);
   });
+
+  it("buildTrainingPlan passes chosen skills through — they lead the plan", () => {
+    const plan = useAppStore.getState().buildTrainingPlan({
+      primaryGoals: ["SPEED"],
+      skillIds: ["skill-shooting", "skill-ballhandling"],
+      periodWeeks: 6,
+    });
+
+    expect(plan.components[0]?.id).toBe("skill-shooting");
+    expect(plan.components[1]?.id).toBe("skill-ballhandling");
+    expect(plan.components[0]?.priority).toBe(1);
+  });
 });
 
 describe("personal milestones — store integration", () => {

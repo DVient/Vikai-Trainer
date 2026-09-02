@@ -111,6 +111,8 @@ export interface VikaiTrainerAppState {
   buildTrainingPlan: (draft: {
     personaId?: PersonaId;
     primaryGoals?: TrainingGoal[];
+    /** Customized-path basketball skills (SKILL block ids), 1–3. */
+    skillIds?: string[];
     periodWeeks: number;
     startDate?: string;
   }) => BuiltPlan;
@@ -226,6 +228,7 @@ export const useAppStore = create<VikaiTrainerAppState>()(
           id: createLocalId("plan"),
           personaId: draft.personaId,
           primaryGoals: draft.primaryGoals,
+          skillIds: draft.skillIds,
           periodWeeks: draft.periodWeeks,
           startDate: draft.startDate ?? today,
           history,
