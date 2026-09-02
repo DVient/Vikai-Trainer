@@ -220,6 +220,18 @@ export function planStatus(
   return "active";
 }
 
+/** Athlete-facing phase label for today within the plan (pure). */
+export function planPhaseLabel(
+  plan: Pick<BuiltPlan, "startDate" | "periodWeeks">,
+  localDate: string,
+): string {
+  const weekIndex = weekIndexOf(plan, localDate);
+  if (weekIndex >= plan.periodWeeks) return "Complete";
+  if (weekIndex === plan.periodWeeks - 1) return "Taper week";
+  if (weekIndex % 4 === 3) return "Deload week";
+  return "Building";
+}
+
 /**
  * Exercise-rotation variant for ONE block of a plan on a date: a stable
  * seed from the plan identity (persona or goals + start date), the week

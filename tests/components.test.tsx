@@ -99,6 +99,7 @@ import type { ReactElement } from "react";
 
 import Index from "../app/index";
 import About from "../app/about";
+import Plan from "../app/plan";
 import CheckIn from "../app/checkin";
 import PracticeLog from "../app/practice-log";
 import Workout from "../app/workout";
@@ -156,6 +157,8 @@ function resetStore(): void {
     workoutLogs: [],
     workoutProgress: {},
     notificationIdentifiers: { scheduleReminders: {} },
+    activePlan: null,
+    personalBests: [],
   });
   searchParamsMock.eventId = undefined;
 }
@@ -908,6 +911,152 @@ describe("about screen — the teen-friendly app tour", () => {
 
     // Footer.
     expect(screen.getByText(/play long — not just hard/)).toBeTruthy();
+  });
+});
+
+describe("my plan — build, milestones, completion loop", () => {
+  it("opens from Home and builds a plan from a persona", () => {
+    render(<Index />);
+
+    fireEvent.click(screen.getByLabelText("Open my plan"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/plan");
+  });
+
+  it("walks the build flow: persona → weeks → build", () => {
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Focus: Jump higher"));
+    // Persona preset suggests 8 weeks; the value shows in the stepper.
+    expect(screen.getByText("8 weeks")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Build my plan"));
+
+    const plan = useAppStore.getState().activePlan;
+    expect(plan?.personaId).toBe("JUMP_HIGHER");
+    expect(plan?.periodWeeks).toBe(8);
+    // The active view appears with today's blocks and the milestone drills.
+    expect(screen.getByText(/Building · Week 1 of 8/)).toBeTruthy();
+    expect(screen.getByText("Personal milestones")).toBeTruthy();
+    expect(screen.getByText("Standing jump touch")).toBeTruthy();
+  });
+
+  it("supports the custom-goals path", () => {
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Goal Speed"));
+    fireEvent.click(screen.getByLabelText("Build my plan"));
+
+    expect(useAppStore.getState().activePlan?.primaryGoals).toEqual(["SPEED"]);
+  });
+
+  it("logs a milestone result and shows the best", () => {
+    useAppStore.setState({
+      activePlan: {
+        id: "plan-1",
+        startDate: localDate(0),
+        periodWeeks: 8,
+        primaryGoals: ["EXPLOSIVENESS", "STRENGTH"],
+        personaId: "JUMP_HIGHER",
+        startScale: 0.75,
+        components: [],
+      },
+    });
+
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Log result: Standing jump touch"));
+    fireEvent.change(screen.getByPlaceholderText("Result (cm)"), { target: { value: "42" } });
+    fireEvent.click(screen.getByLabelText("Save Standing jump touch result"));
+
+    const attempts = useAppStore.getState().personalBests;
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]).toMatchObject({ drillId: "jump-touch", value: 42 });
+    expect(screen.getByText("Best: 42 cm")).toBeTruthy();
+  });
+
+  it("shows the ended recap on the plan screen when the period is over", () => {
+    useAppStore.setState({
+      activePlan: {
+        id: "plan-1",
+        startDate: "2026-01-01",
+        periodWeeks: 4,
+        primaryGoals: ["STRENGTH"],
+        personaId: "GET_STRONGER",
+        startScale: 1,
+        components: [],
+      },
+    });
+
+    render(<Plan />);
+
+    expect(screen.getByText(/Period complete 🎉/)).toBeTruthy();
+    expect(screen.getByText(/Week 5 of 4|Complete/)).toBeTruthy();
+  });
+
+  it("prompts for a new goal on Home when the plan has ended", () => {
+    useAppStore.setState({
+      activePlan: {
+        id: "plan-1",
+        startDate: "2026-01-01",
+        periodWeeks: 4,
+        primaryGoals: ["STRENGTH"],
+        personaId: "GET_STRONGER",
+        startScale: 1,
+        components: [],
+      },
+    });
+
+    render(<Index />);
+
+    expect(screen.getByText(/plan is complete 🎉/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Set a new goal"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/plan");
+
+    // "Train without a plan" clears back to the default template.
+    fireEvent.click(screen.getByLabelText("Train without a plan"));
+    expect(useAppStore.getState().activePlan).toBeNull();
+  });
+
+  it("derives the cockpit prescription from the active plan", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      activePlan: {
+        id: "plan-1",
+        startDate: localDate(0),
+        periodWeeks: 8,
+        primaryGoals: ["SPEED"],
+        personaId: "FASTER_FIRST_STEP",
+        startScale: 1,
+        components: [
+          {
+            id: "acceleration-sprints",
+            type: "SPEED",
+            stress: "HIGH",
+            priority: 1,
+            baseVolume: 3,
+            optional: false,
+            bodyRegion: "FULL",
+            estimatedMinutes: 8,
+          },
+          {
+            id: "mobility-recovery",
+            type: "RECOVERY",
+            stress: "RECOVERY",
+            priority: 2,
+            baseVolume: 1,
+            optional: false,
+            bodyRegion: "FULL",
+            estimatedMinutes: 5,
+          },
+        ],
+      },
+    });
+
+    render(<Index />);
+
+    // The speed-first plan leads with the sprint block; the squat block
+    // from the default template is nowhere in today's prescription.
+    expect(screen.getByText(/Building · Week 1 of 8/)).toBeTruthy();
+    expect(screen.queryByLabelText("Toggle Squat pattern strength")).toBeNull();
   });
 });
 

@@ -8,12 +8,14 @@ import { toLocalDateString } from "../src/engine/autoregulation";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { buildSessionView } from "../src/lib/session";
-import { seasonPhaseFor } from "../src/plans/fall2026";
+import { seasonPhaseFor, exerciseDetailsFor } from "../src/plans/fall2026";
 import { powerBanner, powerLevel } from "../src/lib/power";
 import { tapHeavy, tapSuccess } from "../src/lib/haptics";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { activePlanForDay, blockVariant } from "../src/plans/planBuilder";
+import { libraryExerciseDetail } from "../src/plans/library";
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
@@ -35,7 +37,10 @@ export default function Workout() {
   const activityLogs = useAppStore((state) => state.activityLogs);
 
   const localToday = toLocalDateString(new Date(), profile.timezone);
-  const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
+  const activePlan = useAppStore((state) => state.activePlan);
+  // Built plans replace the default template; no plan ⇒ today's default.
+  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : DEFAULT_BASE_PLAN;
+  const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,
   });
@@ -50,6 +55,29 @@ export default function Workout() {
     tapSuccess();
     recordWorkoutLog({ activityDate: localToday, notes: undefined });
     router.navigate("/practice-log");
+  };
+
+  // Built plans rotate through their library pools; the default plan keeps
+  // the season-plan details.
+  const resolveDetail = (componentId: string) => {
+    if (activePlan !== null) {
+      const rotated = libraryExerciseDetail(
+        componentId,
+        blockVariant(activePlan, localToday, componentId),
+      );
+      if (rotated !== undefined) {
+        return {
+          componentId,
+          exercises: rotated.exercises.map((exercise) => ({
+            name: exercise.name,
+            prescription: exercise.prescription,
+            cue: exercise.cue,
+            videoQuery: exercise.videoQuery,
+          })),
+        };
+      }
+    }
+    return exerciseDetailsFor(componentId, localToday);
   };
 
   return (
@@ -132,6 +160,7 @@ export default function Workout() {
         view={session}
         localDate={localToday}
         onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
+        resolveDetail={resolveDetail}
       />
 
       {session.finishable && !hasWorkoutLogToday ? (

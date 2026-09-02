@@ -8,6 +8,8 @@ import { SessionChecklist } from "../src/components/SessionChecklist";
 import { StatusBanner } from "../src/components/StatusBanner";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { toLocalDateString } from "../src/engine/autoregulation";
+import { exerciseDetailsFor } from "../src/plans/fall2026";
+import { libraryExerciseDetail } from "../src/plans/library";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { nextUpcomingEvents, SCHEDULED_EVENT_LABELS } from "../src/lib/format";
 import { todaySteps } from "../src/lib/flow";
@@ -18,6 +20,8 @@ import { checkInStreak, powerLevel } from "../src/lib/power";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { activePlanForDay, blockVariant, planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
+import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
@@ -39,10 +43,15 @@ export default function Index() {
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
   const profile = useAppStore((state) => state.profile);
   const trainingObjective = useAppStore((state) => state.trainingObjective);
+  const activePlan = useAppStore((state) => state.activePlan);
+  const clearTrainingPlan = useAppStore((state) => state.clearTrainingPlan);
 
   const now = new Date();
   const localToday = toLocalDateString(now, profile.timezone);
-  const prescription = applyRestrictionsToBasePlan(DEFAULT_BASE_PLAN, result.restrictions, {
+  // Built plans replace the default template; no plan ⇒ exactly today's
+  // default 9-block behavior.
+  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : DEFAULT_BASE_PLAN;
+  const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,
   });
@@ -69,6 +78,29 @@ export default function Index() {
     tapSuccess();
     recordWorkoutLog({ activityDate: localToday, notes: undefined });
     router.navigate("/practice-log");
+  };
+
+  // Built plans rotate through their library pools; the default plan keeps
+  // the season-plan details.
+  const resolveDetail = (componentId: string) => {
+    if (activePlan !== null) {
+      const rotated = libraryExerciseDetail(
+        componentId,
+        blockVariant(activePlan, localToday, componentId),
+      );
+      if (rotated !== undefined) {
+        return {
+          componentId,
+          exercises: rotated.exercises.map((exercise) => ({
+            name: exercise.name,
+            prescription: exercise.prescription,
+            cue: exercise.cue,
+            videoQuery: exercise.videoQuery,
+          })),
+        };
+      }
+    }
+    return exerciseDetailsFor(componentId, localToday);
   };
   return (
     <>
@@ -169,6 +201,7 @@ export default function Index() {
           view={session}
           localDate={localToday}
           onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
+          resolveDetail={resolveDetail}
         />
 
         {session.finishable && !hasWorkoutLogToday ? (
@@ -257,6 +290,78 @@ export default function Index() {
         </View>
         <Text className="text-xl text-slate-500">›</Text>
       </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open my plan"
+        onPress={() => {
+          tapLight();
+          router.navigate("/plan");
+        }}
+        className={
+          activePlan !== null
+            ? "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-green-500/40 bg-green-500/10 p-4"
+            : "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+        }
+      >
+        <Text className="text-3xl">🎯</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-slate-50">
+            {activePlan !== null
+              ? `${personaById(activePlan.personaId ?? "ALL_ROUND")?.label ?? "Custom plan"}`
+              : "My Plan"}
+          </Text>
+          <Text className="text-sm text-slate-400">
+            {activePlan !== null
+              ? `${planPhaseLabel(activePlan, localToday)} · Week ${Math.min(weekIndexOf(activePlan, localToday) + 1, activePlan.periodWeeks)} of ${activePlan.periodWeeks}`
+              : "Build a plan around your goal"}
+          </Text>
+        </View>
+        <Text className="text-xl text-slate-500">›</Text>
+      </Pressable>
+
+      {activePlan !== null && planStatus(activePlan, localToday) === "final-week" ? (
+        <View className="rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-4">
+          <Text className="text-sm font-semibold text-yellow-300">
+            Last week of your plan — record fresh test results so your next plan
+            starts from reality.
+          </Text>
+        </View>
+      ) : null}
+
+      {activePlan !== null && planStatus(activePlan, localToday) === "ended" ? (
+        <View className="rounded-2xl border-2 border-green-500/40 bg-green-500/10 p-4">
+          <Text className="text-base font-bold text-green-300">
+            Your {activePlan.periodWeeks}-week plan is complete 🎉
+          </Text>
+          <Text className="mt-1 text-sm text-slate-300">
+            Ready for the next one? Set a new goal and the app will build your
+            next plan from everything you just did.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Set a new goal"
+            onPress={() => {
+              tapLight();
+              router.navigate("/plan");
+            }}
+            className="mt-3 h-12 items-center justify-center rounded-xl bg-green-500"
+          >
+            <Text className="text-sm font-black text-slate-950">Set a new goal 🎯</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Train without a plan"
+            onPress={() => {
+              tapLight();
+              clearTrainingPlan();
+            }}
+            className="mt-2 h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+          >
+            <Text className="text-sm font-bold text-slate-300">Train without a plan</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {result.requiresAdultAttention ? (
         <View className="rounded-2xl border-2 border-red-500/40 bg-slate-800 p-4">

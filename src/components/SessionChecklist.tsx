@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { BASE_PLAN_TITLES } from "../plans/basePlan";
+import { libraryBlockById } from "../plans/library";
 import { exerciseDetailsFor, type ComponentDetail } from "../plans/fall2026";
 import { tapLight } from "../lib/haptics";
 import type { SessionRow, SessionView } from "../lib/session";
@@ -24,12 +25,19 @@ interface SessionChecklistProps {
   /** Local date used to resolve the season plan's exercise detail. */
   localDate: string;
   onToggle: (componentId: string, sets: number) => void;
+  /**
+   * Optional detail resolver: built plans rotate through their block
+   * library's exercise pools; the default (fall2026 season plan) applies
+   * when omitted.
+   */
+  resolveDetail?: (componentId: string) => ComponentDetail | undefined;
 }
 
-export function SessionChecklist({ view, localDate, onToggle }: SessionChecklistProps) {
+export function SessionChecklist({ view, localDate, onToggle, resolveDetail }: SessionChecklistProps) {
   const remaining = view.rows.filter((row) => row.state === "remaining");
   const done = view.rows.filter((row) => row.state === "done");
   const skipped = view.rows.filter((row) => row.state === "skipped");
+  const resolve = resolveDetail ?? ((componentId: string) => exerciseDetailsFor(componentId, localDate));
 
   return (
     <View className="gap-2">
@@ -37,7 +45,7 @@ export function SessionChecklist({ view, localDate, onToggle }: SessionChecklist
         <ChecklistRow
           key={row.componentId}
           row={row}
-          localDate={localDate}
+          resolveDetail={resolve}
           onToggle={onToggle}
         />
       ))}
@@ -47,7 +55,7 @@ export function SessionChecklist({ view, localDate, onToggle }: SessionChecklist
             <ChecklistRow
               key={row.componentId}
               row={row}
-              localDate={localDate}
+              resolveDetail={resolve}
               onToggle={onToggle}
             />
           ))}
@@ -59,7 +67,7 @@ export function SessionChecklist({ view, localDate, onToggle }: SessionChecklist
             Adjusted out today
           </Text>
           {skipped.map((row) => (
-            <ChecklistRow key={row.componentId} row={row} localDate={localDate} />
+            <ChecklistRow key={row.componentId} row={row} resolveDetail={resolve} />
           ))}
         </View>
       ) : null}
@@ -69,15 +77,16 @@ export function SessionChecklist({ view, localDate, onToggle }: SessionChecklist
 
 function ChecklistRow({
   row,
-  localDate,
+  resolveDetail,
   onToggle,
 }: {
   row: SessionRow;
-  localDate: string;
+  resolveDetail: (componentId: string) => ComponentDetail | undefined;
   onToggle?: (componentId: string, sets: number) => void;
 }) {
-  const title = BASE_PLAN_TITLES[row.componentId] ?? row.componentId;
-  const detail = exerciseDetailsFor(row.componentId, localDate);
+  const title =
+    BASE_PLAN_TITLES[row.componentId] ?? libraryBlockById(row.componentId)?.title ?? row.componentId;
+  const detail = resolveDetail(row.componentId);
   const done = row.state === "done";
   const locked = onToggle === undefined;
 

@@ -46,6 +46,7 @@ export default function RootLayout() {
           options={{ title: "Add Event", presentation: "modal" }}
         />
         <Stack.Screen name="about" options={{ title: "About Vikai Trainer" }} />
+        <Stack.Screen name="plan" options={{ title: "My Plan" }} />
       </Stack>
     </>
   );
