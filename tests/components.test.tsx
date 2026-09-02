@@ -60,11 +60,20 @@ vi.mock("expo-notifications", () => ({
   AndroidImportance: { DEFAULT: 5, HIGH: 6 },
 }));
 
+// Captures per-screen <Stack.Screen options={...}> so header wiring
+// (headerRight buttons) is assertable — jsdom never renders native headers.
+const stackScreenOptionsSpy = vi.hoisted(() => vi.fn<(options: unknown) => void>(() => undefined));
+
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
   useLocalSearchParams: () => searchParamsMock,
   Link: () => null,
-  Stack: { Screen: () => null },
+  Stack: {
+    Screen: (props: { options?: unknown }) => {
+      stackScreenOptionsSpy(props.options);
+      return null;
+    },
+  },
 }));
 
 const searchParamsMock = vi.hoisted(() => ({ eventId: undefined as string | undefined }));
@@ -85,6 +94,8 @@ vi.mock("react-native", async () => {
   mod.Linking = { openURL: linkingOpenSpy };
   return mod;
 });
+
+import type { ReactElement } from "react";
 
 import Index from "../app/index";
 import About from "../app/about";
@@ -154,6 +165,7 @@ beforeEach(() => {
   routerMock.navigate.mockClear();
   routerMock.replace.mockClear();
   linkingOpenSpy.mockClear();
+  stackScreenOptionsSpy.mockClear();
   notificationsSpy.schedule.mockClear();
   notificationsSpy.cancel.mockClear();
 });
@@ -843,9 +855,18 @@ describe("editable entries: scheduled list, reschedule resync, activity edit", (
 });
 
 describe("about screen — the teen-friendly app tour", () => {
-  it("opens from Home in one tap", () => {
+  it("wires a question-mark button into the Home header pointing at the tour", () => {
     render(<Index />);
 
+    // The header button is declared via <Stack.Screen options={{ headerRight }}>
+    // — the spy captures it because jsdom never renders the native header.
+    const headerEntry = stackScreenOptionsSpy.mock.calls
+      .map((call) => call[0] as { headerRight?: () => ReactElement })
+      .find((options) => typeof options?.headerRight === "function");
+    expect(headerEntry).toBeDefined();
+
+    // Render the header button the way the native header would, then tap it.
+    render((headerEntry?.headerRight ?? (() => null))());
     fireEvent.click(screen.getByLabelText("How this app works"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/about");
   });
