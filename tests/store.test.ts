@@ -33,6 +33,8 @@ const INITIAL_SLICES = {
   workoutLogs: [],
   workoutProgress: {},
   notificationIdentifiers: { scheduleReminders: {} },
+  activePlan: null,
+  personalBests: [],
 } satisfies Partial<VikaiTrainerAppState>;
 
 function resetStore(): void {
@@ -344,6 +346,67 @@ describe("workout progress — live session check-offs (guided flow)", () => {
     expect(second).toMatchObject({ componentId: "a", sets: 2 });
     expect(second?.completedAt ?? "").toBeTruthy();
     expect((second?.completedAt ?? "") >= (first?.completedAt ?? "")).toBe(true);
+  });
+});
+
+describe("plan builder — store integration", () => {
+  it("builds and activates a plan from a persona draft", () => {
+    const plan = useAppStore.getState().buildTrainingPlan({
+      personaId: "JUMP_HIGHER",
+      periodWeeks: 8,
+    });
+
+    const state = useAppStore.getState();
+    expect(state.activePlan?.id).toBe(plan.id);
+    expect(state.activePlan?.primaryGoals).toEqual(["EXPLOSIVENESS", "STRENGTH"]);
+    expect(state.activePlan?.startScale).toBeCloseTo(0.75, 5);
+    for (const component of plan.components) {
+      expect(component.id).toBeTruthy();
+      expect(component.priority).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("rebuilding with identical inputs is idempotent; clearing returns to default", () => {
+    const first = useAppStore.getState().buildTrainingPlan({ personaId: "ALL_ROUND", periodWeeks: 6 });
+    const second = useAppStore.getState().buildTrainingPlan({ personaId: "ALL_ROUND", periodWeeks: 6 });
+    expect(first.components).toEqual(second.components);
+    expect(second.id).not.toBe(first.id); // new plan record, same shape
+
+    useAppStore.getState().clearTrainingPlan();
+    expect(useAppStore.getState().activePlan).toBeNull();
+  });
+
+  it("history feeds the calibration: logged workouts raise the start scale", () => {
+    const now = new Date();
+    const logs = Array.from({ length: 8 }, (_, index) => ({
+      id: `w${index}`,
+      activityDate: "2026-01-02",
+      createdAt: new Date(now.getTime() - index * 86_400_000).toISOString(),
+      updatedAt: now.toISOString(),
+    }));
+    useAppStore.setState({ workoutLogs: logs });
+
+    const plan = useAppStore.getState().buildTrainingPlan({ personaId: "GET_STRONGER", periodWeeks: 4 });
+    expect(plan.startScale).toBeGreaterThan(0.75);
+  });
+});
+
+describe("personal milestones — store integration", () => {
+  it("logs attempts with full history (no overwriting)", () => {
+    const first = useAppStore.getState().addPersonalBest({ drillId: "jump-touch", value: 40 });
+    const second = useAppStore.getState().addPersonalBest({ drillId: "jump-touch", value: 46 });
+
+    const attempts = useAppStore.getState().personalBests;
+    expect(attempts).toHaveLength(2);
+    expect(attempts.map((entry) => entry.id)).toEqual([first.id, second.id]);
+    expect(second.activityDate).toBeTruthy();
+  });
+
+  it("removes a mistyped attempt", () => {
+    const attempt = useAppStore.getState().addPersonalBest({ drillId: "sprint-20yd", value: 3.1 });
+    useAppStore.getState().addPersonalBest({ drillId: "sprint-20yd", value: 3.0 });
+    useAppStore.getState().removePersonalBest(attempt.id);
+    expect(useAppStore.getState().personalBests).toHaveLength(1);
   });
 });
 

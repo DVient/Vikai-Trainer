@@ -362,3 +362,64 @@ export interface NotificationIdentifiers {
   /** SCHEDULE_REMINDER per scheduled event, keyed by event id. */
   scheduleReminders: Record<string, string>;
 }
+
+/* ──────────────── Plan Builder — personas, milestones, plans ──────────── */
+
+/** Persona archetypes the athlete can base a plan on (Plan Builder). */
+export type PersonaId =
+  | "JUMP_HIGHER"
+  | "GET_STRONGER"
+  | "FASTER_FIRST_STEP"
+  | "TWO_WAY_ENGINE"
+  | "ALL_ROUND"
+  | "HANDLES_PRESSURE"
+  | "CATCH_SHOOT"
+  | "FINISHING_RIM"
+  | "COURT_VISION";
+
+/**
+ * A benchmark drill that measures a training capacity. Fixed protocol text
+ * makes re-tests comparable — the drill catalog is curated data, and each
+ * entry carries a one-line basis note so the pairing is inspectable.
+ */
+export interface MilestoneDrill {
+  id: string;
+  label: string;
+  /** The training capacity this drill is a field proxy for. */
+  goal: TrainingGoal;
+  unit: "reps" | "seconds" | "cm" | "count";
+  higherIsBetter: boolean;
+  /** Fixed procedure shown whenever a result is logged. */
+  protocol: string;
+  /** One line on why this drill measures the construct. */
+  basis: string;
+}
+
+/** One logged attempt at a benchmark drill. Attempts are never overwritten. */
+export interface PersonalBest {
+  id: string;
+  drillId: string;
+  value: number;
+  /** ISO instant of the entry. */
+  recordedAt: string;
+  /** Local calendar date, YYYY-MM-DD. */
+  activityDate: string;
+}
+
+/** A built training plan: the athlete's active base plan for its period. */
+export interface BuiltPlan {
+  id: string;
+  /** First day of the plan, local date YYYY-MM-DD (week 1 starts here). */
+  startDate: string;
+  /** 4–12. */
+  periodWeeks: number;
+  primaryGoals: TrainingGoal[];
+  personaId?: PersonaId;
+  /** The week-1 session template (progression scales it per day). */
+  components: TrainingComponent[];
+  /** History-calibrated starting volume factor (0.7–1.0). */
+  startScale: number;
+}
+
+/** Where a built plan is in its life, derived purely from date + period. */
+export type PlanStatus = "active" | "final-week" | "ended";

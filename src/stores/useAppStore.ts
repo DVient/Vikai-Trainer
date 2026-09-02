@@ -22,15 +22,21 @@ import {
   DEFAULT_OBJECTIVE,
   type ActivityLog,
   type AthleteProfile,
+  type BuiltPlan,
   type CompletedComponent,
   type NotificationIdentifiers,
   type NotificationSlot,
+  type PersonalBest,
+  type PersonaId,
   type ReadinessInput,
   type ScheduledEvent,
+  type TrainingGoal,
   type TrainingObjective,
   type WorkoutLog,
 } from "../types";
 import { DEFAULT_ATHLETE_PROFILE } from "../config/defaults";
+import { buildPlan, type PlanHistorySnapshot } from "../plans/planBuilder";
+import { toLocalDateString } from "../engine/autoregulation";
 
 /** Collision-resistant local identifier (no native crypto dependency). */
 function createLocalId(prefix: string): string {
@@ -60,6 +66,10 @@ export interface VikaiTrainerAppState {
   workoutProgress: Record<string, Record<string, CompletedComponent>>;
   /** Per-notification identifier tracking (SPEC §35 / AGENTS.md guardrail). */
   notificationIdentifiers: NotificationIdentifiers;
+  /** The athlete's active built plan; null = the default 9-block template. */
+  activePlan: BuiltPlan | null;
+  /** Benchmark attempts, full history (PB = best per drill, derived). */
+  personalBests: PersonalBest[];
 
   /* ── Actions ── */
   /** Replaces the profile on confirmation (SPEC §32 overwrite semantics). */
@@ -97,6 +107,19 @@ export interface VikaiTrainerAppState {
   storeNotificationId: (slot: NotificationSlot, id: string | null) => void;
   /** Tracks (or clears, with null) a per-event SCHEDULE_REMINDER identifier. */
   setScheduleReminderId: (eventId: string, id: string | null) => void;
+  /** Builds and activates a training plan from the draft + current history. */
+  buildTrainingPlan: (draft: {
+    personaId?: PersonaId;
+    primaryGoals?: TrainingGoal[];
+    periodWeeks: number;
+    startDate?: string;
+  }) => BuiltPlan;
+  /** Clears the active plan — the app returns to the default template. */
+  clearTrainingPlan: () => void;
+  /** Logs one benchmark attempt (history is never overwritten). */
+  addPersonalBest: (draft: { drillId: string; value: number; activityDate?: string }) => PersonalBest;
+  /** Removes a mistyped benchmark attempt. */
+  removePersonalBest: (id: string) => void;
 }
 
 export const useAppStore = create<VikaiTrainerAppState>()(
@@ -110,6 +133,8 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       workoutLogs: [],
       workoutProgress: {},
       notificationIdentifiers: { scheduleReminders: {} },
+      activePlan: null,
+      personalBests: [],
 
       setProfile: (profile) => {
         set({ profile });
@@ -164,6 +189,72 @@ export const useAppStore = create<VikaiTrainerAppState>()(
           activityLogs: state.activityLogs.map((entry) =>
             entry.id === id ? { ...entry, ...patch, updatedAt: new Date().toISOString() } : entry,
           ),
+        }));
+      },
+
+      buildTrainingPlan: (draft) => {
+        const state = get();
+        const now = new Date();
+        const today = toLocalDateString(now, state.profile.timezone);
+        const cutoff28 = new Date(now.getTime() - 28 * 86_400_000).toISOString();
+        const workoutsLast28d = state.workoutLogs.filter(
+          (entry) => entry.createdAt >= cutoff28,
+        ).length;
+        // Daily activity load (sessionRpe × duration) averaged over the last
+        // 7 local dates; null when nothing was logged — the builder treats
+        // that as "no load signal" rather than zero strain.
+        const loadByDay = new Map<string, number>();
+        for (const entry of state.activityLogs) {
+          const load = (entry.sessionRpe ?? 0) * (entry.durationMinutes ?? 0);
+          loadByDay.set(entry.activityDate, (loadByDay.get(entry.activityDate) ?? 0) + load);
+        }
+        let loadSum = 0;
+        let loadDays = 0;
+        for (let offset = 0; offset < 7; offset += 1) {
+          const day = toLocalDateString(new Date(now.getTime() - offset * 86_400_000), state.profile.timezone);
+          const load = loadByDay.get(day);
+          if (load !== undefined) {
+            loadSum += load;
+            loadDays += 1;
+          }
+        }
+        const history: PlanHistorySnapshot = {
+          workoutsLast28d,
+          avgDailyLoad7d: loadDays > 0 ? loadSum / 7 : null,
+        };
+        const plan = buildPlan({
+          id: createLocalId("plan"),
+          personaId: draft.personaId,
+          primaryGoals: draft.primaryGoals,
+          periodWeeks: draft.periodWeeks,
+          startDate: draft.startDate ?? today,
+          history,
+        });
+        set({ activePlan: plan });
+        return plan;
+      },
+
+      clearTrainingPlan: () => {
+        set({ activePlan: null });
+      },
+
+      addPersonalBest: (draft) => {
+        const state = get();
+        const record: PersonalBest = {
+          id: createLocalId("milestone"),
+          drillId: draft.drillId,
+          value: draft.value,
+          recordedAt: new Date().toISOString(),
+          activityDate:
+            draft.activityDate ?? toLocalDateString(new Date(), state.profile.timezone),
+        };
+        set((current) => ({ personalBests: [...current.personalBests, record] }));
+        return record;
+      },
+
+      removePersonalBest: (id) => {
+        set((state) => ({
+          personalBests: state.personalBests.filter((entry) => entry.id !== id),
         }));
       },
 
