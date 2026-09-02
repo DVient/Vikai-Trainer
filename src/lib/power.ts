@@ -43,16 +43,7 @@ export function powerLevel(result: EngineResult): PowerView {
   }
 }
 
-/** Game Plan banner copy, e.g. "100% Full Send 🔥" / "60% Power Save 🌙". */
-export function powerBanner(power: PowerView): string {
-  if (power.percent === null) return `${power.label} ⚡`;
-  if (power.percent === 100) return "100% Full Send 🔥";
-  if (power.percent === 0) return "0% Shielded 🛡️";
-  return `${power.percent}% ${power.label} 🌙`;
-}
-
-/**
- * Consecutive check-in days ending today (or yesterday, when today's check-in
+/** Consecutive check-in days ending today (or yesterday, when today's check-in
  * is still pending — the streak survives the day until it ends).
  */
 export function checkInStreak(

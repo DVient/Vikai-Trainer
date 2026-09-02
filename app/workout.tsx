@@ -9,10 +9,9 @@ import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { buildSessionView } from "../src/lib/session";
 import { seasonPhaseFor, exerciseDetailsFor } from "../src/plans/fall2026";
-import { powerBanner, powerLevel } from "../src/lib/power";
+import { powerLevel } from "../src/lib/power";
 import { tapHeavy, tapSuccess } from "../src/lib/haptics";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
-import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
 import { activePlanForDay, blockVariant } from "../src/plans/planBuilder";
 import { libraryExerciseDetail } from "../src/plans/library";
@@ -91,9 +90,6 @@ export default function Workout() {
         label={power.label}
         sublabel={hasWorkoutLogToday ? "Session complete ✓" : undefined}
       />
-      <Text className="text-center text-2xl font-black text-slate-50">
-        {powerBanner(power)}
-      </Text>
 
       <StatusBanner status={result.status} reasons={result.reasons} />
 
@@ -195,12 +191,6 @@ export default function Workout() {
       >
         <Text className="text-base font-bold text-slate-100">📝 Log an activity</Text>
       </Pressable>
-
-      {result.requiresAdultAttention ? (
-        <View className="rounded-2xl border-2 border-red-500/40 bg-slate-800 p-4">
-          <Text className="text-sm font-semibold text-red-300">{ADULT_ATTENTION_MESSAGE}</Text>
-        </View>
-      ) : null}
     </ScrollView>
   );
 }

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
  * Design refresh — power gauge / streak helpers (pure presentation math).
  */
 
-import { checkInStreak, powerBanner, powerLevel } from "../src/lib/power";
+import { checkInStreak, powerLevel } from "../src/lib/power";
 import { evaluateAutoregulationEngine } from "../src/engine/autoregulation";
 import { DEFAULT_ATHLETE_PROFILE, } from "../src/config/defaults";
 import { DEFAULT_OBJECTIVE, type EngineResult, type ReadinessInput } from "../src/types";
@@ -72,23 +72,6 @@ describe("powerLevel — engine status → battery", () => {
     };
     const power = powerLevel(resultFor(pain));
     expect(power).toEqual({ percent: 0, tone: "red", label: "Shielded" });
-  });
-});
-
-describe("powerBanner — Game Plan multiplier copy", () => {
-  it("formats the full-send / power-save / shielded lines", () => {
-    expect(powerBanner({ percent: 100, tone: "green", label: "Full Send" })).toBe(
-      "100% Full Send 🔥",
-    );
-    expect(powerBanner({ percent: 60, tone: "yellow", label: "Power Save" })).toBe(
-      "60% Power Save 🌙",
-    );
-    expect(powerBanner({ percent: 0, tone: "red", label: "Shielded" })).toBe(
-      "0% Shielded 🛡️",
-    );
-    expect(powerBanner({ percent: null, tone: "neutral", label: "Tap to charge" })).toBe(
-      "Tap to charge ⚡",
-    );
   });
 });
 

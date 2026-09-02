@@ -4,12 +4,8 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { DayStepper } from "../src/components/DayStepper";
 import { PowerGauge } from "../src/components/PowerGauge";
 import { ReminderStatusChip } from "../src/components/ReminderStatusChip";
-import { SessionChecklist } from "../src/components/SessionChecklist";
-import { StatusBanner } from "../src/components/StatusBanner";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { toLocalDateString } from "../src/engine/autoregulation";
-import { exerciseDetailsFor } from "../src/plans/fall2026";
-import { libraryExerciseDetail } from "../src/plans/library";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { nextUpcomingEvents, SCHEDULED_EVENT_LABELS } from "../src/lib/format";
 import { todaySteps } from "../src/lib/flow";
@@ -19,17 +15,20 @@ import { partitionActivities } from "../src/lib/activityTiming";
 import { checkInStreak, powerLevel } from "../src/lib/power";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
-import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
-import { activePlanForDay, blockVariant, planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
+import { BASE_PLAN_TITLES, DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { activePlanForDay, planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
+import { libraryBlockById } from "../src/plans/library";
 import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
- * Home Hub (live session cockpit): the Ready State battery and today's full
- * Game Plan live together. The athlete checks off components as they do
- * them; logging an activity mid-session re-derives restrictions and the
- * remaining rows re-scale in place — completed ones keep credit. GREEN can
- * never display without today's check-in (SPEC §27 rule).
+ * Home Hub: the Ready State battery, the guided day flow, the athlete's
+ * plan, and a compact Game Plan summary that opens the full session on
+ * /workout — where blocks are checked off and logging mid-session re-scales
+ * the remaining rows. The battery alone carries the engine state (GO /
+ * Power Save / Shielded); reason chips live on the session screen where
+ * the athlete acts on them. GREEN can never display without today's
+ * check-in (SPEC §27 rule).
  */
 export default function Index() {
   const router = useRouter();
@@ -39,7 +38,6 @@ export default function Index() {
   const activityLogs = useAppStore((state) => state.activityLogs);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const workoutProgress = useAppStore((state) => state.workoutProgress);
-  const toggleComponentDone = useAppStore((state) => state.toggleComponentDone);
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
   const profile = useAppStore((state) => state.profile);
   const trainingObjective = useAppStore((state) => state.trainingObjective);
@@ -80,28 +78,15 @@ export default function Index() {
     router.navigate("/practice-log");
   };
 
-  // Built plans rotate through their library pools; the default plan keeps
-  // the season-plan details.
-  const resolveDetail = (componentId: string) => {
-    if (activePlan !== null) {
-      const rotated = libraryExerciseDetail(
-        componentId,
-        blockVariant(activePlan, localToday, componentId),
-      );
-      if (rotated !== undefined) {
-        return {
-          componentId,
-          exercises: rotated.exercises.map((exercise) => ({
-            name: exercise.name,
-            prescription: exercise.prescription,
-            cue: exercise.cue,
-            videoQuery: exercise.videoQuery,
-          })),
-        };
-      }
-    }
-    return exerciseDetailsFor(componentId, localToday);
-  };
+  // The summary card names the next block to do — same title resolution
+  // the session screen's checklist uses.
+  const nextUp = session.rows.find((row) => row.state === "remaining");
+  const nextUpTitle =
+    nextUp !== undefined
+      ? (BASE_PLAN_TITLES[nextUp.componentId] ??
+        libraryBlockById(nextUp.componentId)?.title ??
+        nextUp.componentId)
+      : undefined;
   return (
     <>
       <Stack.Screen
@@ -148,7 +133,11 @@ export default function Index() {
         sublabel={hasCheckedInToday ? "Checked in ✓" : "Check-in pending"}
       />
 
-      <StatusBanner status={result.status} reasons={result.reasons} />
+      {result.requiresAdultAttention ? (
+        <View className="rounded-2xl border-2 border-red-500/40 bg-slate-800 p-4">
+          <Text className="text-sm font-semibold text-red-300">{ADULT_ATTENTION_MESSAGE}</Text>
+        </View>
+      ) : null}
 
       <ReminderStatusChip />
 
@@ -177,119 +166,6 @@ export default function Index() {
       </Pressable>
 
       <DayStepper steps={steps} onStepPress={(_id, route) => router.navigate(route)} />
-
-      <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4 gap-3">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-base font-black text-slate-50">Today's Game Plan</Text>
-          <Text className="text-xs font-semibold text-slate-400">
-            {session.doneCount}/{session.doneCount + session.remainingCount} checked off
-          </Text>
-        </View>
-
-        {hasWorkoutLogToday ? (
-          <Text className="rounded-xl bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
-            Session complete 🎉
-          </Text>
-        ) : (
-          <Text className="text-xs text-slate-400">
-            Check off each block as you go. Logs update the remaining volume
-            automatically 🔄
-          </Text>
-        )}
-
-        <SessionChecklist
-          view={session}
-          localDate={localToday}
-          onToggle={(componentId, sets) => toggleComponentDone(localToday, componentId, sets)}
-          resolveDetail={resolveDetail}
-        />
-
-        {session.finishable && !hasWorkoutLogToday ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Finish workout"
-            onPress={finish}
-            className="h-14 items-center justify-center rounded-xl bg-green-500"
-          >
-            <Text className="text-base font-black text-slate-950">Finish workout 🏁</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <View className="flex-row gap-3">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Log an activity"
-          onPress={() => router.navigate("/practice-log")}
-          className="min-h-[64px] flex-1 items-center justify-center rounded-2xl border-2 border-slate-700 bg-slate-800 p-3"
-        >
-          <Text className="text-2xl">📝</Text>
-          <Text className="text-sm font-bold text-slate-50">Log activity</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open full plan"
-          onPress={() => router.navigate("/workout")}
-          className="min-h-[64px] flex-1 items-center justify-center rounded-2xl border-2 border-slate-700 bg-slate-800 p-3"
-        >
-          <Text className="text-2xl">📋</Text>
-          <Text className="text-sm font-bold text-slate-50">Full plan</Text>
-        </Pressable>
-      </View>
-
-      {nextGame ? (
-        <View className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
-          <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            Next game
-          </Text>
-          <Text className="mt-1 text-lg font-black text-slate-50">{nextGame.countdown}</Text>
-          <Text className="text-sm text-slate-400">
-            Fresh legs win games — protect them today.
-          </Text>
-        </View>
-      ) : null}
-
-      {upcoming.length > 0 ? (
-        <View className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
-          <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            Upcoming
-          </Text>
-          {upcoming.map((view) => (
-            <Pressable
-              key={view.event.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit event: ${SCHEDULED_EVENT_LABELS[view.event.eventType]}`}
-              onPress={() => {
-                tapLight();
-                router.navigate(`/event-form?eventId=${view.event.id}`);
-              }}
-              className="min-h-[48px] mt-1 flex-row items-center justify-between"
-            >
-              <Text className="text-sm font-semibold text-slate-100">
-                {SCHEDULED_EVENT_LABELS[view.event.eventType]}
-              </Text>
-              <View className="flex-row items-center gap-2">
-                <Text className="text-sm text-slate-400">{view.countdown}</Text>
-                <Text className="text-sm text-slate-500">›</Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open calendar"
-        onPress={() => router.navigate("/history")}
-        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
-      >
-        <Text className="text-3xl">📅</Text>
-        <View className="flex-1">
-          <Text className="text-base font-bold text-slate-50">Calendar</Text>
-          <Text className="text-sm text-slate-400">Past sessions & upcoming events</Text>
-        </View>
-        <Text className="text-xl text-slate-500">›</Text>
-      </Pressable>
 
       <Pressable
         accessibilityRole="button"
@@ -363,11 +239,157 @@ export default function Index() {
         </View>
       ) : null}
 
-      {result.requiresAdultAttention ? (
-        <View className="rounded-2xl border-2 border-red-500/40 bg-slate-800 p-4">
-          <Text className="text-sm font-semibold text-red-300">{ADULT_ATTENTION_MESSAGE}</Text>
+      <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4 gap-3">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-base font-black text-slate-50">Today's Game Plan</Text>
+          <Text className="text-xs font-semibold text-slate-400">
+            {session.doneCount}/{session.doneCount + session.remainingCount} checked off
+          </Text>
+        </View>
+
+        {hasWorkoutLogToday ? (
+          <>
+            <Text className="rounded-xl bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
+              Session complete 🎉
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open practice log"
+              onPress={() => {
+                tapLight();
+                router.navigate("/practice-log");
+              }}
+              className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+            >
+              <Text className="text-sm font-bold text-slate-100">
+                Log how it went 📝
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            {nextUpTitle !== undefined ? (
+              <Text className="text-sm text-slate-300">
+                Up next: <Text className="font-bold text-slate-100">{nextUpTitle}</Text>
+                {session.remainingCount > 1
+                  ? ` · ${session.remainingCount} blocks to go`
+                  : ""}
+              </Text>
+            ) : null}
+            {session.skippedCount > 0 ? (
+              <Text className="text-xs text-slate-400">
+                {session.skippedCount === 1
+                  ? "1 block adjusted out today"
+                  : `${session.skippedCount} blocks adjusted out today`}{" "}
+                — the session screen shows why.
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open today's session"
+              onPress={() => {
+                tapLight();
+                router.navigate("/workout");
+              }}
+              className="h-14 items-center justify-center rounded-xl bg-green-500"
+            >
+              <Text className="text-base font-black text-slate-950">
+                Open today's session →
+              </Text>
+            </Pressable>
+          </>
+        )}
+
+        {session.finishable && !hasWorkoutLogToday ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Finish workout"
+            onPress={finish}
+            className="h-14 items-center justify-center rounded-xl border-2 border-green-500 bg-green-500/10"
+          >
+            <Text className="text-base font-black text-green-300">Finish workout 🏁</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Log an activity"
+        onPress={() => router.navigate("/practice-log")}
+        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+      >
+        <Text className="text-2xl">📝</Text>
+        <View className="flex-1">
+          <Text className="text-sm font-bold text-slate-50">Log activity</Text>
+          <Text className="text-xs text-slate-400">
+            What you did shapes today's volume — and your next workout
+          </Text>
+        </View>
+        <Text className="text-xl text-slate-500">›</Text>
+      </Pressable>
+
+      {upcoming.length > 0 ? (
+        <View className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
+          {nextGame ? (
+            <View className="mb-1">
+              <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                Next game
+              </Text>
+              <Text className="mt-0.5 text-lg font-black text-slate-50">
+                {nextGame.countdown}
+              </Text>
+              <Text className="text-sm text-slate-400">
+                Fresh legs win games — protect them today.
+              </Text>
+            </View>
+          ) : null}
+          <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            Upcoming
+          </Text>
+          {upcoming.map((view) => (
+            <Pressable
+              key={view.event.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit event: ${SCHEDULED_EVENT_LABELS[view.event.eventType]}`}
+              onPress={() => {
+                tapLight();
+                router.navigate(`/event-form?eventId=${view.event.id}`);
+              }}
+              className="min-h-[48px] mt-1 flex-row items-center justify-between"
+            >
+              <Text className="text-sm font-semibold text-slate-100">
+                {SCHEDULED_EVENT_LABELS[view.event.eventType]}
+              </Text>
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className={`text-sm ${
+                    view.event.eventType === "GAME"
+                      ? "font-bold text-orange-300"
+                      : "text-slate-400"
+                  }`}
+                >
+                  {view.countdown}
+                </Text>
+                <Text className="text-sm text-slate-500">›</Text>
+              </View>
+            </Pressable>
+          ))}
         </View>
       ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open calendar"
+        onPress={() => router.navigate("/history")}
+        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+      >
+        <Text className="text-3xl">📅</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-slate-50">Calendar</Text>
+          <Text className="text-sm text-slate-400">Past sessions & upcoming events</Text>
+        </View>
+        <Text className="text-xl text-slate-500">›</Text>
+      </Pressable>
     </ScrollView>
     </>
   );

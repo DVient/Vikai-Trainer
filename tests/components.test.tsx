@@ -192,14 +192,15 @@ describe("home hub (app/index)", () => {
     render(<Index />);
 
     expect(screen.getByText("Vikai Trainer")).toBeTruthy();
-    expect(screen.getByText("GO 🟢")).toBeTruthy();
     expect(screen.getByText("100%")).toBeTruthy();
     expect(screen.getByText("Full Send")).toBeTruthy();
     expect(screen.getByText("🔥 2-day streak")).toBeTruthy();
-    // The workout lives on Home, ready to be checked off.
+    // The battery alone carries the engine state on Home — no status banner.
+    expect(screen.queryByText("GO 🟢")).toBeNull();
+    // The Game Plan summary opens the full session on /workout.
     expect(screen.getByText("Today's Game Plan")).toBeTruthy();
     expect(screen.getByText("0/9 checked off")).toBeTruthy();
-    expect(screen.getByText(/Check off each block as you go/)).toBeTruthy();
+    expect(screen.getByLabelText("Open today's session")).toBeTruthy();
     expect(screen.queryByText(ADULT_ATTENTION_MESSAGE)).toBeNull();
   });
 
@@ -208,9 +209,11 @@ describe("home hub (app/index)", () => {
 
     render(<Index />);
 
+    // The battery alone carries the state on Home — neutral charge prompt.
     expect(screen.queryByText("GO 🟢")).toBeNull();
-    expect(screen.getByText("Tap to charge ⚡")).toBeTruthy();
-    expect(screen.getByText("No check-in yet")).toBeTruthy();
+    expect(screen.getByText("?")).toBeTruthy();
+    expect(screen.getByText("Tap to charge")).toBeTruthy();
+    expect(screen.getByText("Check-in pending")).toBeTruthy();
   });
 
   it("encourages the check-in and shows its timestamp once done", () => {
@@ -244,12 +247,16 @@ describe("home hub (app/index)", () => {
 
     render(<Index />);
 
-    expect(screen.getByText("SHIELD 🔴")).toBeTruthy();
+    // The battery alone carries the state — Shielded at 0%, no banner.
     expect(screen.getByText("0%")).toBeTruthy();
-    expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(2);
-    // All nine blocks sit in the adjusted-out group; nothing is checkable.
-    expect(screen.getByText("Adjusted out today")).toBeTruthy();
-    expect(screen.getAllByText("Not part of today's plan")).toHaveLength(9);
+    expect(screen.getByText("Shielded")).toBeTruthy();
+    expect(screen.queryByText("SHIELD 🔴")).toBeNull();
+    // The safety message appears exactly once, right under the battery.
+    expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(1);
+    // The full checklist moved to /workout; Home shows the summary card
+    // with everything adjusted out.
+    expect(screen.queryByText("Adjusted out today")).toBeNull();
+    expect(screen.getByText(/9 blocks adjusted out today/)).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
@@ -270,7 +277,8 @@ describe("home hub (app/index)", () => {
     fireEvent.click(screen.getByLabelText("Log an activity"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
 
-    fireEvent.click(screen.getByLabelText("Open full plan"));
+    // The Game Plan summary card is the route into the full session.
+    fireEvent.click(screen.getByLabelText("Open today's session"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
 
     fireEvent.click(screen.getByText("Calendar"));
@@ -281,17 +289,16 @@ describe("home hub (app/index)", () => {
   });
 });
 
-describe("live session cockpit — check-offs and mid-session rescaling", () => {
+describe("game plan session screen — check-offs and mid-session rescaling", () => {
   it("checks off a component: persists progress and freezes the completed sets", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
-    render(<Index />);
+    render(<Workout />);
 
     fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
 
     const day = useAppStore.getState().workoutProgress[localDate(0)];
     expect(day?.["primary-lower-squat"]).toMatchObject({ sets: 4 });
-    expect(screen.getByText("1/9 checked off")).toBeTruthy();
     expect(screen.getByText("You did 4 sets · tap to undo")).toBeTruthy();
     // Finish only appears once NOTHING remains to check off.
     expect(screen.queryByLabelText("Finish workout")).toBeNull();
@@ -300,7 +307,7 @@ describe("live session cockpit — check-offs and mid-session rescaling", () => 
   it("undoes a mistaken check-off and re-checks at the current volume", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
-    render(<Index />);
+    render(<Workout />);
 
     // Mistake: check the squat, then undo it via the advertised affordance.
     fireEvent.click(screen.getByLabelText("Toggle Squat pattern strength"));
@@ -319,7 +326,7 @@ describe("live session cockpit — check-offs and mid-session rescaling", () => 
   it("allows correcting check-offs after the session is finished", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)] });
 
-    render(<Index />);
+    render(<Workout />);
 
     // RED day — everything adjusted out, so the session is finishable.
     fireEvent.click(screen.getByLabelText("Finish workout"));
@@ -357,7 +364,7 @@ describe("live session cockpit — check-offs and mid-session rescaling", () => 
   it("re-scales remaining rows after an activity log lands mid-session", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
-    render(<Index />);
+    render(<Workout />);
 
     // Before: full volume.
     expect(screen.getAllByText("4 sets").length).toBeGreaterThanOrEqual(1);
@@ -387,7 +394,7 @@ describe("live session cockpit — check-offs and mid-session rescaling", () => 
     expect(screen.queryByLabelText("Finish workout")).toBeNull();
   });
 
-  it("finishes the workout: records the log and completes the loop", () => {
+  it("finishes the workout from the Home summary card on a RED day", () => {
     useAppStore.setState({
       readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)],
     });
@@ -552,8 +559,8 @@ describe("game plan screen (app/workout)", () => {
   it("shows the unscaled base plan and a charge prompt when no check-in exists", () => {
     render(<Workout />);
 
-    // Gauge + status banner both prompt for the 3-tap check-in.
-    expect(screen.getAllByText("Tap to charge ⚡").length).toBeGreaterThanOrEqual(2);
+    // Gauge prompts for the 3-tap check-in.
+    expect(screen.getByText("Tap to charge")).toBeTruthy();
     expect(screen.getByText(/unscaled base plan/i)).toBeTruthy();
     expect(screen.queryAllByText("Not part of today's plan")).toHaveLength(0);
   });
@@ -564,10 +571,12 @@ describe("game plan screen (app/workout)", () => {
     render(<Workout />);
 
     expect(screen.getByText("SHIELD 🔴")).toBeTruthy();
-    expect(screen.getByText("0% Shielded 🛡️")).toBeTruthy();
+    expect(screen.getByText("0%")).toBeTruthy();
+    expect(screen.getByText("Shielded")).toBeTruthy();
     expect(screen.getAllByText("Not part of today's plan")).toHaveLength(9);
     expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
-    expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(2);
+    // The banner carries the safety message now — exactly once.
+    expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(1);
   });
 
   it("shares check-off state with Home and finishes the session", () => {
@@ -611,7 +620,8 @@ describe("game plan screen (app/workout)", () => {
     render(<Workout />);
 
     expect(screen.getByText("MODULATE 🟡")).toBeTruthy();
-    expect(screen.getByText("50% Power Save 🌙")).toBeTruthy();
+    expect(screen.getByText("50%")).toBeTruthy();
+    expect(screen.getByText("Power Save")).toBeTruthy();
     // Primary lower scales (4 × 0.5 = 2) — and the allowed primer-day
     // jump mechanics scale the same way (4 × 0.5 = 2), per SPEC §17.
     expect(screen.getAllByText("4 → 2 sets").length).toBeGreaterThanOrEqual(2);
