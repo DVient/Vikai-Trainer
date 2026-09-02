@@ -56,6 +56,7 @@ export default function Plan() {
 
   const [selectedPersona, setSelectedPersona] = useState<PersonaId | null>(null);
   const [customGoals, setCustomGoals] = useState<TrainingGoal[]>([]);
+  const [buildMode, setBuildMode] = useState<"preset" | "custom" | null>(null);
   const [weeks, setWeeks] = useState(8);
   const [rebuilding, setRebuilding] = useState(false);
   const [loggingDrill, setLoggingDrill] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export default function Plan() {
 
   const build = () => {
     if (selectedPersona === null && customGoals.length === 0) {
-      setError("Pick a focus above — or a few goals — to build your plan.");
+      setError("Choose Preset or Customized, then pick your focus to build your plan.");
       return;
     }
     tapHeavy();
@@ -84,12 +85,25 @@ export default function Plan() {
 
   const toggleCustomGoal = (goal: TrainingGoal) => {
     tapLight();
-    setSelectedPersona(null);
     setCustomGoals((current) =>
       current.includes(goal)
         ? current.filter((entry) => entry !== goal)
-        : [...current, goal].slice(0, 2),
+        : current.length >= 3
+          ? current // up to 3 focus areas — extra taps do nothing
+          : [...current, goal],
     );
+  };
+
+  const chooseMode = (mode: "preset" | "custom") => {
+    tapLight();
+    setBuildMode(mode);
+    // Only one path's selections can be live at a time.
+    if (mode === "custom") {
+      setSelectedPersona(null);
+      setCustomGoals((current) => (current.length > 0 ? current : []));
+    } else {
+      setCustomGoals([]);
+    }
   };
 
   const planDrills = () => {
@@ -118,64 +132,111 @@ export default function Plan() {
           </Text>
         </View>
 
-        <Text className="text-sm font-bold text-slate-100">1 · Pick a focus</Text>
+        <Text className="text-sm font-bold text-slate-100">1 · How do you want to build it?</Text>
         <View className="gap-2">
-          {PERSONAS.map((persona) => {
-            const selected = selectedPersona === persona.id;
-            return (
-              <Pressable
-                key={persona.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Focus: ${persona.label}`}
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  tapLight();
-                  setSelectedPersona(persona.id);
-                  setCustomGoals([]);
-                  setWeeks(persona.suggestedWeeks);
-                }}
-                className={`min-h-[64px] rounded-2xl border-2 p-3 ${
-                  selected
-                    ? "border-green-500 bg-green-500/20"
-                    : "border-slate-700 bg-slate-800"
-                }`}
-              >
-                <Text className="text-base font-bold text-slate-50">
-                  {persona.emoji} {persona.label}
-                </Text>
-                <Text className="mt-0.5 text-xs text-slate-400">{persona.blurb}</Text>
-              </Pressable>
-            );
-          })}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Preset plan"
+            accessibilityState={{ selected: buildMode === "preset" }}
+            onPress={() => chooseMode("preset")}
+            className={`min-h-[64px] rounded-2xl border-2 p-3 ${
+              buildMode === "preset"
+                ? "border-green-500 bg-green-500/20"
+                : "border-slate-700 bg-slate-800"
+            }`}
+          >
+            <Text className="text-base font-bold text-slate-50">Preset plan 🏋️</Text>
+            <Text className="mt-0.5 text-xs text-slate-400">
+              Pick a ready-made focus, and the app builds around it.
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Customized plan"
+            accessibilityState={{ selected: buildMode === "custom" }}
+            onPress={() => chooseMode("custom")}
+            className={`min-h-[64px] rounded-2xl border-2 p-3 ${
+              buildMode === "custom"
+                ? "border-green-500 bg-green-500/20"
+                : "border-slate-700 bg-slate-800"
+            }`}
+          >
+            <Text className="text-base font-bold text-slate-50">Customized plan 🎯</Text>
+            <Text className="mt-0.5 text-xs text-slate-400">
+              Choose your own focus areas — up to 3.
+            </Text>
+          </Pressable>
         </View>
 
-        <Text className="text-sm font-bold text-slate-100">
-          …or set your own focus (pick 1–2)
-        </Text>
-        <View className="flex-row flex-wrap gap-2">
-          {SELECTABLE_GOALS.map((goal) => {
-            const selected = customGoals.includes(goal);
-            return (
-              <Pressable
-                key={goal}
-                accessibilityRole="button"
-                accessibilityLabel={`Goal ${TRAINING_GOAL_LABELS[goal]}`}
-                onPress={() => toggleCustomGoal(goal)}
-                className={`h-12 rounded-full border-2 px-4 ${
-                  selected ? "border-green-500 bg-green-500/20" : "border-slate-700 bg-slate-800"
-                }`}
-              >
-                <Text
-                  className={`h-12 text-sm font-bold leading-12 ${
-                    selected ? "text-green-300" : "text-slate-300"
+        {buildMode === "preset" ? (
+          <View className="gap-2">
+            {PERSONAS.map((persona) => {
+              const selected = selectedPersona === persona.id;
+              return (
+                <Pressable
+                  key={persona.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Focus: ${persona.label}`}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    tapLight();
+                    setSelectedPersona(persona.id);
+                    setCustomGoals([]);
+                    setWeeks(persona.suggestedWeeks);
+                  }}
+                  className={`min-h-[64px] rounded-2xl border-2 p-3 ${
+                    selected
+                      ? "border-green-500 bg-green-500/20"
+                      : "border-slate-700 bg-slate-800"
                   }`}
                 >
-                  {TRAINING_GOAL_LABELS[goal]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text className="text-base font-bold text-slate-50">
+                    {persona.emoji} {persona.label}
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-slate-400">{persona.blurb}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {buildMode === "custom" ? (
+          <>
+            <Text className="text-sm font-bold text-slate-100">
+              Pick your focus (up to 3)
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {SELECTABLE_GOALS.map((goal) => {
+                const selected = customGoals.includes(goal);
+                return (
+                  <Pressable
+                    key={goal}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Goal ${TRAINING_GOAL_LABELS[goal]}`}
+                    accessibilityState={{ selected }}
+                    onPress={() => toggleCustomGoal(goal)}
+                    className={`h-12 rounded-full border-2 px-4 ${
+                      selected ? "border-green-500 bg-green-500/20" : "border-slate-700 bg-slate-800"
+                    }`}
+                  >
+                    <Text
+                      className={`h-12 text-sm font-bold leading-12 ${
+                        selected ? "text-green-300" : "text-slate-300"
+                      }`}
+                    >
+                      {TRAINING_GOAL_LABELS[goal]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {customGoals.length > 0 ? (
+              <Text className="text-xs text-slate-400">
+                {customGoals.length} of 3 picked — tap a goal again to remove it.
+              </Text>
+            ) : null}
+          </>
+        ) : null}
 
         <Text className="text-sm font-bold text-slate-100">2 · How many weeks?</Text>
         <View className="flex-row items-center gap-3">
@@ -419,8 +480,17 @@ export default function Plan() {
         onPress={() => {
           tapLight();
           setRebuilding(true);
+          // Pre-fill the form with what the saved plan used, revealed in
+          // the matching mode.
           if (plan.personaId !== undefined) {
+            setBuildMode("preset");
             setSelectedPersona(plan.personaId);
+            setCustomGoals([]);
+            setWeeks(plan.periodWeeks);
+          } else {
+            setBuildMode("custom");
+            setSelectedPersona(null);
+            setCustomGoals(plan.primaryGoals.slice(0, 3));
             setWeeks(plan.periodWeeks);
           }
         }}
@@ -428,18 +498,25 @@ export default function Plan() {
       >
         <Text className="text-sm font-bold text-slate-100">Rebuild plan 🔄</Text>
       </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="End plan and train without one"
-        onPress={() => {
-          tapLight();
-          clearTrainingPlan();
-          setRebuilding(false);
-        }}
-        className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
-      >
-        <Text className="text-sm font-bold text-slate-400">Train without a plan</Text>
-      </Pressable>
+
+      <View className="gap-1">
+        <Text className="text-xs text-slate-500">
+          Changed your mind? The default plan is always here.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reset to default plan"
+          onPress={() => {
+            tapLight();
+            clearTrainingPlan();
+            setRebuilding(false);
+            setBuildMode(null);
+          }}
+          className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+        >
+          <Text className="text-sm font-bold text-slate-400">Reset to default plan</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }

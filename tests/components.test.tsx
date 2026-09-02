@@ -932,9 +932,14 @@ describe("my plan — build, milestones, completion loop", () => {
     expect(routerMock.navigate).toHaveBeenCalledWith("/plan");
   });
 
-  it("walks the build flow: persona → weeks → build", () => {
+  it("walks the build flow: preset mode → persona → weeks → build", () => {
     render(<Plan />);
 
+    // Neither path's options show until a mode is chosen.
+    expect(screen.queryByLabelText("Focus: Jump higher")).toBeNull();
+    expect(screen.queryByLabelText("Goal Speed")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Preset plan"));
     fireEvent.click(screen.getByLabelText("Focus: Jump higher"));
     // Persona preset suggests 8 weeks; the value shows in the stepper.
     expect(screen.getByText("8 weeks")).toBeTruthy();
@@ -949,13 +954,80 @@ describe("my plan — build, milestones, completion loop", () => {
     expect(screen.getByText("Standing jump touch")).toBeTruthy();
   });
 
-  it("supports the custom-goals path", () => {
+  it("supports the custom-goals path with up to 3 picks", () => {
     render(<Plan />);
 
+    fireEvent.click(screen.getByLabelText("Customized plan"));
     fireEvent.click(screen.getByLabelText("Goal Speed"));
+    fireEvent.click(screen.getByLabelText("Goal Acceleration"));
+    fireEvent.click(screen.getByLabelText("Goal Strength"));
+    // A 4th pick is a no-op — the cap is three.
+    fireEvent.click(screen.getByLabelText("Goal Explosive"));
+    expect(screen.getByText("3 of 3 picked — tap a goal again to remove it.")).toBeTruthy();
+
     fireEvent.click(screen.getByLabelText("Build my plan"));
 
-    expect(useAppStore.getState().activePlan?.primaryGoals).toEqual(["SPEED"]);
+    expect(useAppStore.getState().activePlan?.primaryGoals).toEqual([
+      "SPEED",
+      "ACCELERATION",
+      "STRENGTH",
+    ]);
+  });
+
+  it("switching build modes clears the other path's selection", () => {
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Preset plan"));
+    fireEvent.click(screen.getByLabelText("Focus: Jump higher"));
+    fireEvent.click(screen.getByLabelText("Customized plan"));
+
+    // Persona selection is gone; building without goals is blocked.
+    fireEvent.click(screen.getByLabelText("Build my plan"));
+    expect(useAppStore.getState().activePlan).toBeNull();
+    expect(screen.getByText(/Choose Preset or Customized/)).toBeTruthy();
+  });
+
+  it("offers Reset to default plan once a plan is saved", () => {
+    useAppStore.setState({
+      activePlan: {
+        id: "plan-1",
+        startDate: localDate(0),
+        periodWeeks: 8,
+        primaryGoals: ["EXPLOSIVENESS", "STRENGTH"],
+        personaId: "JUMP_HIGHER",
+        startScale: 0.75,
+        components: [],
+      },
+    });
+
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Reset to default plan"));
+    expect(useAppStore.getState().activePlan).toBeNull();
+    // Back to the build form — the default template is live on Home.
+    expect(screen.getByText("Build my training plan 🎯")).toBeTruthy();
+  });
+
+  it("rebuild pre-fills the saved plan's mode and selections", () => {
+    useAppStore.setState({
+      activePlan: {
+        id: "plan-2",
+        startDate: localDate(0),
+        periodWeeks: 6,
+        primaryGoals: ["SPEED", "ACCELERATION"],
+        personaId: undefined,
+        startScale: 1,
+        components: [],
+      },
+    });
+
+    render(<Plan />);
+
+    fireEvent.click(screen.getByLabelText("Rebuild plan"));
+    // Custom mode revealed with the saved goals seeded (capped at 3).
+    expect(screen.getByText("Pick your focus (up to 3)")).toBeTruthy();
+    expect(screen.getByText("2 of 3 picked — tap a goal again to remove it.")).toBeTruthy();
+    expect(screen.getByText("6 weeks")).toBeTruthy();
   });
 
   it("logs a milestone result and shows the best", () => {
@@ -1021,8 +1093,8 @@ describe("my plan — build, milestones, completion loop", () => {
     fireEvent.click(screen.getByLabelText("Set a new goal"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/plan");
 
-    // "Train without a plan" clears back to the default template.
-    fireEvent.click(screen.getByLabelText("Train without a plan"));
+    // "Reset to default plan" clears back to the default template.
+    fireEvent.click(screen.getByLabelText("Reset to default plan"));
     expect(useAppStore.getState().activePlan).toBeNull();
   });
 

@@ -227,14 +227,14 @@ export default function Index() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Train without a plan"
+            accessibilityLabel="Reset to default plan"
             onPress={() => {
               tapLight();
               clearTrainingPlan();
             }}
             className="mt-2 h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
           >
-            <Text className="text-sm font-bold text-slate-300">Train without a plan</Text>
+            <Text className="text-sm font-bold text-slate-300">Reset to default plan</Text>
           </Pressable>
         </View>
       ) : null}
