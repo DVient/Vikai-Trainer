@@ -8,7 +8,7 @@ name: Deploy web preview to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, version-3]
   workflow_dispatch:
 
 permissions:
