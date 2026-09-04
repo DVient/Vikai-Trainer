@@ -1,0 +1,64 @@
+name: Deploy web preview to GitHub Pages
+
+# Builds the static web export of the app and publishes it to GitHub Pages
+# on every push to main — giving the repo a permanent live preview link:
+#   https://<owner>.github.io/<repo-name>/
+# Requires one-time setup: Settings → Pages → Build and deployment →
+# Source: "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a new push supersedes an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # GitHub Pages serves the site from /<repo-name>/ — Expo needs the
+      # base path baked into the export, derived from the actual repo.
+      - name: Inject Pages base path
+        run: >-
+          node -e "const fs=require('fs');const repo=process.env.GITHUB_REPOSITORY.split('/')[1];const f='app.json';const j=JSON.parse(fs.readFileSync(f,'utf8'));j.expo.experiments=Object.assign({},j.expo.experiments,{baseUrl:'/'+repo});fs.writeFileSync(f,JSON.stringify(j,null,2)+'\n');console.log('baseUrl=/'+repo)"
+
+      - name: Export static web bundle
+        run: pnpm exec expo export --platform web
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          CI: "1"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

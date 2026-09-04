@@ -6,7 +6,9 @@
     "scheme": "vikai-trainer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "runtimeVersion": { "policy": "appVersion" },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -35,7 +37,12 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-notifications", { "color": "#22C55E" }]
+      [
+        "expo-notifications",
+        {
+          "color": "#22C55E"
+        }
+      ]
     ]
   }
 }

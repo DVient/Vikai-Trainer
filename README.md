@@ -2,6 +2,10 @@
 
 Local-first basketball readiness and autoregulation for youth athletes — built with React Native (Expo).
 
+> **🌐 Live preview:** once this repo is on GitHub, the web app is published automatically on every push to `main` at
+> **`https://<your-username>.github.io/<repo-name>/`**
+> One-time setup: repo **Settings → Pages → Build and deployment → Source: "GitHub Actions"**. The workflow (`.github/workflows/deploy-pages.yml`) builds the static export with the base path derived from the repo name, so deep links like `/plan` and `/workout` work on Pages too.
+
 VIKAI builds each athlete's training day around *them*: how they slept, how their body feels, what's on the schedule, and what they've already done this week. Same effort, smarter placement — and it stays 100% on the device.
 
 ## What it does
@@ -78,6 +82,10 @@ pnpm start          # Expo dev server
 3. The app runs live; code changes appear on reload.
 
 Limits: the app only runs while the dev server runs, and Android notifications are restricted inside Expo Go.
+
+### GitHub Pages preview (automatic on push)
+
+Pushing to `main` deploys the static web build to GitHub Pages (workflow: `.github/workflows/deploy-pages.yml`). Enable it once under **Settings → Pages → Source: "GitHub Actions"**; the preview link is `https://<your-username>.github.io/<repo-name>/`. The base path is derived from the repository name at build time — no manual configuration needed.
 
 ### Install properly + future updates over the air (EAS)
 
