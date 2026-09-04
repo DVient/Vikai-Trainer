@@ -1,14 +1,13 @@
 name: Deploy web preview to GitHub Pages
 
 # Builds the static web export of the app and publishes it to GitHub Pages
-# on every push to main — giving the repo a permanent live preview link:
+# on every push (any branch) — giving the repo a permanent live preview link:
 #   https://<owner>.github.io/<repo-name>/
 # Requires one-time setup: Settings → Pages → Build and deployment →
 # Source: "GitHub Actions".
 
 on:
   push:
-    branches: [main, version-3]
   workflow_dispatch:
 
 permissions:
