@@ -525,6 +525,70 @@ describe("3-tap check-in (app/checkin)", () => {
   });
 });
 
+describe("check-in body map (Phase 7)", () => {
+  it("is hidden entirely on the pain path — the §16 override owns that day", () => {
+    render(<CheckIn />);
+
+    fireEvent.click(screen.getByText("Sharp pain"));
+
+    expect(screen.queryByText("Optional — Body map 🗺️")).toBeNull();
+  });
+
+  it("stays optional: saving without flags stores no soreAreas", () => {
+    render(<CheckIn />);
+
+    fireEvent.click(screen.getByText("8h+"));
+    fireEvent.click(screen.getByText("Zero pain"));
+    fireEvent.click(screen.getByText("Hyped"));
+    fireEvent.click(screen.getByRole("button", { name: "Save check-in" }));
+
+    const saved = useAppStore.getState().readinessInputs[0];
+    expect(saved?.jointStatus).toBe("NO_CONCERN");
+    expect(saved?.soreAreas).toBeUndefined();
+  });
+
+  it("steps region → areas, persists flags, and shows the summary", () => {
+    render(<CheckIn />);
+
+    // Step 1: region cards. Step 2: area chips inside the flagged region.
+    fireEvent.click(screen.getByRole("button", { name: "Legs" }));
+    expect(screen.getByText("What's sore in the legs?")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Quad" }));
+    expect(screen.getByRole("button", { name: "Quad flagged as sore" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Calf" }));
+    expect(screen.getByText("Sore today: Quad, Calf")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("8h+"));
+    fireEvent.click(screen.getByText("Zero pain"));
+    fireEvent.click(screen.getByText("Hyped"));
+    fireEvent.click(screen.getByRole("button", { name: "Save check-in" }));
+
+    const saved = useAppStore.getState().readinessInputs[0];
+    expect(saved?.soreAreas).toEqual(["QUAD", "CALF"]);
+  });
+
+  it("clears a region's flags when the region is collapsed", () => {
+    render(<CheckIn />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Legs" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quad" }));
+    expect(screen.getByText("Sore today: Quad")).toBeTruthy();
+
+    // Collapse the region — state never lingers behind a closed step.
+    fireEvent.click(screen.getByRole("button", { name: "Legs" }));
+    expect(screen.queryByText("Sore today: Quad")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Quad" })).toBeNull();
+
+    fireEvent.click(screen.getByText("8h+"));
+    fireEvent.click(screen.getByText("Zero pain"));
+    fireEvent.click(screen.getByText("Hyped"));
+    fireEvent.click(screen.getByRole("button", { name: "Save check-in" }));
+
+    expect(useAppStore.getState().readinessInputs[0]?.soreAreas).toBeUndefined();
+  });
+});
+
 describe("practice log (app/practice-log)", () => {
   it("validates the draft and surfaces the exact error", () => {
     render(<PracticeLog />);

@@ -52,6 +52,13 @@ function modificationsOf(prescription: readonly ScaledComponent[]): string[] {
   return prescription.map((entry) => entry.modification);
 }
 
+/** Single-entry prescriptions: guards noUncheckedIndexedAccess at the edge. */
+function firstOf(prescription: readonly ScaledComponent[]): ScaledComponent {
+  const entry = prescription[0];
+  if (entry === undefined) throw new Error("expected a prescription entry");
+  return entry;
+}
+
 describe("scaleSets (SPEC §23 verbatim)", () => {
   it("rounds half-up and never drops below one set", () => {
     expect(scaleSets(4, 0.5)).toBe(2);
@@ -521,5 +528,116 @@ describe("duration cap enforcement (maxTrainingDurationMinutes)", () => {
 
     // Nothing droppable remains — overflow is accepted, nothing removed.
     expect(modificationsOf(prescription)).toEqual(["KEPT", "KEPT"]);
+  });
+});
+
+describe("targeted soreness mapping (Phase 7)", () => {
+  const soreRestrictions = makeRestrictions({
+    sorenessScale: { QUAD: 0.6, CALF: 0.6 },
+  });
+
+  it("sits a block out entirely when every area it targets is sore", () => {
+    const plan = [
+      makeComponent({ id: "squat", baseVolume: 4, muscleGroups: ["QUAD"] }),
+      makeComponent({ id: "calf-ankle", baseVolume: 3, muscleGroups: ["CALF", "ANKLE", "FOOT"] }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, soreRestrictions);
+
+    const squat = prescription.find((entry) => entry.component.id === "squat");
+    const calfAnkle = prescription.find((entry) => entry.component.id === "calf-ankle");
+    // QUAD is sore and the only tag → sit-out.
+    expect(squat?.modification).toBe("REMOVED");
+    expect(squat?.modificationReason).toBe(
+      "Removed: Quad is sore — this block sits out today.",
+    );
+    // CALF is sore but ANKLE/FOOT are not → partial overlap survives.
+    expect(calfAnkle?.modification).toBe("REDUCED");
+    expect(calfAnkle?.scaledVolume).toBe(2); // round(3 × 0.6) = 2
+    expect(calfAnkle?.modificationReason).toContain("Calf is sore");
+  });
+
+  it("leaves untagged components untouched (skills and recovery are exempt)", () => {
+    const plan = [
+      makeComponent({ id: "skill-drill", type: "EXPLOSIVENESS", stress: "LOW", baseVolume: 3, bodyRegion: "FULL" }),
+      makeComponent({ id: "recovery-flow", type: "RECOVERY", stress: "RECOVERY", priority: 6, baseVolume: 1, bodyRegion: "FULL" }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, soreRestrictions);
+
+    expect(modificationsOf(prescription)).toEqual(["KEPT", "KEPT"]);
+  });
+
+  it("exempts components when no flagged area overlaps their tags", () => {
+    const plan = [
+      makeComponent({ id: "upper-push", baseVolume: 4, bodyRegion: "UPPER", muscleGroups: ["ARM", "SHOULDER"] }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, soreRestrictions);
+
+    expect(modificationsOf(prescription)).toEqual(["KEPT"]);
+  });
+
+  it("composes region scale and soreness scale (worst wins per block)", () => {
+    const plan = [
+      makeComponent({ id: "leg-block", baseVolume: 4, bodyRegion: "LOWER", muscleGroups: ["HAMSTRING", "QUAD"] }),
+    ];
+    const restrictions = makeRestrictions({
+      lowerBodyScale: 0.7,
+      sorenessScale: { QUAD: 0.6 },
+    });
+
+    const prescription = applyRestrictionsToBasePlan(plan, restrictions);
+
+    const entry = firstOf(prescription);
+    expect(entry.modification).toBe("REDUCED");
+    // 0.7 (region) × 0.6 (partial soreness) = 0.42 → round(4 × 0.42) = 2.
+    expect(entry.scaledVolume).toBe(2);
+    expect(entry.modificationReason).toContain("Quad is sore");
+  });
+
+  it("takes the sorest overlapping area when several overlap", () => {
+    const plan = [
+      makeComponent({ id: "sprint", baseVolume: 4, bodyRegion: "FULL", muscleGroups: ["QUAD", "HAMSTRING", "ANKLE"] }),
+    ];
+    const restrictions = makeRestrictions({
+      sorenessScale: { QUAD: 0.6, ANKLE: 0.8 },
+    });
+
+    const prescription = applyRestrictionsToBasePlan(plan, restrictions);
+
+    // Sorest overlap 0.6; HAMSTRING is healthy so the block is scaled, not removed.
+    expect(firstOf(prescription).modification).toBe("REDUCED");
+    expect(firstOf(prescription).scaledVolume).toBe(2); // round(4 × 0.6) = 2
+  });
+
+  it("keeps a surviving sore block at its minimum volume", () => {
+    const plan = [
+      makeComponent({ id: "protected", baseVolume: 4, minimumVolume: 3, muscleGroups: ["QUAD", "HAMSTRING"] }),
+    ];
+    const restrictions = makeRestrictions({
+      // Partial overlap (only QUAD sore) scales; both the region cut and the
+      // soreness scale apply, and minimumVolume still holds.
+      lowerBodyScale: 0.7,
+      sorenessScale: { QUAD: 0.6 },
+    });
+
+    const prescription = applyRestrictionsToBasePlan(plan, restrictions);
+
+    // round(4 × 0.42) = 2 → minimumVolume 3 wins.
+    expect(firstOf(prescription).scaledVolume).toBe(3);
+  });
+
+  it("strips optional accessories on a partial soreness scale like any reduced day", () => {
+    const plan = [
+      makeComponent({ id: "optional-ankle", baseVolume: 3, optional: true, muscleGroups: ["CALF", "ANKLE"] }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, soreRestrictions);
+
+    // CALF sore (partial overlap) scales below 1 → optional accessory is
+    // stripped by the §23 step-1 rule that protects recovery.
+    expect(firstOf(prescription).modification).toBe("REMOVED");
+    expect(firstOf(prescription).modificationReason).toContain("optional accessory");
   });
 });

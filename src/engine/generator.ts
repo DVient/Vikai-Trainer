@@ -32,11 +32,13 @@ import type {
   ActivityType,
   BodyRegion,
   ScheduledEvent,
+  SoreArea,
   TrainingComponent,
   TrainingGoal,
   TrainingRestrictions,
 } from "../types";
 import { isHighStressEvent, toLocalDateString } from "./autoregulation";
+import { soreAreaLabel } from "../lib/bodyMap";
 
 /* ──────────────────────── §23 — Volume scaling rules ──────────────────── */
 
@@ -143,6 +145,36 @@ function regionIsBlocked(region: BodyRegion, restrictions: TrainingRestrictions)
   return !restrictions.lowerBodyAllowed || !restrictions.upperBodyAllowed;
 }
 
+/* ─────────────── Phase 7 — Body-map soreness mapping ──────────────────── */
+
+/**
+ * How the engine's per-area `sorenessScale` lands on ONE component:
+ * - EXEMPT  — untagged (skills, recovery) or nothing it targets is sore.
+ * - REMOVE  — every area the block targets is sore: the whole block sits
+ *             out today (targeted equivalent of the RED region removal).
+ * - SCALE   — partial overlap: the block survives at the sorest overlapping
+ *             area's scale (region scales still apply on top).
+ * Deterministic and pure; unknown/untagged components are never affected.
+ */
+type SorenessAdjustment =
+  | { kind: "EXEMPT" }
+  | { kind: "REMOVE"; areas: readonly SoreArea[] }
+  | { kind: "SCALE"; scale: number; areas: readonly SoreArea[] };
+
+function sorenessAdjustmentFor(
+  component: TrainingComponent,
+  restrictions: TrainingRestrictions,
+): SorenessAdjustment {
+  const muscles = component.muscleGroups;
+  if (muscles === undefined || muscles.length === 0) return { kind: "EXEMPT" };
+  const scaleMap = restrictions.sorenessScale;
+  if (scaleMap === undefined) return { kind: "EXEMPT" };
+  const sore = muscles.filter((area) => scaleMap[area] !== undefined);
+  if (sore.length === 0) return { kind: "EXEMPT" };
+  if (sore.length === muscles.length) return { kind: "REMOVE", areas: sore };
+  return { kind: "SCALE", scale: Math.min(...sore.map((area) => scaleMap[area] ?? 1)), areas: sore };
+}
+
 function removed(
   component: TrainingComponent,
   reason: string,
@@ -172,12 +204,13 @@ export interface GeneratorOptions {
 
 /**
  * Map engine restrictions onto a base plan. Hard removals (plyometrics, high
- * impact, blocked body regions) always win; surviving components are scaled
- * by their region's scale — with goal-aware redistribution when the athlete's
- * primary goals are provided (non-goal secondaries are cut deeper first).
- * Optional accessories are stripped before any set reduction (SPEC §23 step 1).
- * A duration cap, when the engine set one, is enforced by dropping the least
- * goal-relevant components until the plan fits.
+ * impact, blocked body regions, a block whose every targeted sore area is
+ * flagged) always win; surviving components are scaled by their region's
+ * scale times any partial soreness scale — with goal-aware redistribution
+ * when the athlete's primary goals are provided (non-goal secondaries are
+ * cut deeper first). Optional accessories are stripped before any set
+ * reduction (SPEC §23 step 1). A duration cap, when the engine set one, is
+ * enforced by dropping the least goal-relevant components until the plan fits.
  */
 export function applyRestrictionsToBasePlan(
   basePlan: readonly TrainingComponent[],
@@ -228,7 +261,21 @@ export function applyRestrictionsToBasePlan(
       continue;
     }
 
-    const scale = regionScaleFor(region, restrictions);
+    /* Phase 7 — targeted soreness: whole-block sit-out precedes volume math. */
+    const soreness = sorenessAdjustmentFor(component, restrictions);
+    if (soreness.kind === "REMOVE") {
+      const labels = soreness.areas.map(soreAreaLabel).join(" & ");
+      prescription.push(
+        removed(
+          component,
+          `Removed: ${labels} ${soreness.areas.length > 1 ? "are" : "is"} sore — this block sits out today.`,
+        ),
+      );
+      continue;
+    }
+    const sorenessScale = soreness.kind === "SCALE" ? soreness.scale : 1;
+
+    const scale = regionScaleFor(region, restrictions) * sorenessScale;
 
     /* Step 1 — optional accessories are stripped before any set reduction. */
     if (component.optional && scale < 1) {
@@ -244,11 +291,17 @@ export function applyRestrictionsToBasePlan(
       component.minimumVolume !== undefined ? Math.max(component.minimumVolume, scaled) : scaled;
 
     if (volume < component.baseVolume) {
+      const modificationReason =
+        soreness.kind === "SCALE"
+          ? `Reduced: ${soreness.areas.map(soreAreaLabel).join(" & ")} ${
+              soreness.areas.length > 1 ? "are" : "is"
+            } sore — volume scaled for today.`
+          : `Reduced: volume scaled to ${effectiveScale}× for today's readiness.`;
       prescription.push({
         component,
         modification: "REDUCED",
         scaledVolume: volume,
-        modificationReason: `Reduced: volume scaled to ${effectiveScale}× for today's readiness.`,
+        modificationReason,
       });
       continue;
     }

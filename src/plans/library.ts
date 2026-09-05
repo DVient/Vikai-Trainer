@@ -10,9 +10,14 @@
  * engine computes TrainingRestrictions; the generator maps them onto
  * whatever base plan exists (default or built). This library is the content
  * the builder selects from — plan-domain data, pure and static.
+ *
+ * PHASE 7 (body map): PHYSICAL blocks declare `muscleGroups` — the sore
+ * areas they target, which the generator uses to apply the engine's
+ * soreness scales. SKILL and RECOVERY blocks are deliberately untagged:
+ * skill work and recovery never scale with soreness.
  */
 
-import type { TrainingComponent } from "../types";
+import type { SoreArea, TrainingComponent } from "../types";
 
 export type BlockKind = "PHYSICAL" | "SKILL" | "RECOVERY";
 export type ExerciseVariantTag = "A" | "B";
@@ -53,7 +58,7 @@ const c = (block: Omit<TrainingComponent, "optional"> & { optional?: boolean }):
  */
 export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
   {
-    component: c({ id: "primary-lower-squat", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 16 }),
+    component: c({ id: "primary-lower-squat", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 16, muscleGroups: ["QUAD"] as readonly SoreArea[] }),
     title: "Squat pattern strength",
     kind: "PHYSICAL",
     rank: 1,
@@ -64,7 +69,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "primary-lower-hinge", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 16 }),
+    component: c({ id: "primary-lower-hinge", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 16, muscleGroups: ["HAMSTRING"] as readonly SoreArea[] }),
     title: "Hip hinge strength",
     kind: "PHYSICAL",
     rank: 2,
@@ -75,7 +80,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "lower-split-squat", type: "STRENGTH", stress: "HIGH", priority: 2, baseVolume: 3, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 12 }),
+    component: c({ id: "lower-split-squat", type: "STRENGTH", stress: "HIGH", priority: 2, baseVolume: 3, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 12, muscleGroups: ["QUAD"] as readonly SoreArea[] }),
     title: "Single-leg strength",
     kind: "PHYSICAL",
     rank: 6,
@@ -86,7 +91,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "lower-calf-ankle", type: "STRENGTH", stress: "HIGH", priority: 4, baseVolume: 3, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 8 }),
+    component: c({ id: "lower-calf-ankle", type: "STRENGTH", stress: "HIGH", priority: 4, baseVolume: 3, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 8, muscleGroups: ["CALF", "ANKLE", "FOOT"] as readonly SoreArea[] }),
     title: "Calf & ankle complex",
     kind: "PHYSICAL",
     rank: 9,
@@ -97,7 +102,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "primary-upper-push", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "UPPER", estimatedMinutes: 16 }),
+    component: c({ id: "primary-upper-push", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "UPPER", estimatedMinutes: 16, muscleGroups: ["ARM", "SHOULDER"] as readonly SoreArea[] }),
     title: "Upper push strength",
     kind: "PHYSICAL",
     rank: 3,
@@ -108,7 +113,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "primary-upper-pull", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "UPPER", estimatedMinutes: 14 }),
+    component: c({ id: "primary-upper-pull", type: "STRENGTH", stress: "HIGH", priority: 1, baseVolume: 4, minimumVolume: 2, bodyRegion: "UPPER", estimatedMinutes: 14, muscleGroups: ["ARM", "SHOULDER"] as readonly SoreArea[] }),
     title: "Upper pull strength",
     kind: "PHYSICAL",
     rank: 4,
@@ -119,7 +124,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "accessory-upper", type: "STRENGTH", stress: "LOW", priority: 5, baseVolume: 3, optional: true, bodyRegion: "UPPER", estimatedMinutes: 10 }),
+    component: c({ id: "accessory-upper", type: "STRENGTH", stress: "LOW", priority: 5, baseVolume: 3, optional: true, bodyRegion: "UPPER", estimatedMinutes: 10, muscleGroups: ["ARM", "SHOULDER"] as readonly SoreArea[] }),
     title: "Upper accessory",
     kind: "PHYSICAL",
     rank: 12,
@@ -130,7 +135,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "accessory-core", type: "STRENGTH", stress: "LOW", priority: 5, baseVolume: 2, optional: true, bodyRegion: "FULL", estimatedMinutes: 6 }),
+    component: c({ id: "accessory-core", type: "STRENGTH", stress: "LOW", priority: 5, baseVolume: 2, optional: true, bodyRegion: "FULL", estimatedMinutes: 6, muscleGroups: ["ABS"] as readonly SoreArea[] }),
     title: "Core strength",
     kind: "PHYSICAL",
     rank: 11,
@@ -141,7 +146,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "explosive-jumps", type: "EXPLOSIVENESS", stress: "HIGH", priority: 2, baseVolume: 4, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 10 }),
+    component: c({ id: "explosive-jumps", type: "EXPLOSIVENESS", stress: "HIGH", priority: 2, baseVolume: 4, minimumVolume: 2, bodyRegion: "LOWER", estimatedMinutes: 10, muscleGroups: ["QUAD", "CALF", "ANKLE"] as readonly SoreArea[] }),
     title: "Jump mechanics",
     kind: "PHYSICAL",
     rank: 5,
@@ -152,7 +157,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "explosive-broad-response", type: "EXPLOSIVENESS", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "LOWER", estimatedMinutes: 8 }),
+    component: c({ id: "explosive-broad-response", type: "EXPLOSIVENESS", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "LOWER", estimatedMinutes: 8, muscleGroups: ["QUAD", "CALF"] as readonly SoreArea[] }),
     title: "Broad jump & response",
     kind: "PHYSICAL",
     rank: 8,
@@ -163,7 +168,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "explosive-upper-power", type: "EXPLOSIVENESS", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "UPPER", estimatedMinutes: 8 }),
+    component: c({ id: "explosive-upper-power", type: "EXPLOSIVENESS", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "UPPER", estimatedMinutes: 8, muscleGroups: ["ARM", "SHOULDER"] as readonly SoreArea[] }),
     title: "Upper-body power",
     kind: "PHYSICAL",
     rank: 13,
@@ -174,7 +179,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "acceleration-sprints", type: "SPEED", stress: "HIGH", priority: 2, baseVolume: 3, minimumVolume: 1, bodyRegion: "FULL", estimatedMinutes: 8 }),
+    component: c({ id: "acceleration-sprints", type: "SPEED", stress: "HIGH", priority: 2, baseVolume: 3, minimumVolume: 1, bodyRegion: "FULL", estimatedMinutes: 8, muscleGroups: ["QUAD", "HAMSTRING", "CALF", "ANKLE", "FOOT"] as readonly SoreArea[] }),
     title: "Acceleration",
     kind: "PHYSICAL",
     rank: 7,
@@ -185,7 +190,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "speed-strides", type: "SPEED", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "FULL", estimatedMinutes: 10 }),
+    component: c({ id: "speed-strides", type: "SPEED", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "FULL", estimatedMinutes: 10, muscleGroups: ["QUAD", "HAMSTRING", "CALF", "ANKLE", "FOOT"] as readonly SoreArea[] }),
     title: "Top speed strides",
     kind: "PHYSICAL",
     rank: 10,
@@ -196,7 +201,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "cod-drills", type: "CHANGE_OF_DIRECTION", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "FULL", estimatedMinutes: 8 }),
+    component: c({ id: "cod-drills", type: "CHANGE_OF_DIRECTION", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "FULL", estimatedMinutes: 8, muscleGroups: ["QUAD", "ANKLE", "KNEE", "CALF"] as readonly SoreArea[] }),
     title: "Change of direction",
     kind: "PHYSICAL",
     rank: 6,
@@ -207,7 +212,7 @@ export const BLOCK_LIBRARY: ReadonlyArray<LibraryBlock> = [
     },
   },
   {
-    component: c({ id: "decel-braking", type: "DECELERATION", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "LOWER", estimatedMinutes: 8 }),
+    component: c({ id: "decel-braking", type: "DECELERATION", stress: "HIGH", priority: 3, baseVolume: 3, minimumVolume: 1, bodyRegion: "LOWER", estimatedMinutes: 8, muscleGroups: ["QUAD", "HAMSTRING", "CALF", "KNEE", "ANKLE"] as readonly SoreArea[] }),
     title: "Braking & landing",
     kind: "PHYSICAL",
     rank: 10,

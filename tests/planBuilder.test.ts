@@ -12,9 +12,12 @@ import {
   type PlanBuilderInput,
 } from "../src/plans/planBuilder";
 import { libraryBlockById } from "../src/plans/library";
+import { BLOCK_LIBRARY } from "../src/plans/library";
+import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { isSoreArea } from "../src/types";
 import { MILESTONE_DRILLS, currentBests, drillsForGoals } from "../src/plans/milestones";
 import { PERSONAS, personaById } from "../src/plans/personas";
-import type { PersonalBest } from "../src/types";
+import type { PersonalBest, TrainingComponent } from "../src/types";
 
 const NO_HISTORY = { workoutsLast28d: 0, avgDailyLoad7d: null };
 
@@ -284,5 +287,36 @@ describe("milestone catalog + pairing", () => {
   it("persona lookups resolve", () => {
     expect(personaById("JUMP_HIGHER")?.label).toBe("Jump higher");
     expect(personaById("ALL_ROUND")?.skillPriority).toBe(false);
+  });
+});
+
+describe("body-map muscle tags (Phase 7)", () => {
+  it("tags every PHYSICAL block with valid sore areas", () => {
+    for (const block of BLOCK_LIBRARY) {
+      if (block.kind !== "PHYSICAL") continue;
+      const tags = block.component.muscleGroups;
+      expect(tags, `${block.component.id} must declare muscleGroups`).toBeDefined();
+      expect(tags!.length, `${block.component.id} must target at least one area`).toBeGreaterThan(0);
+      for (const tag of tags!) {
+        expect(isSoreArea(tag), `${block.component.id} tag ${tag} must be a SoreArea`).toBe(true);
+      }
+    }
+  });
+
+  it("leaves SKILL and RECOVERY blocks untagged (never sore-scaled)", () => {
+    for (const block of BLOCK_LIBRARY) {
+      if (block.kind === "PHYSICAL") continue;
+      expect(
+        block.component.muscleGroups,
+        `${block.component.id} must stay exempt from soreness scaling`,
+      ).toBeUndefined();
+    }
+  });
+
+  it("keeps DEFAULT_BASE_PLAN tags in sync with BLOCK_LIBRARY for shared ids", () => {
+    for (const component of DEFAULT_BASE_PLAN as readonly TrainingComponent[]) {
+      const libraryTags = libraryBlockById(component.id)?.component.muscleGroups;
+      expect(component.muscleGroups).toEqual(libraryTags);
+    }
   });
 });

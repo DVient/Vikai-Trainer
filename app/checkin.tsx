@@ -4,17 +4,19 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput,
 
 import { OptionCard } from "../src/components/OptionCard";
 import { Toast } from "../src/components/Toast";
+import { soreAreaLabel, SORE_REGIONS } from "../src/lib/bodyMap";
 import { toLocalDateString } from "../src/engine/autoregulation";
-import { tapHeavy, tapSuccess } from "../src/lib/haptics";
+import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { useAppStore } from "../src/stores/useAppStore";
-import type { EnergyAnchor, JointStatus, SleepAnchor } from "../src/types";
+import type { EnergyAnchor, JointStatus, SleepAnchor, SoreArea, SoreRegion } from "../src/types";
 
 /**
  * 3-Tap Check-In (design refresh): sleep, body feel, and energy as big
  * emoji selector cards with haptic ticks — done in under 5 seconds. Includes
- * a conditional pain sub-form (location & description) and an offline save
- * toast. Purely a data-entry screen — the engine decides what the answers
- * mean (AGENTS.md decoupling).
+ * a conditional pain sub-form (location & description), the Phase-7 body map
+ * (optional stepped soreness input: regions → areas; skipped entirely when
+ * everything feels good), and an offline save toast. Purely a data-entry
+ * screen — the engine decides what the answers mean (AGENTS.md decoupling).
  */
 
 const SLEEP_OPTIONS: ReadonlyArray<{ value: SleepAnchor; emoji: string; label: string }> = [
@@ -47,6 +49,8 @@ export default function CheckIn() {
   const [energyAnchor, setEnergyAnchor] = useState<EnergyAnchor | null>(null);
   const [painLocation, setPainLocation] = useState("");
   const [painDescription, setPainDescription] = useState("");
+  const [openRegions, setOpenRegions] = useState<SoreRegion[]>([]);
+  const [soreAreas, setSoreAreas] = useState<SoreArea[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const navigateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +65,23 @@ export default function CheckIn() {
   const painLocationMissing = painReported && painLocation.trim() === "";
   const canSave =
     sleepAnchor !== null && jointStatus !== null && energyAnchor !== null && !painLocationMissing;
+
+  const toggleRegion = (region: SoreRegion) => {
+    tapLight();
+    const wasOpen = openRegions.includes(region);
+    setOpenRegions((prev) => (wasOpen ? prev.filter((entry) => entry !== region) : [...prev, region]));
+    if (wasOpen) {
+      // Collapsing a region clears its flagged areas — state never lingers.
+      const regionAreas = SORE_REGIONS.find((entry) => entry.id === region)?.areas ?? [];
+      const regionAreaIds = regionAreas.map((area) => area.id);
+      setSoreAreas((prev) => prev.filter((area) => !regionAreaIds.includes(area)));
+    }
+  };
+
+  const toggleArea = (area: SoreArea) => {
+    tapLight();
+    setSoreAreas((prev) => (prev.includes(area) ? prev.filter((entry) => entry !== area) : [...prev, area]));
+  };
 
   const onSave = () => {
     if (sleepAnchor === null || jointStatus === null || energyAnchor === null) return;
@@ -77,6 +98,7 @@ export default function CheckIn() {
       ...(painReported
         ? { painLocation: painLocation.trim(), painDescription: painDescription.trim() || undefined }
         : {}),
+      ...(soreAreas.length > 0 ? { soreAreas: [...soreAreas] } : {}),
     });
 
     // Confirm physically, show the offline toast, then return Home where
@@ -161,6 +183,58 @@ export default function CheckIn() {
         ))}
       </SelectorGroup>
 
+      {painReported ? null : (
+        <View className="gap-2">
+          <Text className="text-sm font-bold text-slate-100">Optional — Body map 🗺️</Text>
+          <Text className="text-xs text-slate-400">
+            Flag sore spots and Vikai scales just those blocks today — not the whole day. Skip if
+            everything feels good. 💪
+          </Text>
+          <View className="flex-row gap-2">
+            {SORE_REGIONS.map((region) => (
+              <OptionCard
+                key={region.id}
+                emoji={region.emoji}
+                label={region.label}
+                selected={openRegions.includes(region.id)}
+                onSelect={() => toggleRegion(region.id)}
+                className="flex-1"
+              />
+            ))}
+          </View>
+          {openRegions.map((region) => {
+            const option = SORE_REGIONS.find((entry) => entry.id === region);
+            if (option === undefined) return null;
+            return (
+              <View
+                key={region}
+                className="rounded-2xl border border-slate-700 bg-slate-800 p-3 gap-2"
+              >
+                <Text className="text-xs font-semibold text-slate-300">
+                  What's sore in the {option.label.toLowerCase()}?
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {option.areas.map((area) => (
+                    <AreaChip
+                      key={area.id}
+                      emoji={area.emoji}
+                      label={area.label}
+                      selected={soreAreas.includes(area.id)}
+                      onPress={() => toggleArea(area.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          })}
+          {soreAreas.length > 0 ? (
+            <Text className="text-xs text-slate-400">
+              Sore today: {soreAreas.map(soreAreaLabel).join(", ")}
+            </Text>
+          ) : null}
+        </View>
+      )}
+
       <Pressable
         accessibilityRole="button"
         onPress={() => {
@@ -189,5 +263,35 @@ function SelectorGroup({ label, children }: { label: string; children: React.Rea
       <Text className="text-sm font-bold text-slate-100">{label}</Text>
       <View className="flex-row gap-2">{children}</View>
     </View>
+  );
+}
+
+/** ≥48px tappable sore-area chip (second step of the body map). */
+function AreaChip({
+  emoji,
+  label,
+  selected,
+  onPress,
+}: {
+  emoji: string;
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${label} ${selected ? "flagged as sore" : ""}`.trim()}
+      onPress={onPress}
+      className={`h-12 flex-row items-center gap-1.5 rounded-full border-2 px-4 ${
+        selected ? "border-amber-400 bg-amber-400/20" : "border-slate-600 bg-slate-900"
+      }`}
+    >
+      <Text className="text-base">{emoji}</Text>
+      <Text className={`text-sm font-semibold ${selected ? "text-amber-300" : "text-slate-300"}`}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }

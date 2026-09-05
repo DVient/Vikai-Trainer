@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_OBJECTIVE,
+  isSoreArea,
+  SORE_AREA_IDS,
   type ActivityLog,
   type AthleteProfile,
   type EngineInput,
@@ -12,6 +14,7 @@ import {
   type TrainingObjective,
   type TrainingRestrictions,
 } from "../src/types";
+import { soreAreaLabel, soreRegionOf, SORE_REGIONS } from "../src/lib/bodyMap";
 
 /**
  * Phase 1 foundation tests.
@@ -156,5 +159,37 @@ describe("Phase 1: foundation & local domain types", () => {
       "RED",
     ];
     expect(new Set(statuses).size).toBe(5);
+  });
+});
+
+describe("body-map soreness catalog (Phase 7)", () => {
+  it("covers every canonical area id exactly once across regions", () => {
+    const flattened = SORE_REGIONS.flatMap((region) => region.areas.map((area) => area.id));
+    expect([...flattened].sort()).toEqual([...SORE_AREA_IDS].sort());
+    expect(new Set(flattened).size).toBe(flattened.length);
+  });
+
+  it("gives every area an athlete-facing label", () => {
+    for (const area of SORE_AREA_IDS) {
+      expect(soreAreaLabel(area).length).toBeGreaterThan(0);
+      expect(soreAreaLabel(area)).not.toBe(area);
+    }
+  });
+
+  it("maps every area back to exactly one region", () => {
+    for (const area of SORE_AREA_IDS) {
+      expect(soreRegionOf(area)).toBeDefined();
+    }
+    expect(soreRegionOf("QUAD")).toBe("LEGS");
+    expect(soreRegionOf("ABS")).toBe("CORE");
+    expect(soreRegionOf("ARM")).toBe("ARMS");
+  });
+
+  it("rejects unknown values through the type guard", () => {
+    expect(isSoreArea("QUAD")).toBe(true);
+    expect(isSoreArea("HAMSTRING")).toBe(true);
+    expect(isSoreArea("SHIN")).toBe(false);
+    expect(isSoreArea(42)).toBe(false);
+    expect(isSoreArea(undefined)).toBe(false);
   });
 });

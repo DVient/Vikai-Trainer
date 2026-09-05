@@ -49,8 +49,10 @@ import type {
   ScheduledEvent,
   ScheduledEventType,
   SleepAnchor,
+  SoreArea,
   TrainingRestrictions,
 } from "../types";
+import { isSoreArea } from "../types";
 
 /* ───────────────────── §12 — Arithmetic readiness scoring ─────────────── */
 
@@ -87,6 +89,12 @@ export interface EngineThresholds {
   highRpe: number;
   /** Arithmetic readiness score at/below this cannot resolve to GREEN (SPEC §12/§15). */
   readinessScoreYellowMax: number;
+  /**
+   * Scale applied to blocks targeting a body-map area flagged as sore
+   * (additive Phase 7). Targeted, not global: regions stay allowed, only
+   * the overlapping blocks are affected.
+   */
+  soreAreaScale: number;
 }
 
 export const DEFAULT_ENGINE_THRESHOLDS: EngineThresholds = {
@@ -96,6 +104,7 @@ export const DEFAULT_ENGINE_THRESHOLDS: EngineThresholds = {
   highCumulative24hLoad: 1000,
   highRpe: 8,
   readinessScoreYellowMax: 6,
+  soreAreaScale: 0.6,
 };
 
 /* ────────────────────────── Date / window helpers ─────────────────────── */
@@ -306,6 +315,8 @@ function mergeFiredRules(restrictionsList: readonly TrainingRestrictions[]): Tra
   let plyometricsAllowed = true;
   let highImpactAllowed = true;
   let maxTrainingDurationMinutes: number | undefined;
+  const sorenessScale: Partial<Record<SoreArea, number>> = {};
+  let hasSorenessScale = false;
 
   for (const r of restrictionsList) {
     lowerBodyAllowed = lowerBodyAllowed && r.lowerBodyAllowed;
@@ -314,6 +325,16 @@ function mergeFiredRules(restrictionsList: readonly TrainingRestrictions[]): Tra
     upperBodyScale = Math.min(upperBodyScale, r.upperBodyScale);
     plyometricsAllowed = plyometricsAllowed && r.plyometricsAllowed;
     highImpactAllowed = highImpactAllowed && r.highImpactAllowed;
+    if (r.sorenessScale !== undefined) {
+      for (const [area, scale] of Object.entries(r.sorenessScale) as [
+        SoreArea,
+        number | undefined,
+      ][]) {
+        if (scale === undefined) continue;
+        hasSorenessScale = true;
+        sorenessScale[area] = Math.min(sorenessScale[area] ?? 1, scale);
+      }
+    }
     if (r.maxTrainingDurationMinutes !== undefined) {
       maxTrainingDurationMinutes =
         maxTrainingDurationMinutes === undefined
@@ -329,6 +350,7 @@ function mergeFiredRules(restrictionsList: readonly TrainingRestrictions[]): Tra
     upperBodyScale,
     plyometricsAllowed,
     highImpactAllowed,
+    ...(hasSorenessScale ? { sorenessScale } : {}),
     ...(maxTrainingDurationMinutes !== undefined ? { maxTrainingDurationMinutes } : {}),
   };
 }
@@ -482,6 +504,30 @@ export function evaluateAutoregulationEngine(
       },
       reason: "LOW_ENERGY",
       recoveryAction: "Low energy: keep intensity low and stop if it feels worse.",
+    });
+  }
+
+  /*
+   * Body-map soreness (additive Phase 7): targeted, muscle-level scaling —
+   * the missing adjustment the expert review identified. Unlike the
+   * §16 pain path, this never halts a body region and never triggers adult
+   * attention; it only scales the blocks that target the flagged areas (the
+   * generator owns that mapping). Soreness is deliberately NOT part of the
+   * multiple-concern count: it is block-targeted, not a global day status.
+   * Unknown persisted ids are dropped; duplicates collapse into one entry.
+   */
+  const soreAreas = [...new Set((readiness.soreAreas ?? []).filter(isSoreArea))];
+  if (soreAreas.length > 0) {
+    const sorenessScale: Partial<Record<SoreArea, number>> = {};
+    for (const area of soreAreas) {
+      sorenessScale[area] = thresholds.soreAreaScale;
+    }
+    fired.push({
+      status: "YELLOW",
+      restrictions: { ...baselineRestrictions(), sorenessScale },
+      reason: "SORENESS_FLAGGED",
+      recoveryAction:
+        "Soreness noted: blocks working the flagged areas are scaled down; everything else runs as planned.",
     });
   }
 

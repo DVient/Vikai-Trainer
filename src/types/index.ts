@@ -193,6 +193,47 @@ export type JointStatus = "NO_CONCERN" | "MILD_STIFFNESS" | "PAIN_CONCERN";
 
 export type EnergyAnchor = "DRAINED" | "NORMAL" | "HIGH";
 
+/* ────────────── §11.1 — Body-map soreness areas (Phase 7) ─────────────── */
+
+/**
+ * Body areas the stepped check-in can flag as sore (Phase 7 body map).
+ * Muscle-level, deliberately coarse: the athlete taps a region, then areas —
+ * the app leads the discussion (UX decision from the builder/expert review).
+ * This is NOT pain assessment: the `PAIN_CONCERN` joint path keeps its own
+ * safety semantics; sore areas only scale the blocks that target them.
+ */
+export type SoreArea =
+  | "FOOT"
+  | "ANKLE"
+  | "KNEE"
+  | "QUAD"
+  | "HAMSTRING"
+  | "CALF"
+  | "ABS"
+  | "SHOULDER"
+  | "ARM";
+
+/** Top-level region grouping for the check-in's stepped body map. */
+export type SoreRegion = "LEGS" | "CORE" | "ARMS";
+
+/** Canonical area ids (catalog display data lives in src/lib/bodyMap.ts). */
+export const SORE_AREA_IDS: readonly SoreArea[] = [
+  "FOOT",
+  "ANKLE",
+  "KNEE",
+  "QUAD",
+  "HAMSTRING",
+  "CALF",
+  "ABS",
+  "SHOULDER",
+  "ARM",
+];
+
+/** Type guard for persisted/untrusted area values. Pure. */
+export function isSoreArea(value: unknown): value is SoreArea {
+  return typeof value === "string" && (SORE_AREA_IDS as readonly string[]).includes(value);
+}
+
 /** The daily check-in record (SPEC §11). */
 export interface ReadinessInput {
   id: string;
@@ -208,6 +249,12 @@ export interface ReadinessInput {
   painLocation?: string;
   /** Required in UI when jointStatus === "PAIN_CONCERN" (SPEC §28). */
   painDescription?: string;
+  /**
+   * Sore areas flagged on the body map (additive Phase 7). Optional — the
+   * all-good path stays one tap. The engine maps these to targeted scales;
+   * it never treats them as pain (§16 path unchanged).
+   */
+  soreAreas?: readonly SoreArea[];
   createdAt: string;
   updatedAt: string;
 }
@@ -239,6 +286,7 @@ export type EngineReason =
   | "LOW_SLEEP"
   | "LOW_ENERGY"
   | "MULTIPLE_READINESS_CONCERNS"
+  | "SORENESS_FLAGGED"
   | "NORMAL_READINESS";
 
 /**
@@ -255,6 +303,12 @@ export interface TrainingRestrictions {
   upperBodyScale: number;
   plyometricsAllowed: boolean;
   highImpactAllowed: boolean;
+  /**
+   * Per-area soreness scales (additive Phase 7): areas flagged on the body
+   * map map to a 0.0–1.0 factor the generator applies to blocks whose
+   * `muscleGroups` target them. Absent ⇒ nothing sore-scaled.
+   */
+  sorenessScale?: Partial<Record<SoreArea, number>>;
   /** Optional ceiling on total session duration in minutes. */
   maxTrainingDurationMinutes?: number;
 }
@@ -315,6 +369,14 @@ export interface TrainingComponent {
    * reaches the UI as a duration promise.
    */
   estimatedMinutes?: number;
+  /**
+   * Sore areas this block targets (additive Phase 7, authoring data). The
+   * generator applies `sorenessScale` to a block through these tags; a block
+   * whose ENTIRE tag set is sore sits out for the day, a partial overlap is
+   * scaled. SKILL and RECOVERY blocks stay untagged ⇒ never sore-scaled.
+   * Undefined ⇒ exempt (default-plan components authored before Phase 7).
+   */
+  muscleGroups?: readonly SoreArea[];
 }
 
 /* ─────────────── §33 — Workout log (minimal Phase 3 shape) ─────────────── */

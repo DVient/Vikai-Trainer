@@ -572,3 +572,90 @@ describe("toLocalDateString", () => {
     expect(toLocalDateString(new Date("2026-01-02T00:30:00.000Z"), "Not/AZone")).toBe("2026-01-02");
   });
 });
+
+describe("body-map soreness (Phase 7)", () => {
+  it("emits targeted soreness scales without touching region allowances", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ readiness: makeReadiness({ soreAreas: ["QUAD", "CALF"] }) }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toContain("SORENESS_FLAGGED");
+    expect(result.requiresAdultAttention).toBe(false);
+    expect(result.restrictions.lowerBodyAllowed).toBe(true);
+    expect(result.restrictions.upperBodyAllowed).toBe(true);
+    expect(result.restrictions.plyometricsAllowed).toBe(true);
+    expect(result.restrictions.lowerBodyScale).toBe(1);
+    expect(result.restrictions.upperBodyScale).toBe(1);
+    expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, CALF: 0.6 });
+  });
+
+  it("keeps GREEN semantics when nothing is flagged", () => {
+    const result = evaluateAutoregulationEngine(makeInput({ readiness: makeReadiness() }));
+
+    expect(result.status).toBe("GREEN");
+    expect(result.restrictions.sorenessScale).toBeUndefined();
+  });
+
+  it("never fires on its own when no sore areas were saved", () => {
+    const withEmpty = evaluateAutoregulationEngine(
+      makeInput({ readiness: makeReadiness({ soreAreas: [] }) }),
+    );
+    expect(withEmpty.reasons).not.toContain("SORENESS_FLAGGED");
+  });
+
+  it("drops unknown persisted area ids and deduplicates", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({
+          // Deliberately untrusted input: junk ids + duplicates.
+          soreAreas: ["QUAD", "NOT_AN_AREA", "QUAD"] as unknown as ReadinessInput["soreAreas"],
+        }),
+      }),
+    );
+
+    expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6 });
+  });
+
+  it("composes with other rules by taking the minimum soreness scale", () => {
+    // Low sleep fires a stricter global template; soreness only narrows areas.
+    const result = evaluateAutoregulationEngine(
+      makeInput({ readiness: makeReadiness({ sleepAnchor: "UNDER_7_HRS", soreAreas: ["ARM"] }) }),
+    );
+
+    expect(result.reasons).toEqual(["LOW_SLEEP", "SORENESS_FLAGGED"]);
+    expect(result.status).toBe("YELLOW");
+    expect(result.restrictions.lowerBodyScale).toBe(0.7);
+    expect(result.restrictions.sorenessScale).toEqual({ ARM: 0.6 });
+  });
+
+  it("pain concern still overrides everything — soreness never softens §16", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ readiness: makeReadiness({ jointStatus: "PAIN_CONCERN", soreAreas: ["QUAD"] }) }),
+    );
+
+    expect(result.status).toBe("RED");
+    expect(result.reasons).toEqual(["PAIN_CONCERN"]);
+    expect(result.requiresAdultAttention).toBe(true);
+    expect(result.restrictions.lowerBodyAllowed).toBe(false);
+    expect(result.restrictions.upperBodyAllowed).toBe(false);
+  });
+
+  it("respects a custom soreAreaScale threshold", () => {
+    const thresholds = { ...DEFAULT_ENGINE_THRESHOLDS, soreAreaScale: 0.5 };
+    const result = evaluateAutoregulationEngine(
+      makeInput({ readiness: makeReadiness({ soreAreas: ["ABS"] }) }),
+      thresholds,
+    );
+
+    expect(result.restrictions.sorenessScale).toEqual({ ABS: 0.5 });
+  });
+
+  it("is deterministic for identical inputs", () => {
+    const input = makeInput({ readiness: makeReadiness({ soreAreas: ["HAMSTRING", "FOOT"] }) });
+    const first = evaluateAutoregulationEngine(input);
+    const second = evaluateAutoregulationEngine(input);
+
+    expect(second).toEqual(first);
+  });
+});

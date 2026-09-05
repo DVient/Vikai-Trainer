@@ -74,6 +74,7 @@ export const ENGINE_REASON_LABELS: Record<EngineReason, string> = {
   LOW_SLEEP: "Short sleep",
   LOW_ENERGY: "Low battery",
   MULTIPLE_READINESS_CONCERNS: "Running low",
+  SORENESS_FLAGGED: "Sore spots flagged",
   NORMAL_READINESS: "All systems go",
 };
 

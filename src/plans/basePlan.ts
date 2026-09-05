@@ -23,6 +23,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: false,
     bodyRegion: "LOWER",
     estimatedMinutes: 16,
+    muscleGroups: ["QUAD"],
   },
   {
     id: "primary-upper-push",
@@ -34,6 +35,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: false,
     bodyRegion: "UPPER",
     estimatedMinutes: 16,
+    muscleGroups: ["ARM", "SHOULDER"],
   },
   {
     id: "explosive-jumps",
@@ -45,6 +47,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: false,
     bodyRegion: "LOWER",
     estimatedMinutes: 10,
+    muscleGroups: ["QUAD", "CALF", "ANKLE"],
   },
   {
     id: "acceleration-sprints",
@@ -56,6 +59,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: false,
     bodyRegion: "FULL",
     estimatedMinutes: 8,
+    muscleGroups: ["QUAD", "HAMSTRING", "CALF", "ANKLE", "FOOT"],
   },
   {
     id: "cod-drills",
@@ -67,6 +71,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: false,
     bodyRegion: "FULL",
     estimatedMinutes: 8,
+    muscleGroups: ["QUAD", "ANKLE", "KNEE", "CALF"],
   },
   {
     id: "skill-ballhandling",
@@ -87,6 +92,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: true,
     bodyRegion: "UPPER",
     estimatedMinutes: 10,
+    muscleGroups: ["ARM", "SHOULDER"],
   },
   {
     id: "accessory-core",
@@ -97,6 +103,7 @@ export const DEFAULT_BASE_PLAN = [
     optional: true,
     bodyRegion: "FULL",
     estimatedMinutes: 6,
+    muscleGroups: ["ABS"],
   },
   {
     id: "mobility-recovery",

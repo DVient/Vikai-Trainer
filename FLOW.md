@@ -2,7 +2,7 @@
 
 This document defines the sequential execution graph for building the Vikai performance application[cite: 2]. The building agent must execute tasks in numerical order[cite: 2].
 
-Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & State │ Phase 6: Verification <── Phase 5: Notifications <── Phase 4: UI Screens
+Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & State │ Phase 6: Verification <── Phase 5: Notifications <── Phase 4: UI Screens ──> Phase 7: Body-Map Soreness & Targeted Adjustment ──> Phase 8: Feedback Loop & Performance Loading
 
 ---
 
@@ -82,3 +82,21 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
   * Confirm no medical terminology is used in UI[cite: 2]. *(comment-stripped scan of app/ + src/; caught and fixed "diagnose" copy in check-in screen)*
   * Confirm non-destructive notification behavior[cite: 2]. *(bulk-cancel ban + targeted-ID usage asserted; never-cancelAll test in `tests/notifications.test.ts`)*
   * Verify full responsive layout on physical mobile viewports[cite: 2]. *(automated portion: touch-target ≥48px + no-oversized-fixed-width scans green; physical-device pass remains a manual checklist for the user — Expo Go / dev build)*
+
+---
+
+## PHASE 7: BODY-MAP SORENESS & TARGETED ADJUSTMENT
+*Goal: close the expert-review gap — the app adjusts for WHAT is sore, not just how much. Today's workout derives from everything logged since the last workout (post-session feedback, completed work) plus this morning's check-in; once derived it never mutates mid-session.*
+
+* [x] **7.1 Domain types & body-map catalog** (`src/types/index.ts`, `src/lib/bodyMap.ts`):
+  * `SoreArea` / `SoreRegion` unions, canonical `SORE_AREA_IDS`, `isSoreArea` guard.
+  * Region→area display catalog with labels/emoji; `ReadinessInput.soreAreas?`, `TrainingRestrictions.sorenessScale?`, `TrainingComponent.muscleGroups?` (all additive).
+* [x] **7.2 Engine targeted scales** (`src/engine/autoregulation.ts`):
+  * `soreAreas` → per-area `sorenessScale` (configurable `soreAreaScale`, default 0.6), merged min across fired rules; `SORENESS_FLAGGED` reason, YELLOW-only.
+  * §16 `PAIN_CONCERN` path untouched: still RED + adult attention, still takes precedence over soreness.
+* [x] **7.3 Stepped check-in body map** (`app/checkin.tsx`):
+  * Optional section after Energy: region cards (default = 💪 all good, zero friction) → area chips only for flagged regions; hidden on the pain path; collapsing a region clears its flags; saved only when non-empty.
+* [x] **7.4 Library muscle tags** (`src/plans/library.ts`, `src/plans/basePlan.ts`):
+  * Every PHYSICAL block declares `muscleGroups`; SKILL and RECOVERY blocks stay untagged (never sore-scaled); `DEFAULT_BASE_PLAN` mirrors the library tags (consistency-tested).
+* [x] **7.5 Generator targeted mapping** (`src/engine/generator.ts`):
+  * Block whose every targeted area is sore sits out (reason names the areas); partial overlap scales by `regionScale × sorest overlap` with sore-aware copy; untagged blocks exempt; §23 stripping order preserved.
