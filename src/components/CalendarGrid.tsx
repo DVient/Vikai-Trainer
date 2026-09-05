@@ -6,9 +6,9 @@ import { tapLight } from "../lib/haptics";
 /**
  * Activity calendar (design iteration): Sunday-start month grid with per-day
  * mark dots — green = checked in, sky = activity logged, emerald = session
- * completed, red = competition day (game / other-sport game / ID session),
- * amber = other scheduled event. Pure presentation: weeks/marks come from
- * src/lib/calendar.ts.
+ * completed, violet = planned workout, red = competition day (game /
+ * other-sport game / ID session), amber = other scheduled event. Pure
+ * presentation: weeks/marks come from src/lib/calendar.ts.
  */
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
@@ -107,6 +107,7 @@ export function CalendarGrid({
                     {dayMark?.checkedIn ? <Dot color="#22C55E" /> : null}
                     {dayMark && dayMark.activityCount > 0 ? <Dot color="#0EA5E9" /> : null}
                     {dayMark?.workoutCompleted ? <Dot color="#34D399" /> : null}
+                    {dayMark?.plannedWorkout ? <Dot color="#A78BFA" /> : null}
                     {dayMark?.isCompetition ? <Dot color="#EF4444" /> : null}
                     {dayMark?.hasEvent && !dayMark.isCompetition ? (
                       <Dot color="#EAB308" />

@@ -11,19 +11,24 @@ import {
   monthMarks,
   monthMatrix,
   upcomingEventRows,
+  type PlannedWorkoutEntry,
 } from "../src/lib/calendar";
 import { tapLight } from "../src/lib/haptics";
 import { SCHEDULED_EVENT_LABELS } from "../src/lib/format";
+import { defaultPlanFocusLabel } from "../src/plans/basePlan";
+import { planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
+import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
  * Calendar (design iteration): past and future at a glance. The month grid
- * marks check-ins, logged activity, completed sessions, and scheduled
- * games/practices; selecting a day shows its timestamped timeline. The
- * Scheduled list gathers every future commitment in one place — when team
- * practice times change, athletes fix them here instead of hunting for the
- * old day on the grid. Future rows open the editor; athletes add their own
- * commitments with the ＋ button.
+ * marks check-ins, logged activity, completed sessions, scheduled
+ * games/practices, and planned workout days; selecting a day shows its
+ * timestamped timeline with the planned session up top. The Scheduled list
+ * gathers every future commitment in one place — when team practice times
+ * change, athletes fix them here instead of hunting for the old day on the
+ * grid. Future rows open the editor; athletes add their own commitments with
+ * the ＋ button.
  */
 export default function History() {
   const router = useRouter();
@@ -32,6 +37,7 @@ export default function History() {
   const activityLogs = useAppStore((state) => state.activityLogs);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const scheduledEvents = useAppStore((state) => state.scheduledEvents);
+  const activePlan = useAppStore((state) => state.activePlan);
 
   const now = new Date();
   const today = toLocalDateString(now, profile.timezone);
@@ -54,13 +60,44 @@ export default function History() {
   );
 
   const weeks = useMemo(() => monthMatrix(cursor.year, cursor.month), [cursor]);
+
+  // Planned sessions: today/future days the plan (default or built) still
+  // covers and that have no completed session yet.
+  const plannedWorkoutDates = useMemo(() => {
+    const logged = new Set(workoutLogs.map((entry) => entry.activityDate));
+    const dates: string[] = [];
+    for (const week of weeks) {
+      for (const cell of week) {
+        if (cell === null || cell < today || logged.has(cell)) continue;
+        if (activePlan && planStatus(activePlan, cell) === "ended") continue;
+        dates.push(cell);
+      }
+    }
+    return dates;
+  }, [weeks, today, activePlan, workoutLogs]);
+
   const marks = useMemo(
-    () => monthMarks(sources, weeks, profile.timezone),
-    [sources, weeks, profile.timezone],
+    () => monthMarks({ ...sources, plannedWorkoutDates }, weeks, profile.timezone),
+    [sources, plannedWorkoutDates, weeks, profile.timezone],
   );
+
+  const plannedEntry = useMemo((): PlannedWorkoutEntry | undefined => {
+    if (selected < today) return undefined;
+    if (workoutLogs.some((entry) => entry.activityDate === selected)) return undefined;
+    if (activePlan) {
+      if (planStatus(activePlan, selected) === "ended") return undefined;
+      const persona =
+        activePlan.personaId !== undefined ? personaById(activePlan.personaId) : undefined;
+      const personaLabel = persona?.label ?? "Your plan";
+      const detail = `${personaLabel} · ${planPhaseLabel(activePlan, selected)} · Week ${weekIndexOf(activePlan, selected) + 1}`;
+      return { label: personaLabel, detail };
+    }
+    return { label: defaultPlanFocusLabel(selected), detail: "Base template" };
+  }, [selected, today, activePlan, workoutLogs]);
+
   const timeline = useMemo(
-    () => dayTimeline(sources, selected, profile.timezone),
-    [sources, selected, profile.timezone],
+    () => dayTimeline(sources, selected, profile.timezone, plannedEntry),
+    [sources, selected, profile.timezone, plannedEntry],
   );
   const scheduled = useMemo(
     () => upcomingEventRows(scheduledEvents, now, profile.timezone),
@@ -172,6 +209,7 @@ export default function History() {
         <LegendDot color="#22C55E" label="Checked in" />
         <LegendDot color="#0EA5E9" label="Activity" />
         <LegendDot color="#34D399" label="Session done" />
+        <LegendDot color="#A78BFA" label="Planned workout" />
         <LegendDot color="#EF4444" label="Game" />
         <LegendDot color="#EAB308" label="Event" />
       </View>

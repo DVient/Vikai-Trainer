@@ -490,6 +490,37 @@ describe("calendar (app/history)", () => {
       screen.getByText("Nothing logged yet — your first session starts today."),
     ).toBeTruthy();
   });
+
+  it("shows the planned workout for today and future days (Phase B)", () => {
+    useAppStore.setState({
+      scheduledEvents: [
+        {
+          id: "p1",
+          eventType: "TEAM_PRACTICE",
+          startAt: "2026-01-07T23:00:00.000Z", // Wed Jan 7, 6 PM ET
+          title: "Team practice",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<History />);
+
+    // Today (frozen Monday) — full template day, nothing logged yet.
+    expect(screen.getByText("Planned: Strength + speed — Base template")).toBeTruthy();
+    expect(screen.getByText("Planned workout")).toBeTruthy();
+
+    // Wednesday practice night — the primer is planned, the practice is booked.
+    fireEvent.click(screen.getByLabelText("Day 2026-01-07"));
+    expect(screen.getByText("Planned: Practice + upper primer — Base template")).toBeTruthy();
+    // The practice shows in the day timeline AND the Scheduled manage list.
+    expect(screen.getAllByText(/Team practice/).length).toBeGreaterThanOrEqual(1);
+
+    // Sunday — recovery-only plan.
+    fireEvent.click(screen.getByLabelText("Day 2026-01-11"));
+    expect(screen.getByText("Planned: Recovery & skills — Base template")).toBeTruthy();
+  });
 });
 
 describe("3-tap check-in (app/checkin)", () => {

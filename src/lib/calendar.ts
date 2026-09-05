@@ -66,6 +66,8 @@ export interface DayMark {
   hasEvent: boolean;
   /** Any competition the athlete walks into wanting to perform. */
   isCompetition: boolean;
+  /** A session is planned for this day (default plan or built plan). */
+  plannedWorkout: boolean;
 }
 
 export interface DayMarkSources {
@@ -73,6 +75,8 @@ export interface DayMarkSources {
   activities: ReadonlyArray<{ activityDate: string }>;
   workoutLogs: ReadonlyArray<{ activityDate: string }>;
   events: ReadonlyArray<{ startAt: string; eventType: ScheduledEventType }>;
+  /** Local dates (today or later) with a planned session. */
+  plannedWorkoutDates?: ReadonlyArray<string>;
 }
 
 /** Aggregates what happened (or is scheduled) on one calendar day. */
@@ -88,6 +92,7 @@ export function dayMarks(sources: DayMarkSources, date: string, timezone: string
       (event) =>
         isCompetitionEvent(event.eventType) && eventDate(event.startAt, timezone) === date,
     ),
+    plannedWorkout: sources.plannedWorkoutDates?.includes(date) ?? false,
   };
 }
 
@@ -127,9 +132,25 @@ export interface TimelineEntry {
   sortKey: number;
 }
 
+/** What the plan says the athlete will do on a day (before it's logged). */
+export interface PlannedWorkoutEntry {
+  /** "Strength + speed" / "Practice + upper primer" / "Recovery & skills". */
+  label: string;
+  /** Optional secondary line ("Base template" / "GET STRONGER · Week 2"). */
+  detail?: string;
+}
+
+/** Emoji for a planned-workout focus label (timeline rows). */
+export function plannedWorkoutEmoji(label: string): string {
+  if (label.includes("Practice")) return "🏀";
+  if (label.includes("Recovery")) return "🧘";
+  return "🏋️";
+}
+
 /**
  * Timestamped rows for one day, past or future: readiness, activities, and
- * completed sessions from the logs; scheduled games/practices from events.
+ * completed sessions from the logs; scheduled games/practices from events;
+ * the planned workout (today/future, unlogged days) sorts first.
  */
 export function dayTimeline(
   sources: DayMarkSources & {
@@ -152,8 +173,19 @@ export function dayTimeline(
   },
   date: string,
   timezone: string,
+  planned?: PlannedWorkoutEntry,
 ): TimelineEntry[] {
   const entries: TimelineEntry[] = [];
+
+  if (planned !== undefined) {
+    const detail = planned.detail !== undefined ? ` — ${planned.detail}` : "";
+    entries.push({
+      time: "",
+      emoji: plannedWorkoutEmoji(planned.label),
+      text: `Planned: ${planned.label}${detail}`,
+      sortKey: -1,
+    });
+  }
 
   for (const entry of sources.readiness) {
     if (entry.localDate !== date) continue;

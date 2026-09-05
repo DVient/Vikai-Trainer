@@ -8,6 +8,7 @@ import {
   monthLabel,
   monthMarks,
   monthMatrix,
+  plannedWorkoutEmoji,
   upcomingEventRows,
 } from "../src/lib/calendar";
 
@@ -66,6 +67,7 @@ describe("dayMarks — what happened on a day", () => {
       workoutCompleted: false,
       hasEvent: true,
       isCompetition: true,
+      plannedWorkout: false,
     });
   });
 
@@ -174,6 +176,62 @@ describe("dayTimeline — timestamped history for one day", () => {
 
   it("returns an empty list for quiet days", () => {
     expect(dayTimeline(sources, "2026-01-05", TZ)).toEqual([]);
+  });
+});
+
+describe("planned workouts (Phase B)", () => {
+  it("marks days listed as planned and skips the rest", () => {
+    const sources = {
+      readiness: [],
+      activities: [],
+      workoutLogs: [],
+      events: [],
+      plannedWorkoutDates: ["2026-01-05", "2026-01-06"],
+    };
+
+    expect(dayMarks(sources, "2026-01-05", TZ).plannedWorkout).toBe(true);
+    expect(dayMarks(sources, "2026-01-06", TZ).plannedWorkout).toBe(true);
+    expect(dayMarks(sources, "2026-01-07", TZ).plannedWorkout).toBe(false);
+    // Absent list entirely ⇒ no planned marks (backward compatible).
+    expect(
+      dayMarks({ readiness: [], activities: [], workoutLogs: [], events: [] }, "2026-01-05", TZ)
+        .plannedWorkout,
+    ).toBe(false);
+  });
+
+  it("puts the planned workout first with an em-dash time slot", () => {
+    const sources = {
+      readiness: [{ localDate: "2026-01-05", recordedAt: "2026-01-05T13:02:00.000Z" }],
+      activities: [],
+      workoutLogs: [],
+      events: [
+        {
+          id: "p1",
+          startAt: "2026-01-05T23:00:00.000Z",
+          eventType: "TEAM_PRACTICE" as const,
+          title: "Team practice",
+        },
+      ],
+    };
+
+    const timeline = dayTimeline(sources, "2026-01-05", TZ, {
+      label: "Strength + speed",
+      detail: "Base template",
+    });
+
+    expect(timeline[0]).toEqual({
+      time: "",
+      emoji: "🏋️",
+      text: "Planned: Strength + speed — Base template",
+      sortKey: -1,
+    });
+    expect(timeline[1]?.time).toBe("8:02 AM"); // readiness still follows
+  });
+
+  it("picks the emoji from the day's focus label", () => {
+    expect(plannedWorkoutEmoji("Strength + speed")).toBe("🏋️");
+    expect(plannedWorkoutEmoji("Practice + upper primer")).toBe("🏀");
+    expect(plannedWorkoutEmoji("Recovery & skills")).toBe("🧘");
   });
 });
 
