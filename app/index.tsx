@@ -17,7 +17,7 @@ import { soreAreaLabel } from "../src/lib/bodyMap";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { computePerformanceScales } from "../src/plans/adherence";
-import { BASE_PLAN_TITLES, DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { BASE_PLAN_TITLES, defaultPlanForDate } from "../src/plans/basePlan";
 import { activePlanForDay, planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
 import { libraryBlockById } from "../src/plans/library";
 import { personaById } from "../src/plans/personas";
@@ -51,7 +51,7 @@ export default function Index() {
   const localToday = toLocalDateString(now, profile.timezone);
   // Built plans replace the default template; no plan ⇒ exactly today's
   // default 9-block behavior.
-  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : DEFAULT_BASE_PLAN;
+  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : defaultPlanForDate(localToday);
   const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,

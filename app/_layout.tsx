@@ -9,9 +9,18 @@ import {
   ensureDefaultRemindersScheduledAsync,
 } from "../src/services/notifications";
 import { HeaderBack } from "../src/components/HeaderBack";
+import { useAppStore } from "../src/stores/useAppStore";
 
 export default function RootLayout() {
   useEffect(() => {
+    // Default practice schedule (Tue/Wed/Thu 6 PM): seeded exactly once —
+    // the persistence guard keeps athlete edits sticky afterwards.
+    try {
+      useAppStore.getState().seedDefaultSchedule();
+    } catch {
+      // A seeding hiccup must never block startup.
+    }
+
     // Notification pipeline setup (Phase 5): presentation behavior plus
     // first-run scheduling of the daily reminders (check-in, fuel-up,
     // activity log). Fully guarded: expo-notifications is partially

@@ -39,8 +39,8 @@ export const FALL_2026_PHASES: ReadonlyArray<SeasonPhase> = [
     startsOn: "2026-09-08",
     endsOn: "2026-10-14",
     focus:
-      "School plus Tuesday/Thursday team practices. Legs are saved for practice — lifting on those days stays up top.",
-    note: "Practice nights: Tuesday & Thursday.",
+      "School plus Tuesday, Wednesday & Thursday team practices. Legs are saved for practice — lifting on those days stays up top.",
+    note: "Practice nights: Tuesday, Wednesday & Thursday.",
   },
   {
     id: "competition",
@@ -154,14 +154,14 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   {
     componentId: "primary-lower-squat",
     phaseId: "in-season",
-    weekdays: [2, 4],
+    weekdays: [2, 3, 4],
     note: "Practice night — zero lower-body lifting. Legs are saved for practice.",
     exercises: [],
   },
   {
     componentId: "primary-lower-squat",
     phaseId: "competition",
-    weekdays: [2],
+    weekdays: [2, 3],
     note: "Micro-lifting before practice — keep the weight, cut the sets.",
     exercises: [
       { name: "Trap Bar Deadlift", prescription: "2 × 4", videoUrl: VIDEO.trapBarDeadlift },
@@ -215,7 +215,7 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   {
     componentId: "primary-upper-push",
     phaseId: "in-season",
-    weekdays: [2],
+    weekdays: [2, 3],
     note: "Pre-practice priming — 30 minutes max, no leg work.",
     exercises: [{ name: "Dumbbell Bench Press", prescription: "3 × 6", videoQuery: "dumbbell bench press form" }],
   },
@@ -234,7 +234,7 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   {
     componentId: "primary-upper-push",
     phaseId: "competition",
-    weekdays: [2],
+    weekdays: [2, 3],
     exercises: [{ name: "Dumbbell Bench Press", prescription: "2 × 5", videoQuery: "dumbbell bench press form" }],
   },
   {
@@ -280,7 +280,7 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   {
     componentId: "accessory-upper",
     phaseId: "in-season",
-    weekdays: [2, 4],
+    weekdays: [2, 3, 4],
     exercises: [{ name: "Pull-ups", prescription: "3 × 5", videoQuery: "pull up form" }],
   },
   {
@@ -310,7 +310,7 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   {
     componentId: "accessory-core",
     phaseId: "in-season",
-    weekdays: [4],
+    weekdays: [2, 3, 4],
     exercises: [{ name: "Cable Core Rotations", prescription: "3 × 8", videoQuery: "cable core rotation exercise" }],
   },
   {
@@ -480,9 +480,10 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   {
     componentId: "mobility-recovery",
     phaseId: "in-season",
-    weekdays: [1, 3],
+    weekdays: [1, 5],
+    note: "Flush the weekend and the practice-week stress.",
     exercises: [
-      { name: "Extensive Grass Tempo", prescription: "10 × 100m at 60–65%", cue: "Flush the weekend / practice stress.", videoUrl: VIDEO.extensiveTempo },
+      { name: "Extensive Grass Tempo", prescription: "10 × 100m at 60–65%", cue: "Relaxed breathing, walk-back rest.", videoUrl: VIDEO.extensiveTempo },
       { name: "Wall-Sit Isometric Holds", prescription: "3 × 45s", cue: "Eases sore knees, builds lasting strength.", videoUrl: VIDEO.spanishSquat },
       { name: "Copenhagen Planks", prescription: "3 × 20s per side", cue: "Groin strength for defensive slides.", videoUrl: VIDEO.copenhagenPlank },
     ],

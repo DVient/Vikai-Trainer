@@ -21,7 +21,7 @@
 
 import type { BuiltPlan, CompletedComponent, TrainingComponent, TrainingGoal, WorkoutLog } from "../types";
 import { activePlanForDay } from "./planBuilder";
-import { DEFAULT_BASE_PLAN } from "./basePlan";
+import { defaultPlanForDate } from "./basePlan";
 
 /** One window's plan-vs-completion record, aggregated per training goal. */
 export interface AdherenceSample {
@@ -87,7 +87,7 @@ export function adherenceSamplesFor(
   const totals = new Map<TrainingGoal, { planned: number; completed: number }>();
   for (const date of sessionDates) {
     const components: readonly TrainingComponent[] =
-      plan !== null ? activePlanForDay(plan, date) : DEFAULT_BASE_PLAN;
+      plan !== null ? activePlanForDay(plan, date) : defaultPlanForDate(date);
     const dayProgress = workoutProgress[date] ?? {};
     for (const component of components) {
       if (component.type === "RECOVERY") continue;

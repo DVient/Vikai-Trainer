@@ -6,6 +6,7 @@ import {
   type TrainingObjective,
 } from "../src/types";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
+import { defaultPracticeEventDrafts } from "../src/lib/defaultSchedule";
 import { useAppStore, type VikaiTrainerAppState } from "../src/stores/useAppStore";
 
 /**
@@ -35,6 +36,7 @@ const INITIAL_SLICES = {
   notificationIdentifiers: { scheduleReminders: {} },
   activePlan: null,
   personalBests: [],
+  defaultScheduleSeeded: false,
 } satisfies Partial<VikaiTrainerAppState>;
 
 function resetStore(): void {
@@ -446,5 +448,23 @@ describe("local persistence (SPEC §31)", () => {
     };
     expect(persisted.state.readinessInputs).toHaveLength(1);
     expect(persisted.state.readinessInputs[0]?.localDate).toBe("2026-01-02");
+  });
+});
+
+describe("default practice schedule seeding (Phase A)", () => {
+  it("seeds the Tue/Wed/Thu 6 PM series once and never again", () => {
+    useAppStore.setState({ scheduledEvents: [], defaultScheduleSeeded: false });
+
+    useAppStore.getState().seedDefaultSchedule();
+    const seeded = useAppStore.getState().scheduledEvents;
+    expect(seeded.length).toBe(defaultPracticeEventDrafts("America/New_York").length);
+    expect(seeded.length).toBeGreaterThanOrEqual(40);
+    expect(new Set(seeded.map((event) => event.seriesId)).size).toBe(1);
+    expect(seeded.every((event) => event.eventType === "TEAM_PRACTICE")).toBe(true);
+    expect(useAppStore.getState().defaultScheduleSeeded).toBe(true);
+
+    // Second call is a no-op — athlete edits and deletions stay sticky.
+    useAppStore.getState().seedDefaultSchedule();
+    expect(useAppStore.getState().scheduledEvents).toBe(seeded);
   });
 });

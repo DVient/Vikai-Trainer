@@ -176,11 +176,14 @@ function resetStore(): void {
 }
 
 beforeEach(() => {
+  // Freeze the clock on Monday, Jan 5 2026 — a full-template weekday — so
+  // the weekday-structured default plan is deterministic in every test.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-05T15:00:00.000Z"));
   resetStore();
   routerMock.navigate.mockClear();
   routerMock.replace.mockClear();
   routerMock.back.mockClear();
-  routerMock.canGoBack.mockClear();
   routerMock.canGoBack.mockReturnValue(true);
   linkingOpenSpy.mockClear();
   stackScreenOptionsSpy.mockClear();
@@ -189,6 +192,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
 });
 
@@ -797,7 +801,7 @@ describe("exercise detail + video library (Fall 2026 plan)", () => {
     render(<Workout />);
 
     expect(screen.getByText("Fall 2026 · Team practice integration")).toBeTruthy();
-    expect(screen.getByText("Practice nights: Tuesday & Thursday.")).toBeTruthy();
+    expect(screen.getByText("Practice nights: Tuesday, Wednesday & Thursday.")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
 
@@ -1248,7 +1252,7 @@ describe("my plan — build, milestones, completion loop", () => {
     useAppStore.setState({
       activePlan: {
         id: "plan-1",
-        startDate: "2026-01-01",
+        startDate: localDate(-35), // five weeks ago — a 4-week period is over
         periodWeeks: 4,
         primaryGoals: ["STRENGTH"],
         personaId: "GET_STRONGER",
@@ -1267,7 +1271,7 @@ describe("my plan — build, milestones, completion loop", () => {
     useAppStore.setState({
       activePlan: {
         id: "plan-1",
-        startDate: "2026-01-01",
+        startDate: localDate(-35), // five weeks ago — a 4-week period is over
         periodWeeks: 4,
         primaryGoals: ["STRENGTH"],
         personaId: "GET_STRONGER",

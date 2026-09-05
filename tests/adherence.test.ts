@@ -79,8 +79,9 @@ describe("adherenceSamplesFor", () => {
   });
 
   it("falls back to the default template when no plan is active", () => {
-    const progress = { "2026-01-06": { "primary-lower-squat": done("primary-lower-squat"), "skill-ballhandling": done("skill-ballhandling") } };
-    const samples = adherenceSamplesFor(null, [makeLog("2026-01-06")], progress, TODAY);
+    // Monday, Jan 5 2026 — a full-template day (not a practice night).
+    const progress = { "2026-01-05": { "primary-lower-squat": done("primary-lower-squat"), "skill-ballhandling": done("skill-ballhandling") } };
+    const samples = adherenceSamplesFor(null, [makeLog("2026-01-05")], progress, TODAY);
 
     const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
     expect(byGoal.get("STRENGTH")?.plannedBlocks).toBe(4); // 4 strength blocks, recovery excluded

@@ -6,10 +6,13 @@
  * principles (SPEC §20). The Workout Generator maps engine restrictions onto
  * this plan at runtime; this file never reads engine state.
  *
- * NOTE: Season-phase selection (SPEC §24–§25) is a documented future
- * extension point — FLOW 4.4 renders this single base plan.
+ * The default plan is weekday-structured around the team's practice schedule
+ * (SPEC §1.2 defaults): practice nights keep the legs out of the gym, Sunday
+ * stays light, and the remaining days carry the full strength/speed template.
  */
 
+import { DEFAULT_SEASON_CONFIG } from "../config/defaults";
+import { weekdayOf } from "./fall2026";
 import type { TrainingComponent } from "../types";
 
 export const DEFAULT_BASE_PLAN = [
@@ -129,3 +132,51 @@ export const BASE_PLAN_TITLES: Record<string, string> = {
   "accessory-core": "Core accessory circuit",
   "mobility-recovery": "Mobility & recovery flow",
 };
+
+/* ─────────────────── Weekday-structured default templates ─────────────── */
+
+/** Blocks kept on practice nights: top-half and technique only — legs are
+ * saved for the 6 PM practice (no high-stress lower-body loading). */
+const PRACTICE_DAY_IDS: ReadonlySet<string> = new Set([
+  "primary-upper-push",
+  "skill-ballhandling",
+  "accessory-upper",
+  "accessory-core",
+  "mobility-recovery",
+]);
+
+/** Sunday stays light: skill touch-up plus the recovery flow. */
+const RECOVERY_DAY_IDS: ReadonlySet<string> = new Set([
+  "skill-ballhandling",
+  "mobility-recovery",
+]);
+
+function pickByIds(ids: ReadonlySet<string>): readonly TrainingComponent[] {
+  return (DEFAULT_BASE_PLAN as readonly TrainingComponent[]).filter((component) =>
+    ids.has(component.id),
+  );
+}
+
+/**
+ * The default plan for a local date: practice nights (Tue/Wed/Thu) run the
+ * practice-day template, Sunday runs recovery, other days the full template.
+ * A built plan (`activePlan`) always wins at the call site.
+ */
+export function defaultPlanForDate(localDate: string): readonly TrainingComponent[] {
+  const weekday = weekdayOf(localDate);
+  if (weekday === 0) return pickByIds(RECOVERY_DAY_IDS);
+  if (DEFAULT_SEASON_CONFIG.practiceWeekdays.includes(weekday)) {
+    return pickByIds(PRACTICE_DAY_IDS);
+  }
+  return DEFAULT_BASE_PLAN as readonly TrainingComponent[];
+}
+
+/** One-line focus label for the day's default plan (calendar + Game Plan). */
+export function defaultPlanFocusLabel(localDate: string): string {
+  const weekday = weekdayOf(localDate);
+  if (weekday === 0) return "Recovery & skills";
+  if (DEFAULT_SEASON_CONFIG.practiceWeekdays.includes(weekday)) {
+    return "Practice + upper primer";
+  }
+  return "Strength + speed";
+}

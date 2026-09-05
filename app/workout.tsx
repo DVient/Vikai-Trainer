@@ -16,7 +16,7 @@ import { powerLevel } from "../src/lib/power";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
 import { computePerformanceScales } from "../src/plans/adherence";
-import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { defaultPlanForDate } from "../src/plans/basePlan";
 import { activePlanForDay, blockVariant } from "../src/plans/planBuilder";
 import { libraryExerciseDetail } from "../src/plans/library";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -43,7 +43,7 @@ export default function Workout() {
   const localToday = toLocalDateString(new Date(), profile.timezone);
   const activePlan = useAppStore((state) => state.activePlan);
   // Built plans replace the default template; no plan ⇒ today's default.
-  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : DEFAULT_BASE_PLAN;
+  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : defaultPlanForDate(localToday);
   const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,

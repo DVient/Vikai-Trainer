@@ -30,6 +30,10 @@ export const DEFAULT_ATHLETE_PROFILE: AthleteProfile = {
  */
 export interface AthleteSeasonConfig {
   practicesPerWeek: number;
+  /** Weekday numbers (0 Sun … 6 Sat) the team practices on. */
+  practiceWeekdays: readonly number[];
+  /** 24h "HH:mm" local start time for recurring practices. */
+  practiceTime: string;
   /** Local calendar dates, YYYY-MM-DD (SPEC §1.2 / §24). */
   seasonStart: string;
   firstGame: string;
@@ -40,7 +44,9 @@ export interface AthleteSeasonConfig {
 }
 
 export const DEFAULT_SEASON_CONFIG: AthleteSeasonConfig = {
-  practicesPerWeek: 2,
+  practicesPerWeek: 3,
+  practiceWeekdays: [2, 3, 4], // Tuesday, Wednesday, Thursday
+  practiceTime: "18:00",
   seasonStart: "2026-09-14",
   firstGame: "2026-10-15",
   schoolStartTime: "09:00",

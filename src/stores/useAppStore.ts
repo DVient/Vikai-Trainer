@@ -35,6 +35,7 @@ import {
   type WorkoutLog,
 } from "../types";
 import { DEFAULT_ATHLETE_PROFILE } from "../config/defaults";
+import { defaultPracticeEventDrafts } from "../lib/defaultSchedule";
 import { buildPlan, type PlanHistorySnapshot } from "../plans/planBuilder";
 import { toLocalDateString } from "../engine/autoregulation";
 
@@ -70,6 +71,11 @@ export interface VikaiTrainerAppState {
   activePlan: BuiltPlan | null;
   /** Benchmark attempts, full history (PB = best per drill, derived). */
   personalBests: PersonalBest[];
+  /**
+   * One-shot guard for the default practice schedule (Tue/Wed/Thu 6 PM):
+   * seeded exactly once so later athlete edits and deletions stick.
+   */
+  defaultScheduleSeeded: boolean;
 
   /* ── Actions ── */
   /** Replaces the profile on confirmation (SPEC §32 overwrite semantics). */
@@ -122,6 +128,8 @@ export interface VikaiTrainerAppState {
   addPersonalBest: (draft: { drillId: string; value: number; activityDate?: string }) => PersonalBest;
   /** Removes a mistyped benchmark attempt. */
   removePersonalBest: (id: string) => void;
+  /** Seeds the default practice series once (no-op after the first run). */
+  seedDefaultSchedule: () => void;
 }
 
 export const useAppStore = create<VikaiTrainerAppState>()(
@@ -137,6 +145,7 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       notificationIdentifiers: { scheduleReminders: {} },
       activePlan: null,
       personalBests: [],
+      defaultScheduleSeeded: false,
 
       setProfile: (profile) => {
         set({ profile });
@@ -309,6 +318,24 @@ export const useAppStore = create<VikaiTrainerAppState>()(
           scheduledEvents: state.scheduledEvents.filter((event) => event.seriesId !== seriesId),
         }));
         return removed;
+      },
+
+      seedDefaultSchedule: () => {
+        if (get().defaultScheduleSeeded) return;
+        const drafts = defaultPracticeEventDrafts(get().profile.timezone);
+        const now = new Date().toISOString();
+        const seriesId = createLocalId("series");
+        const records: ScheduledEvent[] = drafts.map((draft) => ({
+          ...draft,
+          id: createLocalId("event"),
+          seriesId,
+          createdAt: now,
+          updatedAt: now,
+        }));
+        set((state) => ({
+          scheduledEvents: [...state.scheduledEvents, ...records],
+          defaultScheduleSeeded: true,
+        }));
       },
 
       recordWorkoutLog: (draft) => {
