@@ -17,17 +17,17 @@ export function TimelineRow({
 }) {
   const body = (
     <View className="flex-row items-center gap-3 py-2">
-      <Text className="w-[76px] text-xs font-semibold text-slate-400" numberOfLines={1}>
+      <Text className="w-[76px] text-xs font-semibold text-faint" numberOfLines={1}>
         {entry.time === "" ? "—" : entry.time}
       </Text>
       <Text className="text-base">{entry.emoji}</Text>
-      <Text className="flex-1 text-sm text-slate-200">{entry.text}</Text>
+      <Text className="flex-1 text-sm text-body">{entry.text}</Text>
       {entry.seriesCount !== undefined && entry.seriesCount > 1 ? (
         <Text className="text-sm" accessibilityLabel={`Recurring, ${entry.seriesCount} events`}>
           🔁
         </Text>
       ) : null}
-      {entry.eventId !== undefined ? <Text className="text-sm text-slate-500">›</Text> : null}
+      {entry.eventId !== undefined ? <Text className="text-sm text-faint">›</Text> : null}
     </View>
   );
 

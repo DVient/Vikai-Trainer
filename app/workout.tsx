@@ -98,7 +98,7 @@ export default function Workout() {
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-app"
       contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
     >
       <PowerGauge
@@ -111,40 +111,40 @@ export default function Workout() {
       <StatusBanner status={result.status} reasons={result.reasons} />
 
       {result.reasons.includes("SORENESS_FLAGGED") && soreAreasToday.length > 0 ? (
-        <Text className="rounded-xl bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-300">
+        <Text className="rounded-xl bg-modulate-soft px-3 py-2 text-xs font-semibold text-modulate">
           Sore today: {soreAreasToday.map(soreAreaLabel).join(", ")} — blocks targeting them are
           scaled. Everything else runs as planned.
         </Text>
       ) : null}
 
-      <Text className="text-center text-lg font-black text-slate-50">Today's Game Plan</Text>
+      <Text className="text-center text-lg font-black text-strong">Today's Game Plan</Text>
 
       {seasonPhase !== undefined ? (
-        <View className="rounded-xl border border-slate-700 bg-slate-800 p-3">
-          <Text className="text-xs font-bold uppercase tracking-widest text-green-300">
+        <View className="rounded-xl border border-edge bg-card p-3">
+          <Text className="text-xs font-bold uppercase tracking-widest text-go">
             Fall 2026 · {seasonPhase.label}
           </Text>
-          <Text className="mt-1 text-xs text-slate-400">{seasonPhase.focus}</Text>
+          <Text className="mt-1 text-xs text-faint">{seasonPhase.focus}</Text>
           {seasonPhase.note !== undefined ? (
-            <Text className="mt-1 text-xs font-semibold text-slate-300">{seasonPhase.note}</Text>
+            <Text className="mt-1 text-xs font-semibold text-body">{seasonPhase.note}</Text>
           ) : null}
         </View>
       ) : null}
 
       {hasCheckedInToday ? null : (
-        <Text className="rounded-xl bg-slate-800 px-3 py-2 text-center text-xs text-slate-400">
+        <Text className="rounded-xl bg-card px-3 py-2 text-center text-xs text-faint">
           Showing the unscaled base plan — check in to scale it to your day.
         </Text>
       )}
 
-      <View className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+      <View className="rounded-2xl bg-card border border-edge p-4">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Focus
         </Text>
-        <Text className="mt-1 text-lg font-black text-slate-50">
+        <Text className="mt-1 text-lg font-black text-strong">
           {trainingObjective.primaryGoals.map((goal) => TRAINING_GOAL_LABELS[goal]).join(" · ")}
         </Text>
-        <Text className="mt-1 text-xs text-slate-400">
+        <Text className="mt-1 text-xs text-faint">
           Quality over volume — the plan protects the high/low balance. On
           lighter days, your focus areas keep their work longest.
         </Text>
@@ -155,9 +155,9 @@ export default function Workout() {
           accessibilityRole="button"
           accessibilityLabel="Log activities before the workout"
           onPress={() => router.navigate("/practice-log")}
-          className="min-h-[48px] rounded-xl border-2 border-yellow-500/50 bg-yellow-500/10 px-3 py-3"
+          className="min-h-[48px] rounded-xl border-2 border-modulate-line bg-modulate-soft px-3 py-3"
         >
-          <Text className="text-sm font-bold text-yellow-300">
+          <Text className="text-sm font-bold text-modulate">
             Anything already on your legs today? Log it before you start — it
             shapes today's volume 🔄
           </Text>
@@ -165,12 +165,12 @@ export default function Workout() {
       ) : null}
 
       {hasWorkoutLogToday ? (
-        <Text className="rounded-xl bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
+        <Text className="rounded-xl bg-go-soft px-3 py-2 text-sm font-semibold text-go">
           Session complete 🎉 Log anything else you did today — it shapes your
           next workout 🔄
         </Text>
       ) : (
-        <Text className="text-xs text-slate-400">
+        <Text className="text-xs text-faint">
           Check off each block as you go. Logging an activity updates the
           remaining volume automatically 🔄
         </Text>
@@ -192,12 +192,12 @@ export default function Workout() {
               tapLight();
               setFinishStep("bodymap");
             }}
-            className="h-14 items-center justify-center rounded-xl bg-green-500"
+            className="h-14 items-center justify-center rounded-xl bg-accent"
           >
-            <Text className="text-base font-black text-slate-950">Finish workout 🏁</Text>
+            <Text className="text-base font-black text-onaccent">Finish workout 🏁</Text>
           </Pressable>
         ) : (
-          <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4 gap-3">
+          <View className="rounded-2xl border border-edge bg-card p-4 gap-3">
             <BodyMap
               areas={soreAfter}
               onAreasChange={setSoreAfter}
@@ -208,9 +208,9 @@ export default function Workout() {
               accessibilityRole="button"
               accessibilityLabel="Save and close session"
               onPress={finish}
-              className="h-14 items-center justify-center rounded-xl bg-green-500"
+              className="h-14 items-center justify-center rounded-xl bg-accent"
             >
-              <Text className="text-base font-black text-slate-950">Save & close session 🏁</Text>
+              <Text className="text-base font-black text-onaccent">Save & close session 🏁</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -219,20 +219,20 @@ export default function Workout() {
                 setSoreAfter([]);
                 finish();
               }}
-              className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-900"
+              className="h-12 items-center justify-center rounded-xl border-2 border-edge bg-app"
             >
-              <Text className="text-sm font-bold text-slate-300">Close without notes</Text>
+              <Text className="text-sm font-bold text-body">Close without notes</Text>
             </Pressable>
           </View>
         )
       ) : null}
 
       {session.skippedCount > 0 ? (
-        <View className="rounded-xl border border-slate-700 bg-slate-800 p-3">
-          <Text className="text-sm font-bold text-slate-100">
+        <View className="rounded-xl border border-edge bg-card p-3">
+          <Text className="text-sm font-bold text-strong">
             Why the plan looks like this
           </Text>
-          <Text className="mt-1 text-xs text-slate-400">
+          <Text className="mt-1 text-xs text-faint">
             {session.skippedCount === 1
               ? "1 block was adjusted out today."
               : `${session.skippedCount} blocks were adjusted out today.`}{" "}
@@ -244,9 +244,9 @@ export default function Workout() {
       <Pressable
         accessibilityRole="button"
         onPress={() => router.navigate("/practice-log")}
-        className="h-14 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+        className="h-14 items-center justify-center rounded-xl border-2 border-edge bg-card"
       >
-        <Text className="text-base font-bold text-slate-100">📝 Log an activity</Text>
+        <Text className="text-base font-bold text-strong">📝 Log an activity</Text>
       </Pressable>
     </ScrollView>
   );

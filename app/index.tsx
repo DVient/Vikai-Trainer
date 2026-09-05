@@ -98,37 +98,51 @@ export default function Index() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="How this app works"
-              onPress={() => {
-                tapLight();
-                router.navigate("/about");
-              }}
-              className="h-12 w-12 items-center justify-center"
-              hitSlop={6}
-            >
-              <Text className="text-2xl">❓</Text>
-            </Pressable>
+            <View className="flex-row">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Team skin settings"
+                onPress={() => {
+                  tapLight();
+                  router.navigate("/settings");
+                }}
+                className="h-12 w-12 items-center justify-center"
+                hitSlop={6}
+              >
+                <Text className="text-2xl">⚙️</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="How this app works"
+                onPress={() => {
+                  tapLight();
+                  router.navigate("/about");
+                }}
+                className="h-12 w-12 items-center justify-center"
+                hitSlop={6}
+              >
+                <Text className="text-2xl">❓</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
       <ScrollView
-        className="flex-1 bg-slate-900"
+        className="flex-1 bg-app"
       contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
     >
       <View className="flex-row items-center justify-between">
         <View>
-          <Text className="text-3xl font-black text-slate-50">Vikai Trainer</Text>
-          <Text className="mt-1 text-sm text-slate-400">Today · {today}</Text>
+          <Text className="text-3xl font-black text-strong">Vikai Trainer</Text>
+          <Text className="mt-1 text-sm text-faint">Today · {today}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open calendar"
           onPress={() => router.navigate("/history")}
-          className="rounded-full border border-orange-500/40 bg-orange-500/15 px-4 py-2"
+          className="rounded-full border border-modulate-line bg-modulate-soft px-4 py-2"
         >
-          <Text className="text-sm font-bold text-orange-300">🔥 {streak}-day streak</Text>
+          <Text className="text-sm font-bold text-modulate">🔥 {streak}-day streak</Text>
         </Pressable>
       </View>
 
@@ -140,8 +154,8 @@ export default function Index() {
       />
 
       {result.requiresAdultAttention ? (
-        <View className="rounded-2xl border-2 border-red-500/40 bg-slate-800 p-4">
-          <Text className="text-sm font-semibold text-red-300">{ADULT_ATTENTION_MESSAGE}</Text>
+        <View className="rounded-2xl border-2 border-shield-line bg-card p-4">
+          <Text className="text-sm font-semibold text-shield">{ADULT_ATTENTION_MESSAGE}</Text>
         </View>
       ) : null}
 
@@ -153,22 +167,22 @@ export default function Index() {
         onPress={() => router.navigate("/checkin")}
         className={`min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 p-4 ${
           hasCheckedInToday
-            ? "border-green-500/40 bg-green-500/10"
-            : "border-green-500/60 bg-green-500/10"
+            ? "border-go-line bg-go-soft"
+            : "border-go-line bg-go-soft"
         }`}
       >
         <Text className="text-2xl">{hasCheckedInToday ? "✅" : "😴"}</Text>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-slate-50">
+          <Text className="text-sm font-bold text-strong">
             {hasCheckedInToday ? "Checked in" : "Check in first"}
           </Text>
-          <Text className="text-xs text-slate-400">
+          <Text className="text-xs text-faint">
             {hasCheckedInToday && latestCheckIn
               ? `${formatTimeOfDay(latestCheckIn.recordedAt, profile.timezone)} — update if anything changed`
               : "Three taps. Unlocks today's plan."}
           </Text>
         </View>
-        <Text className="text-xl text-slate-500">›</Text>
+        <Text className="text-xl text-faint">›</Text>
       </Pressable>
 
       <DayStepper steps={steps} onStepPress={(_id, route) => router.navigate(route)} />
@@ -182,29 +196,29 @@ export default function Index() {
         }}
         className={
           activePlan !== null
-            ? "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-green-500/40 bg-green-500/10 p-4"
-            : "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+            ? "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-go-line bg-go-soft p-4"
+            : "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
         }
       >
         <Text className="text-3xl">🎯</Text>
         <View className="flex-1">
-          <Text className="text-base font-bold text-slate-50">
+          <Text className="text-base font-bold text-strong">
             {activePlan !== null
               ? `${personaById(activePlan.personaId ?? "ALL_ROUND")?.label ?? "Custom plan"}`
               : "My Plan"}
           </Text>
-          <Text className="text-sm text-slate-400">
+          <Text className="text-sm text-faint">
             {activePlan !== null
               ? `${planPhaseLabel(activePlan, localToday)} · Week ${Math.min(weekIndexOf(activePlan, localToday) + 1, activePlan.periodWeeks)} of ${activePlan.periodWeeks}`
               : "Build a plan around your goal"}
           </Text>
         </View>
-        <Text className="text-xl text-slate-500">›</Text>
+        <Text className="text-xl text-faint">›</Text>
       </Pressable>
 
       {activePlan !== null && planStatus(activePlan, localToday) === "final-week" ? (
-        <View className="rounded-2xl border border-yellow-500/40 bg-yellow-500/10 p-4">
-          <Text className="text-sm font-semibold text-yellow-300">
+        <View className="rounded-2xl border border-modulate-line bg-modulate-soft p-4">
+          <Text className="text-sm font-semibold text-modulate">
             Last week of your plan — record fresh test results so your next plan
             starts from reality.
           </Text>
@@ -212,11 +226,11 @@ export default function Index() {
       ) : null}
 
       {activePlan !== null && planStatus(activePlan, localToday) === "ended" ? (
-        <View className="rounded-2xl border-2 border-green-500/40 bg-green-500/10 p-4">
-          <Text className="text-base font-bold text-green-300">
+        <View className="rounded-2xl border-2 border-go-line bg-go-soft p-4">
+          <Text className="text-base font-bold text-go">
             Your {activePlan.periodWeeks}-week plan is complete 🎉
           </Text>
-          <Text className="mt-1 text-sm text-slate-300">
+          <Text className="mt-1 text-sm text-body">
             Ready for the next one? Set a new goal and the app will build your
             next plan from everything you just did.
           </Text>
@@ -227,9 +241,9 @@ export default function Index() {
               tapLight();
               router.navigate("/plan");
             }}
-            className="mt-3 h-12 items-center justify-center rounded-xl bg-green-500"
+            className="mt-3 h-12 items-center justify-center rounded-xl bg-accent"
           >
-            <Text className="text-sm font-black text-slate-950">Set a new goal 🎯</Text>
+            <Text className="text-sm font-black text-onaccent">Set a new goal 🎯</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -238,24 +252,24 @@ export default function Index() {
               tapLight();
               clearTrainingPlan();
             }}
-            className="mt-2 h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+            className="mt-2 h-12 items-center justify-center rounded-xl border-2 border-edge bg-card"
           >
-            <Text className="text-sm font-bold text-slate-300">Reset to default plan</Text>
+            <Text className="text-sm font-bold text-body">Reset to default plan</Text>
           </Pressable>
         </View>
       ) : null}
 
-      <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4 gap-3">
+      <View className="rounded-2xl border border-edge bg-card p-4 gap-3">
         <View className="flex-row items-center justify-between">
-          <Text className="text-base font-black text-slate-50">Today's Game Plan</Text>
-          <Text className="text-xs font-semibold text-slate-400">
+          <Text className="text-base font-black text-strong">Today's Game Plan</Text>
+          <Text className="text-xs font-semibold text-faint">
             {session.doneCount}/{session.doneCount + session.remainingCount} checked off
           </Text>
         </View>
 
         {hasWorkoutLogToday ? (
           <>
-            <Text className="rounded-xl bg-green-500/10 px-3 py-2 text-sm font-semibold text-green-300">
+            <Text className="rounded-xl bg-go-soft px-3 py-2 text-sm font-semibold text-go">
               Session complete 🎉
             </Text>
             <Pressable
@@ -265,9 +279,9 @@ export default function Index() {
                 tapLight();
                 router.navigate("/practice-log");
               }}
-              className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+              className="h-12 items-center justify-center rounded-xl border-2 border-edge bg-card"
             >
-              <Text className="text-sm font-bold text-slate-100">
+              <Text className="text-sm font-bold text-strong">
                 Log how it went 📝
               </Text>
             </Pressable>
@@ -275,15 +289,15 @@ export default function Index() {
         ) : (
           <>
             {nextUpTitle !== undefined ? (
-              <Text className="text-sm text-slate-300">
-                Up next: <Text className="font-bold text-slate-100">{nextUpTitle}</Text>
+              <Text className="text-sm text-body">
+                Up next: <Text className="font-bold text-strong">{nextUpTitle}</Text>
                 {session.remainingCount > 1
                   ? ` · ${session.remainingCount} blocks to go`
                   : ""}
               </Text>
             ) : null}
             {session.skippedCount > 0 ? (
-              <Text className="text-xs text-slate-400">
+              <Text className="text-xs text-faint">
                 {session.skippedCount === 1
                   ? "1 block adjusted out today"
                   : `${session.skippedCount} blocks adjusted out today`}{" "}
@@ -291,7 +305,7 @@ export default function Index() {
               </Text>
             ) : null}
             {result.reasons.includes("SORENESS_FLAGGED") && soreAreasToday.length > 0 ? (
-              <Text className="text-xs text-amber-300/90">
+              <Text className="text-xs text-modulate">
                 Sore today: {soreAreasToday.map(soreAreaLabel).join(", ")} — those blocks are
                 scaled.
               </Text>
@@ -303,9 +317,9 @@ export default function Index() {
                 tapLight();
                 router.navigate("/workout");
               }}
-              className="h-14 items-center justify-center rounded-xl bg-green-500"
+              className="h-14 items-center justify-center rounded-xl bg-accent"
             >
-              <Text className="text-base font-black text-slate-950">
+              <Text className="text-base font-black text-onaccent">
                 Open today's session →
               </Text>
             </Pressable>
@@ -317,9 +331,9 @@ export default function Index() {
             accessibilityRole="button"
             accessibilityLabel="Finish workout"
             onPress={finish}
-            className="h-14 items-center justify-center rounded-xl border-2 border-green-500 bg-green-500/10"
+            className="h-14 items-center justify-center rounded-xl border-2 border-accent bg-go-soft"
           >
-            <Text className="text-base font-black text-green-300">Finish workout 🏁</Text>
+            <Text className="text-base font-black text-go">Finish workout 🏁</Text>
           </Pressable>
         ) : null}
       </View>
@@ -328,34 +342,34 @@ export default function Index() {
         accessibilityRole="button"
         accessibilityLabel="Log an activity"
         onPress={() => router.navigate("/practice-log")}
-        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
       >
         <Text className="text-2xl">📝</Text>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-slate-50">Log activity</Text>
-          <Text className="text-xs text-slate-400">
+          <Text className="text-sm font-bold text-strong">Log activity</Text>
+          <Text className="text-xs text-faint">
             What you did shapes today's volume — and your next workout
           </Text>
         </View>
-        <Text className="text-xl text-slate-500">›</Text>
+        <Text className="text-xl text-faint">›</Text>
       </Pressable>
 
       {upcoming.length > 0 ? (
-        <View className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
+        <View className="rounded-2xl bg-card border border-edge p-4">
           {nextGame ? (
             <View className="mb-1">
-              <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              <Text className="text-xs font-bold uppercase tracking-widest text-faint">
                 Next game
               </Text>
-              <Text className="mt-0.5 text-lg font-black text-slate-50">
+              <Text className="mt-0.5 text-lg font-black text-strong">
                 {nextGame.countdown}
               </Text>
-              <Text className="text-sm text-slate-400">
+              <Text className="text-sm text-faint">
                 Fresh legs win games — protect them today.
               </Text>
             </View>
           ) : null}
-          <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          <Text className="text-xs font-bold uppercase tracking-widest text-faint">
             Upcoming
           </Text>
           {upcoming.map((view) => (
@@ -369,20 +383,20 @@ export default function Index() {
               }}
               className="min-h-[48px] mt-1 flex-row items-center justify-between"
             >
-              <Text className="text-sm font-semibold text-slate-100">
+              <Text className="text-sm font-semibold text-strong">
                 {SCHEDULED_EVENT_LABELS[view.event.eventType]}
               </Text>
               <View className="flex-row items-center gap-2">
                 <Text
                   className={`text-sm ${
                     view.event.eventType === "GAME"
-                      ? "font-bold text-orange-300"
-                      : "text-slate-400"
+                      ? "font-bold text-modulate"
+                      : "text-faint"
                   }`}
                 >
                   {view.countdown}
                 </Text>
-                <Text className="text-sm text-slate-500">›</Text>
+                <Text className="text-sm text-faint">›</Text>
               </View>
             </Pressable>
           ))}
@@ -393,14 +407,14 @@ export default function Index() {
         accessibilityRole="button"
         accessibilityLabel="Open calendar"
         onPress={() => router.navigate("/history")}
-        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-slate-700 bg-slate-800 p-4"
+        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
       >
         <Text className="text-3xl">📅</Text>
         <View className="flex-1">
-          <Text className="text-base font-bold text-slate-50">Calendar</Text>
-          <Text className="text-sm text-slate-400">Past sessions & upcoming events</Text>
+          <Text className="text-base font-bold text-strong">Calendar</Text>
+          <Text className="text-sm text-faint">Past sessions & upcoming events</Text>
         </View>
-        <Text className="text-xl text-slate-500">›</Text>
+        <Text className="text-xl text-faint">›</Text>
       </Pressable>
     </ScrollView>
     </>

@@ -11,8 +11,8 @@ export function Toast({ message }: { message: string | null }) {
 
   return (
     <View className="absolute inset-x-4 bottom-6 z-10 items-center">
-      <View className="rounded-full border border-green-500/40 bg-slate-800 px-5 py-3">
-        <Text className="text-sm font-semibold text-green-300">{message}</Text>
+      <View className="rounded-full border border-go-line bg-card px-5 py-3">
+        <Text className="text-sm font-semibold text-go">{message}</Text>
       </View>
     </View>
   );

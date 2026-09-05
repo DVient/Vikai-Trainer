@@ -9,17 +9,17 @@ import type { PowerTone } from "../lib/power";
  */
 
 const TONE_FILL: Record<PowerTone, string> = {
-  green: "bg-green-500",
-  yellow: "bg-yellow-500",
-  red: "bg-red-500",
-  neutral: "bg-slate-600",
+  green: "bg-accent",
+  yellow: "bg-modulate",
+  red: "bg-shield",
+  neutral: "bg-edge",
 };
 
 const TONE_TEXT: Record<PowerTone, string> = {
-  green: "text-green-400",
-  yellow: "text-yellow-400",
-  red: "text-red-400",
-  neutral: "text-slate-400",
+  green: "text-go",
+  yellow: "text-modulate",
+  red: "text-shield",
+  neutral: "text-faint",
 };
 
 interface PowerGaugeProps {
@@ -34,20 +34,20 @@ export function PowerGauge({ percent, tone, label, sublabel }: PowerGaugeProps) 
   const text = TONE_TEXT[tone];
 
   return (
-    <View className="rounded-2xl bg-slate-800 border border-slate-700 p-4">
+    <View className="rounded-2xl bg-card border border-edge p-4">
       <View className="flex-row items-center justify-between">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Ready State
         </Text>
         {sublabel !== undefined ? (
-          <Text className="text-xs font-semibold text-slate-400">{sublabel}</Text>
+          <Text className="text-xs font-semibold text-faint">{sublabel}</Text>
         ) : null}
       </View>
 
       <View className="mt-3 flex-row items-center gap-3">
         {/* Battery shell with terminal cap */}
         <View className="flex-1 flex-row items-center">
-          <View className="h-14 flex-1 rounded-xl border-2 border-slate-600 p-1">
+          <View className="h-14 flex-1 rounded-xl border-2 border-edge p-1">
             <View className="h-full overflow-hidden rounded-lg">
               <View
                 className={`h-full rounded-lg ${fill}`}
@@ -55,14 +55,14 @@ export function PowerGauge({ percent, tone, label, sublabel }: PowerGaugeProps) 
               />
             </View>
           </View>
-          <View className="ml-1 rounded-r-md bg-slate-600" style={{ width: 8, height: 24 }} />
+          <View className="ml-1 rounded-r-md bg-edge" style={{ width: 8, height: 24 }} />
         </View>
 
         <View className="min-w-[84px] items-end">
           <Text className={`text-2xl font-black ${text}`}>
             {percent === null ? "?" : `${percent}%`}
           </Text>
-          <Text className="text-xs font-semibold text-slate-300">{label}</Text>
+          <Text className="text-xs font-semibold text-body">{label}</Text>
         </View>
       </View>
     </View>

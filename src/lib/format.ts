@@ -102,16 +102,16 @@ export interface RpeBand {
 /** Effort slider bands, chilled-out → all-out (youth micro-copy). */
 export const RPE_BANDS: readonly RpeBand[] = [
   { maxRpe: 3, label: "Chilling", colorClass: "bg-sky-500" },
-  { maxRpe: 6, label: "Warming Up", colorClass: "bg-green-500" },
-  { maxRpe: 8, label: "Locked In", colorClass: "bg-yellow-500" },
-  { maxRpe: 10, label: "All Out", colorClass: "bg-red-500" },
+  { maxRpe: 6, label: "Warming Up", colorClass: "bg-go" },
+  { maxRpe: 8, label: "Locked In", colorClass: "bg-modulate" },
+  { maxRpe: 10, label: "All Out", colorClass: "bg-shield" },
 ];
 
 export function rpeBand(rpe: number): RpeBand {
   for (const band of RPE_BANDS) {
     if (rpe <= band.maxRpe) return band;
   }
-  return RPE_BANDS[RPE_BANDS.length - 1] ?? { maxRpe: 10, label: "All Out", colorClass: "bg-red-500" };
+  return RPE_BANDS[RPE_BANDS.length - 1] ?? { maxRpe: 10, label: "All Out", colorClass: "bg-shield" };
 }
 
 export function rpeBandClass(rpe: number): string {

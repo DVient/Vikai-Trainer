@@ -93,10 +93,10 @@ export default function CheckIn() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-app"
     >
       <ScrollView
-        className="flex-1 bg-slate-900"
+        className="flex-1 bg-app"
         contentContainerClassName="w-full max-w-md self-center gap-5 p-4"
       >
       <SelectorGroup label="Tap 1 — Sleep 😴">
@@ -126,9 +126,9 @@ export default function CheckIn() {
       </SelectorGroup>
 
       {painReported ? (
-        <View className="rounded-2xl border border-red-500/40 bg-slate-800 p-4 gap-3">
-          <Text className="text-sm font-bold text-slate-50">Tell us about the pain</Text>
-          <Text className="text-xs text-slate-400">
+        <View className="rounded-2xl border border-shield-line bg-card p-4 gap-3">
+          <Text className="text-sm font-bold text-strong">Tell us about the pain</Text>
+          <Text className="text-xs text-faint">
             Vikai does not assess anything — it only pauses training and alerts an adult.
           </Text>
           <TextInput
@@ -136,7 +136,7 @@ export default function CheckIn() {
             onChangeText={setPainLocation}
             placeholder="Where do you feel it? (e.g. right knee)"
             placeholderTextColor="#64748B"
-            className="min-h-[56px] rounded-xl border-2 border-slate-600 bg-slate-900 px-3 text-sm text-slate-100"
+            className="min-h-[56px] rounded-xl border-2 border-edge bg-app px-3 text-sm text-strong"
           />
           <TextInput
             value={painDescription}
@@ -144,10 +144,10 @@ export default function CheckIn() {
             placeholder="Describe how it feels (optional)"
             placeholderTextColor="#64748B"
             multiline
-            className="min-h-[72px] rounded-xl border-2 border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+            className="min-h-[72px] rounded-xl border-2 border-edge bg-app px-3 py-2 text-sm text-strong"
           />
           {painLocationMissing ? (
-            <Text className="text-xs font-semibold text-red-400">A location is required.</Text>
+            <Text className="text-xs font-semibold text-shield">A location is required.</Text>
           ) : null}
         </View>
       ) : null}
@@ -177,10 +177,10 @@ export default function CheckIn() {
         }}
         disabled={!canSave}
         className={`h-14 items-center justify-center rounded-xl ${
-          canSave ? "bg-green-500" : "bg-slate-700"
+          canSave ? "bg-accent" : "bg-edge"
         }`}
       >
-        <Text className={`text-base font-black ${canSave ? "text-slate-950" : "text-slate-500"}`}>
+        <Text className={`text-base font-black ${canSave ? "text-onaccent" : "text-faint"}`}>
           Save check-in
         </Text>
       </Pressable>
@@ -194,7 +194,7 @@ export default function CheckIn() {
 function SelectorGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="gap-2">
-      <Text className="text-sm font-bold text-slate-100">{label}</Text>
+      <Text className="text-sm font-bold text-strong">{label}</Text>
       <View className="flex-row gap-2">{children}</View>
     </View>
   );

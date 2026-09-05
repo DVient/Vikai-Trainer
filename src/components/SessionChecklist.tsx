@@ -62,8 +62,8 @@ export function SessionChecklist({ view, localDate, onToggle, resolveDetail }: S
         </View>
       ) : null}
       {skipped.length > 0 ? (
-        <View className="gap-2 rounded-xl border border-dashed border-slate-700 p-2">
-          <Text className="text-xs font-bold uppercase tracking-widest text-slate-500">
+        <View className="gap-2 rounded-xl border border-dashed border-edge p-2">
+          <Text className="text-xs font-bold uppercase tracking-widest text-faint">
             Adjusted out today
           </Text>
           {skipped.map((row) => (
@@ -93,7 +93,7 @@ function ChecklistRow({
   return (
     <View
       className={`overflow-hidden rounded-xl border-2 ${
-        done ? "border-green-500/40 bg-green-500/10" : "border-slate-700 bg-slate-800"
+        done ? "border-go-line bg-go-soft" : "border-edge bg-card"
       }`}
     >
       <Pressable
@@ -114,27 +114,27 @@ function ChecklistRow({
         ) : (
           <View
             className={`items-center justify-center rounded-md border-2 ${
-              done ? "border-green-500 bg-green-500" : "border-slate-500"
+              done ? "border-accent bg-accent" : "border-edge"
             }`}
             // Decorative checkbox indicator (the whole row is the touch target).
             style={{ width: 28, height: 28 }}
           >
-            {done ? <Text className="text-sm font-black text-slate-950">✓</Text> : null}
+            {done ? <Text className="text-sm font-black text-onaccent">✓</Text> : null}
           </View>
         )}
         <View className="flex-1">
           <Text
-            className={`text-sm font-bold ${done ? "text-slate-400 line-through" : "text-slate-50"}`}
+            className={`text-sm font-bold ${done ? "text-faint line-through" : "text-strong"}`}
           >
             {title}
           </Text>
-          <Text className={`text-xs ${done ? "text-green-300" : "text-slate-400"}`}>
+          <Text className={`text-xs ${done ? "text-go" : "text-faint"}`}>
             {setsText(row)}
           </Text>
         </View>
         {!done && row.modification === "REDUCED" ? (
-          <View className="rounded-full bg-yellow-500/20 px-2 py-1">
-            <Text className="text-xs font-bold text-yellow-300">Scale down</Text>
+          <View className="rounded-full bg-modulate-soft px-2 py-1">
+            <Text className="text-xs font-bold text-modulate">Scale down</Text>
           </View>
         ) : null}
       </Pressable>
@@ -180,19 +180,19 @@ function ExpandableWork({
           tapLight();
           setExpanded(true);
         }}
-        className="min-h-[48px] flex-row items-center gap-2 border-t border-slate-700/60 px-3 py-2"
+        className="min-h-[48px] flex-row items-center gap-2 border-t border-edge px-3 py-2"
       >
-        <Text className={`text-xs font-bold ${locked ? "text-slate-500" : "text-green-300"}`}>
+        <Text className={`text-xs font-bold ${locked ? "text-faint" : "text-go"}`}>
           See the work
         </Text>
-        <Text className="text-xs text-slate-500">▸</Text>
+        <Text className="text-xs text-faint">▸</Text>
       </Pressable>
     );
   }
 
   return (
-    <View className="border-t border-slate-700/60 p-3">
-      <Text className={`text-xs font-semibold ${locked ? "text-slate-500" : "text-green-300"}`}>
+    <View className="border-t border-edge p-3">
+      <Text className={`text-xs font-semibold ${locked ? "text-faint" : "text-go"}`}>
         {locked
           ? "Not part of today's plan — study it anyway."
           : reduced
@@ -211,9 +211,9 @@ function ExpandableWork({
           tapLight();
           setExpanded(false);
         }}
-        className="mt-2 h-12 flex-row items-center justify-center rounded-lg bg-slate-700/50"
+        className="mt-2 h-12 flex-row items-center justify-center rounded-lg bg-edge-mid"
       >
-        <Text className="text-xs font-bold text-slate-300">Hide the work ▴</Text>
+        <Text className="text-xs font-bold text-body">Hide the work ▴</Text>
       </Pressable>
     </View>
   );

@@ -36,6 +36,7 @@ import {
 } from "../types";
 import { DEFAULT_ATHLETE_PROFILE } from "../config/defaults";
 import { defaultPracticeEventDrafts } from "../lib/defaultSchedule";
+import { DEFAULT_TEAM_COLORS, type TeamColors } from "../lib/theme";
 import { buildPlan, type PlanHistorySnapshot } from "../plans/planBuilder";
 import { toLocalDateString } from "../engine/autoregulation";
 
@@ -73,9 +74,11 @@ export interface VikaiTrainerAppState {
   personalBests: PersonalBest[];
   /**
    * One-shot guard for the default practice schedule (Tue/Wed/Thu 6 PM):
-   * seeded exactly once so later athlete edits and deletions stick.
+   * seeded exactly once so later athlete edits and deletions always stick.
    */
   defaultScheduleSeeded: boolean;
+  /** The athlete's two team colors driving the screen skin (additive §33). */
+  teamColors: TeamColors;
 
   /* ── Actions ── */
   /** Replaces the profile on confirmation (SPEC §32 overwrite semantics). */
@@ -130,6 +133,8 @@ export interface VikaiTrainerAppState {
   removePersonalBest: (id: string) => void;
   /** Seeds the default practice series once (no-op after the first run). */
   seedDefaultSchedule: () => void;
+  /** Applies a new team-color pair (drives the screen skin instantly). */
+  setTeamColors: (colors: TeamColors) => void;
 }
 
 export const useAppStore = create<VikaiTrainerAppState>()(
@@ -146,6 +151,7 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       activePlan: null,
       personalBests: [],
       defaultScheduleSeeded: false,
+      teamColors: DEFAULT_TEAM_COLORS,
 
       setProfile: (profile) => {
         set({ profile });
@@ -336,6 +342,10 @@ export const useAppStore = create<VikaiTrainerAppState>()(
           scheduledEvents: [...state.scheduledEvents, ...records],
           defaultScheduleSeeded: true,
         }));
+      },
+
+      setTeamColors: (colors) => {
+        set({ teamColors: { ...colors } });
       },
 
       recordWorkoutLog: (draft) => {

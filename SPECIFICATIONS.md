@@ -30,7 +30,9 @@ const defaultAthleteProfile = {
     "EXPLOSIVENESS",
     "CHANGE_OF_DIRECTION"
   ],
-  practicesPerWeek: 2,
+  practicesPerWeek: 3,
+  practiceWeekdays: [2, 3, 4],
+  practiceTime: "18:00",
   seasonStart: "2026-09-14",
   firstGame: "2026-10-15",
   schoolStartTime: "09:00",

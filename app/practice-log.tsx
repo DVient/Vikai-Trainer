@@ -114,14 +114,14 @@ export default function PracticeLog() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-app"
     >
       <ScrollView
-        className="flex-1 bg-slate-900"
+        className="flex-1 bg-app"
         contentContainerClassName="w-full max-w-md self-center gap-5 p-4"
       >
       <View className="gap-2">
-        <Text className="text-sm font-bold text-slate-100">What did you do?</Text>
+        <Text className="text-sm font-bold text-strong">What did you do?</Text>
         <View className="flex-row flex-wrap gap-2">
           {ACTIVITY_TYPES.map((type) => (
             <OptionCard
@@ -136,7 +136,7 @@ export default function PracticeLog() {
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-bold text-slate-100">
+        <Text className="text-sm font-bold text-strong">
           How hard was it? (effort {sessionRpe}/10)
         </Text>
         <View className="flex-row gap-1">
@@ -154,12 +154,12 @@ export default function PracticeLog() {
                 className={`h-14 min-w-[48px] flex-1 items-center justify-center rounded-lg border-2 ${
                   selected
                     ? `${band.colorClass} border-transparent`
-                    : "border-slate-700 bg-slate-800"
+                    : "border-edge bg-card"
                 }`}
               >
                 <Text
                   className={`text-sm font-black ${
-                    selected ? "text-slate-950" : "text-slate-300"
+                    selected ? "text-onaccent" : "text-body"
                   }`}
                 >
                   {rpe}
@@ -169,21 +169,21 @@ export default function PracticeLog() {
           })}
         </View>
         <View className="flex-row items-center justify-between">
-          <Text className="text-xs text-slate-500">😴 Chilling</Text>
-          <Text className="text-xs font-bold text-slate-200">
+          <Text className="text-xs text-faint">😴 Chilling</Text>
+          <Text className="text-xs font-bold text-body">
             {band.label} {sessionRpe <= 3 ? "😌" : sessionRpe <= 6 ? "🙂" : sessionRpe <= 8 ? "😤" : "🔥"}
           </Text>
-          <Text className="text-xs text-slate-500">🔥 All Out</Text>
+          <Text className="text-xs text-faint">🔥 All Out</Text>
         </View>
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-bold text-slate-100">How long? (minutes)</Text>
+        <Text className="text-sm font-bold text-strong">How long? (minutes)</Text>
         <TextInput
           value={durationText}
           onChangeText={setDurationText}
           keyboardType="number-pad"
-          className="h-14 rounded-xl border-2 border-slate-600 bg-slate-800 px-3 text-sm text-slate-100"
+          className="h-14 rounded-xl border-2 border-edge bg-card px-3 text-sm text-strong"
         />
         <View className="flex-row gap-2">
           {DURATION_CHIPS.map((minutes) => (
@@ -197,13 +197,13 @@ export default function PracticeLog() {
               }}
               className={`h-14 flex-1 items-center justify-center rounded-lg border-2 ${
                 durationText === String(minutes)
-                  ? "border-green-500 bg-green-500/20"
-                  : "border-slate-700 bg-slate-800"
+                  ? "border-accent bg-soft"
+                  : "border-edge bg-card"
               }`}
             >
               <Text
                 className={`text-sm font-bold ${
-                  durationText === String(minutes) ? "text-green-300" : "text-slate-300"
+                  durationText === String(minutes) ? "text-go" : "text-body"
                 }`}
               >
                 {minutes}
@@ -214,19 +214,19 @@ export default function PracticeLog() {
       </View>
 
       <View className="gap-2">
-        <Text className="text-sm font-bold text-slate-100">Notes (optional)</Text>
+        <Text className="text-sm font-bold text-strong">Notes (optional)</Text>
         <TextInput
           value={notes}
           onChangeText={setNotes}
           placeholder="Anything worth remembering?"
           placeholderTextColor="#64748B"
           multiline
-          className="min-h-[72px] rounded-xl border-2 border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+          className="min-h-[72px] rounded-xl border-2 border-edge bg-card px-3 py-2 text-sm text-strong"
         />
       </View>
 
       {error !== null ? (
-        <Text className="text-sm font-semibold text-red-400">{error}</Text>
+        <Text className="text-sm font-semibold text-shield">{error}</Text>
       ) : null}
 
       <Pressable
@@ -235,9 +235,9 @@ export default function PracticeLog() {
           tapHeavy();
           onSave();
         }}
-        className="h-14 items-center justify-center rounded-xl bg-green-500"
+        className="h-14 items-center justify-center rounded-xl bg-accent"
       >
-        <Text className="text-base font-black text-slate-950">
+        <Text className="text-base font-black text-onaccent">
           {editingId !== null ? "Save changes" : "Save activity"}
         </Text>
       </Pressable>
@@ -247,15 +247,15 @@ export default function PracticeLog() {
           accessibilityRole="button"
           accessibilityLabel="Cancel edit"
           onPress={cancelEdit}
-          className="h-12 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+          className="h-12 items-center justify-center rounded-xl border-2 border-edge bg-card"
         >
-          <Text className="text-sm font-bold text-slate-300">Cancel — back to adding</Text>
+          <Text className="text-sm font-bold text-body">Cancel — back to adding</Text>
         </Pressable>
       ) : null}
 
       {todaysLogs.length > 0 ? (
-        <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
-          <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        <View className="rounded-2xl border border-edge bg-card p-4">
+          <Text className="text-xs font-bold uppercase tracking-widest text-faint">
             {todaysLogs.length === 1 ? "Today's log (1 entry)" : `Today's log (${todaysLogs.length} entries)`}
           </Text>
           {todaysLogs.map((entry) => {
@@ -266,15 +266,15 @@ export default function PracticeLog() {
                 className="mt-2 flex-row items-center justify-between"
               >
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-slate-100">
+                  <Text className="text-sm font-semibold text-strong">
                     {ACTIVITY_TYPE_LABELS[entry.activityType]}
                   </Text>
-                  <Text className="text-xs text-slate-400">
+                  <Text className="text-xs text-faint">
                     {entry.sessionRpe ?? "?"}/10 · {entry.durationMinutes ?? "?"} min · load{" "}
                     {(entry.sessionRpe ?? 0) * (entry.durationMinutes ?? 0)}
                   </Text>
                   {workoutDone ? (
-                    <Text className="mt-0.5 text-xs font-semibold text-slate-500">
+                    <Text className="mt-0.5 text-xs font-semibold text-faint">
                       {after
                         ? "After today's session — shapes your next workout"
                         : "Before today's session — already shaped today"}
@@ -285,9 +285,9 @@ export default function PracticeLog() {
                   accessibilityRole="button"
                   accessibilityLabel={`Edit ${ACTIVITY_TYPE_LABELS[entry.activityType]} entry`}
                   onPress={() => startEdit(entry.id)}
-                  className="h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
+                  className="h-14 w-14 items-center justify-center rounded-lg bg-edge"
                 >
-                  <Text className="text-base font-bold text-slate-300">✎</Text>
+                  <Text className="text-base font-bold text-body">✎</Text>
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
@@ -296,9 +296,9 @@ export default function PracticeLog() {
                     tapLight();
                     removeActivityLog(entry.id);
                   }}
-                  className="ml-2 h-14 w-14 items-center justify-center rounded-lg bg-slate-700"
+                  className="ml-2 h-14 w-14 items-center justify-center rounded-lg bg-edge"
                 >
-                  <Text className="text-base font-bold text-slate-300">✕</Text>
+                  <Text className="text-base font-bold text-body">✕</Text>
                 </Pressable>
               </View>
             );
@@ -314,9 +314,9 @@ export default function PracticeLog() {
             tapLight();
             router.replace("/");
           }}
-          className="h-14 items-center justify-center rounded-xl border-2 border-slate-700 bg-slate-800"
+          className="h-14 items-center justify-center rounded-xl border-2 border-edge bg-card"
         >
-          <Text className="text-base font-bold text-slate-100">Done — back to your day</Text>
+          <Text className="text-base font-bold text-strong">Done — back to your day</Text>
         </Pressable>
       ) : null}
 

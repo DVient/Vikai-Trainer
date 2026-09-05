@@ -56,8 +56,8 @@ export function BodyMap({ areas, onAreasChange, heading = "Optional — Body map
 
   return (
     <View className="gap-2">
-      <Text className="text-sm font-bold text-slate-100">{heading}</Text>
-      <Text className="text-xs text-slate-400">{note}</Text>
+      <Text className="text-sm font-bold text-strong">{heading}</Text>
+      <Text className="text-xs text-faint">{note}</Text>
       <View className="flex-row gap-2">
         {SORE_REGIONS.map((region) => (
           <OptionCard
@@ -76,9 +76,9 @@ export function BodyMap({ areas, onAreasChange, heading = "Optional — Body map
         return (
           <View
             key={region}
-            className="rounded-2xl border border-slate-700 bg-slate-800 p-3 gap-2"
+            className="rounded-2xl border border-edge bg-card p-3 gap-2"
           >
-            <Text className="text-xs font-semibold text-slate-300">
+            <Text className="text-xs font-semibold text-body">
               What's sore in the {option.label.toLowerCase()}?
             </Text>
             <View className="flex-row flex-wrap gap-2">
@@ -96,7 +96,7 @@ export function BodyMap({ areas, onAreasChange, heading = "Optional — Body map
         );
       })}
       {areas.length > 0 ? (
-        <Text className="text-xs text-slate-400">
+        <Text className="text-xs text-faint">
           Sore today: {areas.map(soreAreaLabel).join(", ")}
         </Text>
       ) : null}
@@ -123,11 +123,11 @@ function AreaChip({
       accessibilityLabel={`${label} ${selected ? "flagged as sore" : ""}`.trim()}
       onPress={onPress}
       className={`h-12 flex-row items-center gap-1.5 rounded-full border-2 px-4 ${
-        selected ? "border-amber-400 bg-amber-400/20" : "border-slate-600 bg-slate-900"
+        selected ? "border-modulate-line bg-modulate-soft" : "border-edge bg-app"
       }`}
     >
       <Text className="text-base">{emoji}</Text>
-      <Text className={`text-sm font-semibold ${selected ? "text-amber-300" : "text-slate-300"}`}>
+      <Text className={`text-sm font-semibold ${selected ? "text-modulate" : "text-body"}`}>
         {label}
       </Text>
     </Pressable>

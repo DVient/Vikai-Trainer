@@ -2,16 +2,25 @@ import "../global.css";
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { View } from "react-native";
+import { vars } from "nativewind";
 
 import {
   configureNotificationHandler,
   ensureDefaultRemindersScheduledAsync,
 } from "../src/services/notifications";
 import { HeaderBack } from "../src/components/HeaderBack";
+import { themeRoles } from "../src/lib/theme";
 import { useAppStore } from "../src/stores/useAppStore";
 
 export default function RootLayout() {
+  const teamColors = useAppStore((state) => state.teamColors);
+  const roles = useMemo(
+    () => themeRoles(teamColors.primary, teamColors.secondary),
+    [teamColors],
+  );
+
   useEffect(() => {
     // Default practice schedule (Tue/Wed/Thu 6 PM): seeded exactly once —
     // the persistence guard keeps athlete edits sticky afterwards.
@@ -34,13 +43,39 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <>
-      <StatusBar style="light" />
+    <View
+      className="flex-1"
+      style={
+        vars({
+          "--vk-app": roles.appBg,
+          "--vk-card": roles.card,
+          "--vk-edge": roles.edge,
+          "--vk-edge-soft": roles.edgeSoft,
+          "--vk-edge-mid": roles.edgeMid,
+          "--vk-soft": roles.soft,
+          "--vk-strong": roles.strong,
+          "--vk-body": roles.body,
+          "--vk-faint": roles.muted,
+          "--vk-accent": roles.accent,
+          "--vk-on-accent": roles.onAccent,
+          "--vk-go": roles.status.go,
+          "--vk-go-soft": roles.status.goSoft,
+          "--vk-go-line": roles.status.goLine,
+          "--vk-modulate": roles.status.modulate,
+          "--vk-modulate-soft": roles.status.modulateSoft,
+          "--vk-modulate-line": roles.status.modulateLine,
+          "--vk-shield": roles.status.shield,
+          "--vk-shield-soft": roles.status.shieldSoft,
+          "--vk-shield-line": roles.status.shieldLine,
+        }) as Record<string, string>
+      }
+    >
+      <StatusBar style={roles.isDarkBackground ? "light" : "dark"} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: "#0F172A" },
-          headerTintColor: "#F8FAFC",
-          contentStyle: { backgroundColor: "#0F172A" },
+          headerStyle: { backgroundColor: roles.accent },
+          headerTintColor: roles.onAccent,
+          contentStyle: { backgroundColor: roles.appBg },
         }}
       >
         <Stack.Screen name="index" options={{ title: "Vikai Trainer" }} />
@@ -84,7 +119,16 @@ export default function RootLayout() {
           name="plan"
           options={{ title: "My Plan", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
         />
+        <Stack.Screen
+          name="settings"
+          options={{
+            title: "Team Skin",
+            presentation: "modal",
+            headerBackVisible: false,
+            headerLeft: () => <HeaderBack />,
+          }}
+        />
       </Stack>
-    </>
+    </View>
   );
 }

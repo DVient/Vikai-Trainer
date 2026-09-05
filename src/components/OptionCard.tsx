@@ -29,8 +29,8 @@ export function OptionCard({ label, emoji, selected, onSelect, className = "" }:
       }}
       className={`min-h-[64px] items-center justify-center rounded-2xl border-2 px-3 py-3 ${
         selected
-          ? "border-green-500 bg-green-500/20"
-          : "border-slate-700 bg-slate-800"
+          ? "border-accent bg-soft"
+          : "border-edge bg-card"
       } ${className}`}
     >
       {emoji !== undefined ? (
@@ -38,7 +38,7 @@ export function OptionCard({ label, emoji, selected, onSelect, className = "" }:
       ) : null}
       <Text
         className={`text-center text-sm font-semibold ${
-          selected ? "text-green-300" : "text-slate-200"
+          selected ? "text-go" : "text-body"
         }`}
       >
         {label}

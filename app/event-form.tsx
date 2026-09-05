@@ -226,13 +226,13 @@ export default function EventForm() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-app"
     >
       <ScrollView
-        className="flex-1 bg-slate-900"
+        className="flex-1 bg-app"
         contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
       >
-      <Text className="text-sm text-slate-400">
+      <Text className="text-sm text-faint">
         Games, practices, camps — anything that asks something of your legs.
       </Text>
 
@@ -248,7 +248,7 @@ export default function EventForm() {
       </View>
 
       <View className="gap-1">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Date
         </Text>
         <TextInput
@@ -260,12 +260,12 @@ export default function EventForm() {
           editable={editable}
           placeholder="2026-01-15"
           placeholderTextColor="#64748B"
-          className="h-14 rounded-xl border border-slate-700 bg-slate-800 px-4 text-base text-slate-50"
+          className="h-14 rounded-xl border border-edge bg-card px-4 text-base text-strong"
         />
       </View>
 
       <View className="gap-1">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Start time
         </Text>
         <TextInput
@@ -277,12 +277,12 @@ export default function EventForm() {
           editable={editable}
           placeholder="18:00"
           placeholderTextColor="#64748B"
-          className="h-14 rounded-xl border border-slate-700 bg-slate-800 px-4 text-base text-slate-50"
+          className="h-14 rounded-xl border border-edge bg-card px-4 text-base text-strong"
         />
       </View>
 
       <View className="gap-1">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Title (optional)
         </Text>
         <TextInput
@@ -294,13 +294,13 @@ export default function EventForm() {
           editable={editable}
           placeholder="Home opener"
           placeholderTextColor="#64748B"
-          className="h-14 rounded-xl border border-slate-700 bg-slate-800 px-4 text-base text-slate-50"
+          className="h-14 rounded-xl border border-edge bg-card px-4 text-base text-strong"
         />
       </View>
 
       {existing === undefined ? (
         <View className="gap-2">
-          <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          <Text className="text-xs font-bold uppercase tracking-widest text-faint">
             Repeats
           </Text>
           <View className="flex-row gap-2">
@@ -319,8 +319,8 @@ export default function EventForm() {
           </View>
 
           {repeatEnabled ? (
-            <View className="gap-3 rounded-2xl border border-slate-700 bg-slate-800/60 p-4">
-              <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            <View className="gap-3 rounded-2xl border border-edge bg-card p-4">
+              <Text className="text-xs font-bold uppercase tracking-widest text-faint">
                 Which days?
               </Text>
               <View className="flex-row flex-wrap gap-2">
@@ -335,12 +335,12 @@ export default function EventForm() {
                       onPress={() => toggleWeekday(weekday)}
                       className={`min-h-[48px] min-w-[56px] flex-1 items-center justify-center rounded-xl border-2 py-2 ${
                         selected
-                          ? "border-green-500 bg-green-500/20"
-                          : "border-slate-700 bg-slate-900"
+                          ? "border-accent bg-soft"
+                          : "border-edge bg-app"
                       }`}
                     >
                       <Text
-                        className={`text-sm font-bold ${selected ? "text-green-300" : "text-slate-300"}`}
+                        className={`text-sm font-bold ${selected ? "text-go" : "text-body"}`}
                       >
                         {label}
                       </Text>
@@ -350,7 +350,7 @@ export default function EventForm() {
               </View>
 
               <View className="gap-1">
-                <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                <Text className="text-xs font-bold uppercase tracking-widest text-faint">
                   For how many weeks?
                 </Text>
                 <TextInput
@@ -363,17 +363,17 @@ export default function EventForm() {
                   keyboardType="number-pad"
                   placeholder="6"
                   placeholderTextColor="#64748B"
-                  className="h-14 rounded-xl border border-slate-700 bg-slate-800 px-4 text-base text-slate-50"
+                  className="h-14 rounded-xl border border-edge bg-card px-4 text-base text-strong"
                 />
               </View>
 
               {seriesPreview !== "" ? (
-                <Text className="text-sm font-bold text-green-300">
+                <Text className="text-sm font-bold text-go">
                   Creates {seriesPreview} — all at the same time.
                 </Text>
               ) : null}
               {repeatHint !== "" ? (
-                <Text className="text-xs text-slate-400">{repeatHint}</Text>
+                <Text className="text-xs text-faint">{repeatHint}</Text>
               ) : null}
             </View>
           ) : null}
@@ -381,13 +381,13 @@ export default function EventForm() {
       ) : null}
 
       {seriesSize > 1 ? (
-        <Text className="text-xs font-semibold text-slate-400">
+        <Text className="text-xs font-semibold text-faint">
           Part of a weekly series ({seriesSize} events total) — edits change only this one.
         </Text>
       ) : null}
 
       {error !== "" ? (
-        <Text className="text-sm font-semibold text-red-400">{error}</Text>
+        <Text className="text-sm font-semibold text-shield">{error}</Text>
       ) : null}
 
       {editable ? (
@@ -395,14 +395,14 @@ export default function EventForm() {
           accessibilityRole="button"
           accessibilityLabel="Save event"
           onPress={save}
-          className="h-14 items-center justify-center rounded-xl bg-green-500"
+          className="h-14 items-center justify-center rounded-xl bg-accent"
         >
-          <Text className="text-base font-black text-slate-950">
+          <Text className="text-base font-black text-onaccent">
             {existing ? "Save changes" : "Add to calendar"}
           </Text>
         </Pressable>
       ) : (
-        <Text className="text-sm text-slate-500">
+        <Text className="text-sm text-faint">
           This event already happened — history stays as it was.
         </Text>
       )}
@@ -412,9 +412,9 @@ export default function EventForm() {
           accessibilityRole="button"
           accessibilityLabel="Delete event"
           onPress={remove}
-          className="h-14 items-center justify-center rounded-xl border-2 border-red-500/60"
+          className="h-14 items-center justify-center rounded-xl border-2 border-shield-line"
         >
-          <Text className="text-base font-bold text-red-400">Remove from calendar</Text>
+          <Text className="text-base font-bold text-shield">Remove from calendar</Text>
         </Pressable>
       ) : null}
 
@@ -423,9 +423,9 @@ export default function EventForm() {
           accessibilityRole="button"
           accessibilityLabel="Delete series"
           onPress={removeSeries}
-          className="h-14 items-center justify-center rounded-xl border-2 border-red-500/60"
+          className="h-14 items-center justify-center rounded-xl border-2 border-shield-line"
         >
-          <Text className="text-base font-bold text-red-400">
+          <Text className="text-base font-bold text-shield">
             Remove whole series ({seriesSize})
           </Text>
         </Pressable>

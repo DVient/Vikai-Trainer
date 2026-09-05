@@ -18,8 +18,8 @@ interface DayStepperProps {
 
 export function DayStepper({ steps, gamePlanSummary, onStepPress }: DayStepperProps) {
   return (
-    <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4 gap-2">
-      <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+    <View className="rounded-2xl border border-edge bg-card p-4 gap-2">
+      <Text className="text-xs font-bold uppercase tracking-widest text-faint">
         Your day — 3 steps
       </Text>
       {steps.map((step, index) => (
@@ -60,19 +60,19 @@ function StepRow({
         onPress={onPress}
         className={`min-h-[64px] flex-row items-center gap-3 rounded-xl border-2 px-3 py-3 ${
           active
-            ? "border-green-500/60 bg-green-500/10"
+            ? "border-go-line bg-go-soft"
             : done
-              ? "border-transparent bg-slate-700/50"
-              : "border-slate-700 bg-slate-800 opacity-70"
+              ? "border-transparent bg-edge-mid"
+              : "border-edge bg-card opacity-70"
         }`}
       >
         <Text className="text-2xl">{step.emoji}</Text>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-slate-50">
+          <Text className="text-sm font-bold text-strong">
             {index + 1}. {step.title}
           </Text>
           <Text
-            className={`text-xs ${done ? "text-green-300" : active ? "text-slate-300" : "text-slate-500"}`}
+            className={`text-xs ${done ? "text-go" : active ? "text-body" : "text-faint"}`}
           >
             {step.subtitle}
           </Text>
@@ -82,7 +82,7 @@ function StepRow({
         </Text>
       </Pressable>
       {gamePlanSummary !== undefined && step.state !== "locked" ? (
-        <Text className="mt-1 px-3 text-xs text-slate-400">{gamePlanSummary}</Text>
+        <Text className="mt-1 px-3 text-xs text-faint">{gamePlanSummary}</Text>
       ) : null}
     </View>
   );

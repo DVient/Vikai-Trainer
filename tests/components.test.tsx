@@ -107,12 +107,14 @@ import Workout from "../app/workout";
 import History from "../app/history";
 import EventForm from "../app/event-form";
 import { HeaderBack } from "../src/components/HeaderBack";
+import Settings from "../app/settings";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import { monthLabel } from "../src/lib/calendar";
 import { prefillFromIso } from "../src/lib/eventForm";
 import { ACTIVITY_TYPE_LABELS } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
+import { DEFAULT_TEAM_COLORS } from "../src/lib/theme";
 import { useAppStore } from "../src/stores/useAppStore";
 import {
   DEFAULT_BASE_PLAN,
@@ -171,6 +173,7 @@ function resetStore(): void {
     notificationIdentifiers: { scheduleReminders: {} },
     activePlan: null,
     personalBests: [],
+    teamColors: DEFAULT_TEAM_COLORS,
   });
   searchParamsMock.eventId = undefined;
 }
@@ -520,6 +523,49 @@ describe("calendar (app/history)", () => {
     // Sunday — recovery-only plan.
     fireEvent.click(screen.getByLabelText("Day 2026-01-11"));
     expect(screen.getByText("Planned: Recovery & skills — Base template")).toBeTruthy();
+  });
+});
+
+describe("team skin settings (app/settings, Phase C)", () => {
+  it("wires a gear button into the Home header pointing at the skin settings", () => {
+    render(<Index />);
+
+    // The header button is declared via <Stack.Screen options={{ headerRight }}>
+    // — the spy captures it because jsdom never renders the native header.
+    const headerEntry = stackScreenOptionsSpy.mock.calls
+      .map((call) => call[0] as { headerRight?: () => ReactElement })
+      .find((options) => typeof options?.headerRight === "function");
+    expect(headerEntry).toBeDefined();
+
+    render((headerEntry?.headerRight ?? (() => null))());
+    fireEvent.click(screen.getByLabelText("Team skin settings"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/settings");
+  });
+
+  it("repaints instantly from swatches and custom hex, with reset", () => {
+    render(<Settings />);
+
+    // Swatch taps apply immediately.
+    fireEvent.click(screen.getByLabelText("Primary color: Navy"));
+    expect(useAppStore.getState().teamColors.primary).toBe("#001F3F");
+    fireEvent.click(screen.getByLabelText("Secondary color: Forest green"));
+    expect(useAppStore.getState().teamColors.secondary).toBe("#228B22");
+
+    // Custom hex accepts 6-digit values without the # too.
+    const input = screen.getByLabelText("Primary color custom hex");
+    fireEvent.change(input, { target: { value: "9B1B30" } });
+    fireEvent.click(screen.getByLabelText("Apply custom primary color"));
+    expect(useAppStore.getState().teamColors.primary).toBe("#9B1B30");
+
+    // Invalid hex shows the hint and changes nothing.
+    fireEvent.change(input, { target: { value: "zzz" } });
+    fireEvent.click(screen.getByLabelText("Apply custom primary color"));
+    expect(screen.getByText(/Use a hex color like #228B22/)).toBeTruthy();
+    expect(useAppStore.getState().teamColors.primary).toBe("#9B1B30");
+
+    // Reset restores the white + forest green default.
+    fireEvent.click(screen.getByLabelText("Reset to team default"));
+    expect(useAppStore.getState().teamColors).toEqual(DEFAULT_TEAM_COLORS);
   });
 });
 

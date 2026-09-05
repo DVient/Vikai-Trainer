@@ -113,11 +113,11 @@ export default function History() {
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-900"
+      className="flex-1 bg-app"
       contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
     >
       <View className="flex-row items-center justify-between">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Add your commitments — they shape the plan
         </Text>
         <Pressable
@@ -127,9 +127,9 @@ export default function History() {
             tapLight();
             router.navigate("/event-form");
           }}
-          className="h-12 min-w-[48px] items-center justify-center rounded-lg bg-green-500 px-4"
+          className="h-12 min-w-[48px] items-center justify-center rounded-lg bg-accent px-4"
         >
-          <Text className="text-base font-black text-slate-950">＋ Add</Text>
+          <Text className="text-base font-black text-onaccent">＋ Add</Text>
         </Pressable>
       </View>
 
@@ -145,12 +145,12 @@ export default function History() {
         onNextMonth={() => shiftMonth(1)}
       />
 
-      <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+      <View className="rounded-2xl border border-edge bg-card p-4">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Scheduled — tap to change time or day
         </Text>
         {scheduled.length === 0 ? (
-          <Text className="mt-2 text-sm text-slate-400">
+          <Text className="mt-2 text-sm text-faint">
             Nothing scheduled yet — tap ＋ Add to plan your season.
           </Text>
         ) : (
@@ -168,28 +168,28 @@ export default function History() {
               >
                 <Text className="text-base">📅</Text>
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold text-slate-100">
+                  <Text className="text-sm font-semibold text-strong">
                     {event.title
                       ? `${SCHEDULED_EVENT_LABELS[event.eventType]} — ${event.title}`
                       : SCHEDULED_EVENT_LABELS[event.eventType]}
                   </Text>
-                  <Text className="text-xs text-slate-400">{when}</Text>
+                  <Text className="text-xs text-faint">{when}</Text>
                 </View>
                 {event.seriesId !== undefined ? <Text className="text-sm">🔁</Text> : null}
-                <Text className="text-sm text-slate-500">›</Text>
+                <Text className="text-sm text-faint">›</Text>
               </Pressable>
             ))}
           </View>
         )}
       </View>
 
-      <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
-        <Text className="text-xs font-bold uppercase tracking-widest text-slate-400">
+      <View className="rounded-2xl border border-edge bg-card p-4">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           {formatDateLong(selected)}
           {selected === today ? " · Today" : ""}
         </Text>
         {timeline.length === 0 ? (
-          <Text className="mt-2 text-sm text-slate-400">
+          <Text className="mt-2 text-sm text-faint">
             Nothing logged yet — your first session starts today.
           </Text>
         ) : (
@@ -219,9 +219,9 @@ export default function History() {
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <View className="flex-row items-center gap-1.5 rounded-full bg-slate-800 px-3 py-1.5">
+    <View className="flex-row items-center gap-1.5 rounded-full bg-card px-3 py-1.5">
       <View className="rounded-full" style={{ width: 8, height: 8, backgroundColor: color }} />
-      <Text className="text-xs text-slate-300">{label}</Text>
+      <Text className="text-xs text-body">{label}</Text>
     </View>
   );
 }

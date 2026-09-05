@@ -7,6 +7,7 @@ import {
 } from "../src/types";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { defaultPracticeEventDrafts } from "../src/lib/defaultSchedule";
+import { DEFAULT_TEAM_COLORS } from "../src/lib/theme";
 import { useAppStore, type VikaiTrainerAppState } from "../src/stores/useAppStore";
 
 /**
@@ -37,6 +38,7 @@ const INITIAL_SLICES = {
   activePlan: null,
   personalBests: [],
   defaultScheduleSeeded: false,
+  teamColors: DEFAULT_TEAM_COLORS,
 } satisfies Partial<VikaiTrainerAppState>;
 
 function resetStore(): void {
@@ -466,5 +468,17 @@ describe("default practice schedule seeding (Phase A)", () => {
     // Second call is a no-op — athlete edits and deletions stay sticky.
     useAppStore.getState().seedDefaultSchedule();
     expect(useAppStore.getState().scheduledEvents).toBe(seeded);
+  });
+});
+
+describe("team colors (Phase C)", () => {
+  it("applies a new color pair and defaults on first load", () => {
+    expect(useAppStore.getState().teamColors).toEqual(DEFAULT_TEAM_COLORS);
+
+    useAppStore.getState().setTeamColors({ primary: "#001F3F", secondary: "#FFD700" });
+    expect(useAppStore.getState().teamColors).toEqual({
+      primary: "#001F3F",
+      secondary: "#FFD700",
+    });
   });
 });

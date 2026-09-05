@@ -57,12 +57,12 @@ export function ReminderStatusChip() {
       onPress={onPress}
       className={`min-h-[48px] flex-row items-center justify-center rounded-xl border-2 px-3 py-2.5 ${
         copy.tone === "on"
-          ? "border-green-500/40 bg-green-500/10"
-          : "border-yellow-500/60 bg-yellow-500/10"
+          ? "border-go-line bg-go-soft"
+          : "border-modulate-line bg-modulate-soft"
       }`}
     >
       <Text
-        className={`text-sm font-bold ${copy.tone === "on" ? "text-green-300" : "text-yellow-300"}`}
+        className={`text-sm font-bold ${copy.tone === "on" ? "text-go" : "text-modulate"}`}
       >
         {copy.label}
       </Text>

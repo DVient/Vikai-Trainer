@@ -114,3 +114,21 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
   * Objective per-goal completion ratios over the last 7 days of sessions (planned vs checked-off blocks, recovery excluded); under-completed eligible goals (ratio < 0.75 over ≥ 3 blocks) auto-scale the next session at 0.8. Exempt by design: EXPLOSIVENESS (skills/power), SPEED, RECOVERY. Engine never sees adherence data — the generator consumes it as a mapping option.
 * [x] **8.4 Spec audit extension** (`tests/spec-audit.test.ts`):
   * New automated assertions: `src/engine/` imports no framework/storage/clock dependencies and constructs no ambient clocks; body-map and generator copy stay non-medical.
+
+---
+
+## PHASE 9: THREE-PRACTICE WEEK, CALENDAR PLANNED WORKOUTS & TEAM SKIN
+*Goal: the default season runs three team practices (Tue/Wed/Thu at 6:00 PM) that the workout plan respects, the calendar shows both the practices and the planned workouts, and the whole app repaints in the athlete's two team colors with contrast-adaptive fonts.*
+
+* [x] **9.1 Season defaults** (`src/config/defaults.ts`, `src/plans/fall2026.ts`):
+  * `practicesPerWeek: 3` with `practiceWeekdays: [2,3,4]` and `practiceTime: "18:00"`; every Fall 2026 detail entry that encoded the two-night practice rule now covers Tuesday, Wednesday & Thursday (legs saved for practice; upper/skill/accessory priming on practice nights; tempo flush Monday/Friday; competition-phase micro-lifting follows the same pattern).
+* [x] **9.2 Weekday-structured default plan** (`src/plans/basePlan.ts`):
+  * `defaultPlanForDate(localDate)` — practice nights run the practice-day template (upper push, skills, accessories, mobility — zero lower-body loading), Sunday runs recovery (skills + mobility), Mon/Fri/Sat the full 9-block template; `defaultPlanFocusLabel` gives each day its one-line focus. Home, the Game Plan, and the adherence fallback all read the date-aware selector.
+* [x] **9.3 Seeded practice schedule** (`src/lib/defaultSchedule.ts`, store, `app/_layout.tsx`):
+  * One recurring series of real, editable TEAM_PRACTICE events — every Tue/Wed/Thu 6:00 PM local from season start through the Fall 2026 competition end — seeded exactly once behind a persistence flag so athlete edits stick. Practices drive the §20 fresh-legs stripping without tripping game-day locks (verified: game windows fire on GAME types only).
+* [x] **9.4 Calendar planned workouts** (`src/lib/calendar.ts`, `app/history.tsx`, `CalendarGrid`):
+  * Day timelines lead with "Planned: <focus> — <detail>" on today/future unlogged days (base-template focus labels, or persona · phase · week for built plans; emoji follows the focus); the month grid gains a violet planned-workout dot + legend entry.
+* [x] **9.5 Team-color skin** (`src/lib/theme.ts`, `tailwind.config.js`, all screens):
+  * Pure color engine: WCAG luminance/contrast, hex parsing, blending, and `themeRoles(primary, secondary)` deriving every surface role. **Font rule: text on any surface is whichever team color is most visible on it** (3:1 visibility floor), with a black/white fallback when neither team color reads; GO/MODULATE/SHIELD hues keep their semantics but shade for light/dark backgrounds.
+  * The two colors live in the store (`teamColors`, white + forest green defaults); `_layout` feeds them to NativeWind as CSS variables via `vars()`; all ~480 slate/green/yellow/red class tokens across the app now resolve through skin roles (`bg-app`, `bg-card`, `text-strong`, `text-faint`, `bg-accent`, `bg-go`, `border-edge`, …).
+  * New **Team Skin** screen (`app/settings.tsx`, ⚙️ in the Home header): preset swatches + custom hex per slot, instant repaint (the screen itself is the preview), reset to defaults.

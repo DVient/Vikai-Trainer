@@ -27,7 +27,7 @@ export function HeaderBack() {
       className="h-12 min-w-[48px] items-start justify-center px-2"
       hitSlop={6}
     >
-      <Text className="text-2xl text-slate-100">‹</Text>
+      <Text className="text-2xl text-strong">‹</Text>
     </Pressable>
   );
 }

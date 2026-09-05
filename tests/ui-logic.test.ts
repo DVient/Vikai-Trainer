@@ -305,9 +305,9 @@ describe("rpeBandClass legend", () => {
   it("maps the four visual bands (Chilling → All Out)", () => {
     expect(rpeBandClass(1)).toBe("bg-sky-500");
     expect(rpeBandClass(3)).toBe("bg-sky-500");
-    expect(rpeBandClass(6)).toBe("bg-green-500");
-    expect(rpeBandClass(8)).toBe("bg-yellow-500");
-    expect(rpeBandClass(10)).toBe("bg-red-500");
+    expect(rpeBandClass(6)).toBe("bg-go");
+    expect(rpeBandClass(8)).toBe("bg-modulate");
+    expect(rpeBandClass(10)).toBe("bg-shield");
   });
 });
 

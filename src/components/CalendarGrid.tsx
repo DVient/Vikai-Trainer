@@ -38,7 +38,7 @@ export function CalendarGrid({
   onNextMonth,
 }: CalendarGridProps) {
   return (
-    <View className="rounded-2xl border border-slate-700 bg-slate-800 p-4">
+    <View className="rounded-2xl border border-edge bg-card p-4">
       <View className="flex-row items-center justify-between">
         <Pressable
           accessibilityRole="button"
@@ -47,11 +47,11 @@ export function CalendarGrid({
             tapLight();
             onPrevMonth();
           }}
-          className="h-12 w-12 items-center justify-center rounded-lg bg-slate-700"
+          className="h-12 w-12 items-center justify-center rounded-lg bg-edge"
         >
-          <Text className="text-lg font-bold text-slate-200">‹</Text>
+          <Text className="text-lg font-bold text-body">‹</Text>
         </Pressable>
-        <Text className="text-base font-bold text-slate-50">{monthLabel(year, month)}</Text>
+        <Text className="text-base font-bold text-strong">{monthLabel(year, month)}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Next month"
@@ -59,15 +59,15 @@ export function CalendarGrid({
             tapLight();
             onNextMonth();
           }}
-          className="h-12 w-12 items-center justify-center rounded-lg bg-slate-700"
+          className="h-12 w-12 items-center justify-center rounded-lg bg-edge"
         >
-          <Text className="text-lg font-bold text-slate-200">›</Text>
+          <Text className="text-lg font-bold text-body">›</Text>
         </Pressable>
       </View>
 
       <View className="mt-3 flex-row">
         {WEEKDAY_LABELS.map((label, index) => (
-          <Text key={`${label}-${index}`} className="flex-1 text-center text-xs font-bold text-slate-500">
+          <Text key={`${label}-${index}`} className="flex-1 text-center text-xs font-bold text-faint">
             {label}
           </Text>
         ))}
@@ -94,13 +94,13 @@ export function CalendarGrid({
                   }}
                   className={`h-12 flex-1 items-center justify-center rounded-lg border ${
                     isSelected
-                      ? "border-green-500 bg-green-500/20"
+                      ? "border-accent bg-soft"
                       : isToday
-                        ? "border-yellow-500/60 bg-slate-700/50"
-                        : "border-transparent bg-slate-700/30"
+                        ? "border-modulate-line bg-edge-mid"
+                        : "border-transparent bg-edge-soft"
                   }`}
                 >
-                  <Text className={`text-xs font-semibold ${isToday ? "text-yellow-300" : "text-slate-300"}`}>
+                  <Text className={`text-xs font-semibold ${isToday ? "text-modulate" : "text-body"}`}>
                     {Number(cell.slice(8, 10))}
                   </Text>
                   <View className="flex-row gap-0.5">
