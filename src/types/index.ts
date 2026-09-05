@@ -390,6 +390,11 @@ export interface WorkoutLog {
   /** Local calendar date the session belongs to, YYYY-MM-DD. */
   activityDate: string;
   notes?: string;
+  /**
+   * Body-map soreness captured when the session closed (additive Phase 8):
+   * it prices the NEXT workout's derivation — never today's remaining work.
+   */
+  soreAreasAfter?: readonly SoreArea[];
   createdAt: string;
   updatedAt: string;
 }

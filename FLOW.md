@@ -100,3 +100,17 @@ Phase 1: Foundation ──> Phase 2: Pure Engine ──> Phase 3: Generator & St
   * Every PHYSICAL block declares `muscleGroups`; SKILL and RECOVERY blocks stay untagged (never sore-scaled); `DEFAULT_BASE_PLAN` mirrors the library tags (consistency-tested).
 * [x] **7.5 Generator targeted mapping** (`src/engine/generator.ts`):
   * Block whose every targeted area is sore sits out (reason names the areas); partial overlap scales by `regionScale × sorest overlap` with sore-aware copy; untagged blocks exempt; §23 stripping order preserved.
+
+---
+
+## PHASE 8: FEEDBACK LOOP & PERFORMANCE LOADING
+*Goal: the athlete's model — today's workout is adjusted by the inputs given after the last workout (post-session body map, completed-work performance) and before today's workout (morning check-in); once derived it never mutates mid-session.*
+
+* [x] **8.1 Post-session soreness capture** (`app/workout.tsx`, `src/components/BodyMap.tsx`, `src/types/index.ts`):
+  * Two-step Finish: the CTA reveals the shared body-map card ("This prices tomorrow's workout — today's plan is already locked"); flagged areas persist as `WorkoutLog.soreAreasAfter`; a skip path closes without notes. Daily check-in refactored onto the same shared `BodyMap` component.
+* [x] **8.2 Next-day derivation** (`src/lib/engine-bridge.ts`, `src/hooks/useEngineResult.ts`):
+  * The bridge composes today's effective sore areas from the morning check-in ∪ the latest workout log BEFORE today (deduplicated, unknown ids dropped); today's own log never feeds back. SORENESS_FLAGGED surfaces on Home's Game Plan card and the session screen ("Sore today: … — blocks targeting them are scaled").
+* [x] **8.3 Performance-based loading** (`src/plans/adherence.ts`, generator option):
+  * Objective per-goal completion ratios over the last 7 days of sessions (planned vs checked-off blocks, recovery excluded); under-completed eligible goals (ratio < 0.75 over ≥ 3 blocks) auto-scale the next session at 0.8. Exempt by design: EXPLOSIVENESS (skills/power), SPEED, RECOVERY. Engine never sees adherence data — the generator consumes it as a mapping option.
+* [x] **8.4 Spec audit extension** (`tests/spec-audit.test.ts`):
+  * New automated assertions: `src/engine/` imports no framework/storage/clock dependencies and constructs no ambient clocks; body-map and generator copy stay non-medical.

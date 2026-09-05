@@ -159,3 +159,33 @@ describe("§6.2 audit: responsive layout guards", () => {
     expect(readFileSync(join("app", "practice-log.tsx"), "utf8")).toContain("w-[31%]");
   });
 });
+
+describe("§6.2 audit: engine purity (Phase 8.4)", () => {
+  it("keeps src/engine free of framework, storage, and clock dependencies", () => {
+    // AGENTS.md: engine files stay pure — no React, no state/store bindings,
+    // no storage access, no system clocks. Only types, sibling engine
+    // modules, and pure data helpers may be imported.
+    const offenders: string[] = [];
+    for (const file of listFilesRecursively(join("src", "engine"))) {
+      const code = readFileSync(file, "utf8");
+      for (const match of code.matchAll(/from\s+["']([^"']+)["']/g)) {
+        const dep = match[1];
+        if (dep === undefined) continue;
+        if (/^(react|react-native|zustand|expo)/.test(dep) || /async-storage|mmkv|date-fns|dayjs|moment/i.test(dep)) {
+          offenders.push(`${file}: ${dep}`);
+        }
+      }
+      if (/(?:^|\n)\s*(?:const|let)\s+\w+\s*=\s*new Date\(\)/.test(code)) {
+        offenders.push(`${file}: constructs a clock at module/component scope`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps soreness copy non-medical on the body-map surfaces", () => {
+    const bodyMap = readFileSync(join("src", "components", "BodyMap.tsx"), "utf8");
+    expect(bodyMap).toContain("Flag sore spots");
+    const generator = readFileSync(join("src", "engine", "generator.ts"), "utf8");
+    expect(generator).toContain("sits out today");
+  });
+});

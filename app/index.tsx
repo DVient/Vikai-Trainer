@@ -13,13 +13,16 @@ import { buildSessionView } from "../src/lib/session";
 import { formatTimeOfDay } from "../src/lib/calendar";
 import { partitionActivities } from "../src/lib/activityTiming";
 import { checkInStreak, powerLevel } from "../src/lib/power";
+import { soreAreaLabel } from "../src/lib/bodyMap";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
+import { computePerformanceScales } from "../src/plans/adherence";
 import { BASE_PLAN_TITLES, DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
 import { activePlanForDay, planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
 import { libraryBlockById } from "../src/plans/library";
 import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
+import { isSoreArea } from "../src/types";
 
 /**
  * Home Hub: the Ready State battery, the guided day flow, the athlete's
@@ -52,6 +55,8 @@ export default function Index() {
   const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,
+    // Phase 8.3 — comfort-effort categories auto-scale from completion history.
+    performanceScales: computePerformanceScales(activePlan, workoutLogs, workoutProgress, localToday),
   });
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
@@ -70,6 +75,7 @@ export default function Index() {
     .at(-1);
   const upcoming = nextUpcomingEvents(scheduledEvents, now, 3);
   const nextGame = upcoming.find((view) => view.event.eventType === "GAME");
+  const soreAreasToday = Object.keys(result.restrictions.sorenessScale ?? {}).filter(isSoreArea);
 
   const finish = () => {
     tapHeavy();
@@ -282,6 +288,12 @@ export default function Index() {
                   ? "1 block adjusted out today"
                   : `${session.skippedCount} blocks adjusted out today`}{" "}
                 — the session screen shows why.
+              </Text>
+            ) : null}
+            {result.reasons.includes("SORENESS_FLAGGED") && soreAreasToday.length > 0 ? (
+              <Text className="text-xs text-amber-300/90">
+                Sore today: {soreAreasToday.map(soreAreaLabel).join(", ")} — those blocks are
+                scaled.
               </Text>
             ) : null}
             <Pressable

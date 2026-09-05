@@ -200,6 +200,15 @@ export interface GeneratorOptions {
    * region scaling (previous behavior).
    */
   primaryGoals?: readonly TrainingGoal[];
+  /**
+   * Phase 8.3 — performance-based loading: per-goal scales derived from the
+   * athlete's objective completion history (see src/plans/adherence.ts).
+   * Eligible goals under-completed recently map to <1 scales; exempt goals
+   * (skills/technique, top speed, recovery) are absent. The engine never
+   * sees this — it is completion bookkeeping, mapped here like the region
+   * and soreness scales.
+   */
+  performanceScales?: Partial<Record<TrainingGoal, number>>;
 }
 
 /**
@@ -275,7 +284,10 @@ export function applyRestrictionsToBasePlan(
     }
     const sorenessScale = soreness.kind === "SCALE" ? soreness.scale : 1;
 
-    const scale = regionScaleFor(region, restrictions) * sorenessScale;
+    /* Phase 8.3 — performance-based loading for eligible goals. */
+    const performanceScale = options.performanceScales?.[component.type] ?? 1;
+
+    const scale = regionScaleFor(region, restrictions) * sorenessScale * performanceScale;
 
     /* Step 1 — optional accessories are stripped before any set reduction. */
     if (component.optional && scale < 1) {
@@ -296,7 +308,9 @@ export function applyRestrictionsToBasePlan(
           ? `Reduced: ${soreness.areas.map(soreAreaLabel).join(" & ")} ${
               soreness.areas.length > 1 ? "are" : "is"
             } sore — volume scaled for today.`
-          : `Reduced: volume scaled to ${effectiveScale}× for today's readiness.`;
+          : performanceScale < 1
+            ? "Reduced: volume matched to your recent completion pattern."
+            : `Reduced: volume scaled to ${effectiveScale}× for today's readiness.`;
       prescription.push({
         component,
         modification: "REDUCED",

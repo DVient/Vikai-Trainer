@@ -115,11 +115,15 @@ import { ACTIVITY_TYPE_LABELS } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { useAppStore } from "../src/stores/useAppStore";
 import {
+  DEFAULT_BASE_PLAN,
+} from "../src/plans/basePlan";
+import {
   DEFAULT_OBJECTIVE,
   type EnergyAnchor,
   type JointStatus,
   type ReadinessInput,
   type SleepAnchor,
+  type SoreArea,
 } from "../src/types";
 
 const TIMEZONE = DEFAULT_ATHLETE_PROFILE.timezone;
@@ -130,7 +134,12 @@ function localDate(offsetDays: number): string {
 
 function makeCheckIn(
   day: string,
-  anchors: { sleep: SleepAnchor; joint: JointStatus; energy: EnergyAnchor },
+  anchors: {
+    sleep: SleepAnchor;
+    joint: JointStatus;
+    energy: EnergyAnchor;
+    soreAreas?: readonly SoreArea[];
+  },
 ): ReadinessInput {
   const now = new Date().toISOString();
   return {
@@ -143,6 +152,7 @@ function makeCheckIn(
     sleepAnchor: anchors.sleep,
     jointStatus: anchors.joint,
     energyAnchor: anchors.energy,
+    ...(anchors.soreAreas !== undefined ? { soreAreas: anchors.soreAreas } : {}),
   };
 }
 
@@ -333,8 +343,10 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
 
     render(<Workout />);
 
-    // RED day — everything adjusted out, so the session is finishable.
+    // RED day — everything adjusted out, so the session is finishable. The
+    // two-step Finish still logs without body notes on the skip path.
     fireEvent.click(screen.getByLabelText("Finish workout"));
+    fireEvent.click(screen.getByRole("button", { name: "Close session without body notes" }));
     expect(screen.getByText(/Session complete 🎉/)).toBeTruthy();
 
     // GREEN flow correction: a finished session where the athlete notices a
@@ -586,6 +598,71 @@ describe("check-in body map (Phase 7)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save check-in" }));
 
     expect(useAppStore.getState().readinessInputs[0]?.soreAreas).toBeUndefined();
+  });
+});
+
+describe("post-session body map at Finish (Phase 8.1)", () => {
+  function fullyCheckedProgress(): Record<string, Record<string, { componentId: string; sets: number; completedAt: string }>> {
+    const day: Record<string, { componentId: string; sets: number; completedAt: string }> = {};
+    for (const component of DEFAULT_BASE_PLAN) {
+      day[component.id] = { componentId: component.id, sets: 2, completedAt: "" };
+    }
+    return { [localDate(0)]: day };
+  }
+
+  it("reveals the body map on Finish and saves sore areas into the workout log", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      workoutProgress: fullyCheckedProgress(),
+    });
+
+    render(<Workout />);
+
+    // Step 1: the Finish CTA only opens the body map — nothing is logged yet.
+    fireEvent.click(screen.getByRole("button", { name: "Finish workout" }));
+    expect(
+      screen.getByText("Before you close the session — how does the body feel? 🗺️"),
+    ).toBeTruthy();
+    expect(useAppStore.getState().workoutLogs).toHaveLength(0);
+
+    // Step 2: flag a sore area and close.
+    fireEvent.click(screen.getByRole("button", { name: "Legs" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quad" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save and close session" }));
+
+    const logs = useAppStore.getState().workoutLogs;
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.activityDate).toBe(localDate(0));
+    expect(logs[0]?.soreAreasAfter).toEqual(["QUAD"]);
+    expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+  });
+
+  it("closes without notes when the athlete skips the body map", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      workoutProgress: fullyCheckedProgress(),
+    });
+
+    render(<Workout />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Finish workout" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close session without body notes" }));
+
+    const logs = useAppStore.getState().workoutLogs;
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.soreAreasAfter).toBeUndefined();
+  });
+
+  it("shows the soreness visibility line on the session screen", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), { ...GOOD_ANCHORS, soreAreas: ["QUAD", "CALF"] })],
+    });
+
+    render(<Workout />);
+
+    expect(
+      screen.getByText(/Sore today: Quad, Calf — blocks targeting them are scaled/),
+    ).toBeTruthy();
   });
 });
 

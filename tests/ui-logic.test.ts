@@ -25,6 +25,7 @@ import {
   type EngineInput,
   type ReadinessInput,
   type ScheduledEvent,
+  type SoreArea,
 } from "../src/types";
 
 /**
@@ -71,6 +72,7 @@ function makeSourceState(
     readinessInputs: [],
     activityLogs: [],
     scheduledEvents: [],
+    workoutLogs: [],
     ...overrides,
   };
 }
@@ -156,6 +158,98 @@ describe("deriveEngineView (dashboard/workout data source)", () => {
       NOW,
     );
     expect(oneDay.stripOptional).toBe(false);
+  });
+});
+
+describe("post-session feedback loop (Phase 8.2)", () => {
+  function makeWorkoutLog(
+    activityDate: string,
+    soreAreasAfter?: readonly SoreArea[],
+  ): Parameters<typeof deriveEngineView>[0]["workoutLogs"][number] {
+    return {
+      id: `workout-${activityDate}`,
+      activityDate,
+      ...(soreAreasAfter !== undefined ? { soreAreasAfter } : {}),
+      createdAt: "",
+      updatedAt: "",
+    };
+  }
+
+  it("carries the last session's post-session soreness into today's derivation", () => {
+    const view = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [makeReadiness("2026-01-02")],
+        workoutLogs: [
+          makeWorkoutLog("2025-12-30", ["QUAD"]),
+          makeWorkoutLog("2026-01-01", ["QUAD", "HAMSTRING"]),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(view.carriedSoreAreas).toEqual(["QUAD", "HAMSTRING"]);
+    expect(view.input.readiness?.soreAreas).toEqual(["QUAD", "HAMSTRING"]);
+    expect(view.result.reasons).toContain("SORENESS_FLAGGED");
+    expect(view.result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, HAMSTRING: 0.6 });
+  });
+
+  it("merges — never duplicates — morning flags and carried flags", () => {
+    const morning = { ...makeReadiness("2026-01-02"), soreAreas: ["QUAD"] as const };
+
+    const view = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [morning],
+        workoutLogs: [makeWorkoutLog("2026-01-01", ["QUAD", "ANKLE"])],
+      }),
+      NOW,
+    );
+
+    expect(view.input.readiness?.soreAreas).toEqual(["QUAD", "ANKLE"]);
+    expect(view.result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, ANKLE: 0.6 });
+  });
+
+  it("never carries today's own session — the day stays locked", () => {
+    const view = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [makeReadiness("2026-01-02")],
+        workoutLogs: [
+          makeWorkoutLog("2026-01-02", ["CALF"]), // logged today — must be ignored
+          makeWorkoutLog("2026-01-01", ["QUAD"]),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(view.carriedSoreAreas).toEqual(["QUAD"]);
+    expect(view.input.readiness?.soreAreas).toEqual(["QUAD"]);
+  });
+
+  it("carries nothing when the last session closed all-good", () => {
+    const view = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [makeReadiness("2026-01-02")],
+        workoutLogs: [makeWorkoutLog("2026-01-01")],
+      }),
+      NOW,
+    );
+
+    expect(view.carriedSoreAreas).toEqual([]);
+    expect(view.result.reasons).not.toContain("SORENESS_FLAGGED");
+  });
+
+  it("drops unknown persisted area ids from carried feedback", () => {
+    const view = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [makeReadiness("2026-01-02")],
+        workoutLogs: [
+          makeWorkoutLog("2026-01-01", ["SHIN"] as unknown as readonly SoreArea[]),
+        ],
+      }),
+      NOW,
+    );
+
+    expect(view.carriedSoreAreas).toEqual([]);
+    expect(view.result.reasons).not.toContain("SORENESS_FLAGGED");
   });
 });
 

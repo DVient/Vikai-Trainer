@@ -641,3 +641,68 @@ describe("targeted soreness mapping (Phase 7)", () => {
     expect(firstOf(prescription).modificationReason).toContain("optional accessory");
   });
 });
+
+describe("performance-based loading (Phase 8.3)", () => {
+  it("scales eligible under-completed goals and leaves exempt goals alone", () => {
+    const plan = [
+      makeComponent({ id: "strength", type: "STRENGTH", baseVolume: 4, bodyRegion: "LOWER" }),
+      makeComponent({ id: "sprint", type: "SPEED", baseVolume: 4, bodyRegion: "FULL" }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, BASELINE, {
+      performanceScales: { STRENGTH: 0.8 },
+    });
+
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+    expect(byId.get("strength")?.modification).toBe("REDUCED");
+    expect(byId.get("strength")?.scaledVolume).toBe(3); // round(4 × 0.8)
+    expect(byId.get("strength")?.modificationReason).toContain("completion pattern");
+    expect(byId.get("sprint")?.modification).toBe("KEPT"); // SPEED is exempt
+  });
+
+  it("composes performance, region, and soreness scales (multiplicative)", () => {
+    const plan = [
+      makeComponent({ id: "leg", type: "STRENGTH", baseVolume: 10, bodyRegion: "LOWER", muscleGroups: ["HAMSTRING"] }),
+    ];
+    const restrictions = makeRestrictions({ lowerBodyScale: 0.7 });
+
+    const prescription = applyRestrictionsToBasePlan(plan, restrictions, {
+      performanceScales: { STRENGTH: 0.8 },
+    });
+
+    // 0.7 × 1 (no soreness) × 0.8 = 0.56 → round(5.6) = 6.
+    expect(firstOf(prescription).scaledVolume).toBe(6);
+  });
+
+  it("keeps minimumVolume floors above the performance scale", () => {
+    const plan = [
+      makeComponent({ id: "floor", type: "STRENGTH", baseVolume: 4, minimumVolume: 3 }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, BASELINE, {
+      performanceScales: { STRENGTH: 0.8 },
+    });
+
+    // round(4 × 0.8) = 3 → floor 3 holds (equal, not below).
+    expect(firstOf(prescription).scaledVolume).toBe(3);
+  });
+
+  it("prefers the soreness reason when both scales bite", () => {
+    const plan = [
+      makeComponent({ id: "both", type: "STRENGTH", baseVolume: 10, muscleGroups: ["HAMSTRING", "QUAD"] }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, BASELINE, {
+      performanceScales: { STRENGTH: 0.8 },
+      // QUAD sore only → partial overlap → scale 0.6 applies too.
+    });
+    const withSoreness = applyRestrictionsToBasePlan(
+      plan,
+      makeRestrictions({ sorenessScale: { QUAD: 0.6 } }),
+      { performanceScales: { STRENGTH: 0.8 } },
+    );
+
+    expect(withSoreness[0]?.modificationReason).toContain("Quad is sore");
+    expect(prescription[0]?.modificationReason).toContain("completion pattern");
+  });
+});
