@@ -357,17 +357,46 @@ function mergeFiredRules(restrictionsList: readonly TrainingRestrictions[]): Tra
 
 /* ───────────────────── §36 — The engine entry point ───────────────────── */
 
+/**
+ * Phase 9.7 — the effective sore-area map, from BOTH inputs the athlete
+ * gives between workouts: the morning check-in's body map and the sore
+ * areas carried in from the last session's close. Deduped, unknown ids
+ * dropped. Empty/undefined when nothing is flagged — soreness pricing is
+ * then absent from restrictions entirely.
+ */
+function effectiveSorenessScale(
+  input: EngineInput,
+  areaScale: number,
+): Partial<Record<SoreArea, number>> | undefined {
+  const morning = input.readiness?.soreAreas ?? [];
+  const carried = input.carriedSoreAreas ?? [];
+  const areas = [...new Set([...morning, ...carried])].filter(isSoreArea);
+  if (areas.length === 0) return undefined;
+  const scale: Partial<Record<SoreArea, number>> = {};
+  for (const area of areas) {
+    scale[area] = areaScale;
+  }
+  return scale;
+}
+
 export function evaluateAutoregulationEngine(
   input: EngineInput,
   thresholds: EngineThresholds = DEFAULT_ENGINE_THRESHOLDS,
 ): EngineResult {
-  /* Priority 1 — Missing check-in: prompt, restrict to standard baseline. */
+  /* Priority 1 — Missing check-in: prompt, restrict to standard baseline.
+   * The carried post-session body map still prices today (Phase 9.7): the
+   * status stays CHECKIN_REQUIRED (§27 — no GREEN without a check-in), but
+   * the restrictions stop ignoring the athlete's last-known soreness. */
   const readiness = input.readiness;
   if (readiness === undefined) {
+    const carriedScale = effectiveSorenessScale(input, thresholds.soreAreaScale);
     return {
       status: "CHECKIN_REQUIRED",
-      restrictions: baselineRestrictions(),
-      reasons: ["CHECKIN_REQUIRED"],
+      restrictions:
+        carriedScale !== undefined
+          ? { ...baselineRestrictions(), sorenessScale: carriedScale }
+          : baselineRestrictions(),
+      reasons: carriedScale !== undefined ? ["CHECKIN_REQUIRED", "SORENESS_FLAGGED"] : ["CHECKIN_REQUIRED"],
       recoveryActions: ["Complete today's readiness check-in to unlock your training status."],
       requiresAdultAttention: false,
     };
@@ -508,23 +537,20 @@ export function evaluateAutoregulationEngine(
   }
 
   /*
-   * Body-map soreness (additive Phase 7): targeted, muscle-level scaling —
-   * the missing adjustment the expert review identified. Unlike the
-   * §16 pain path, this never halts a body region and never triggers adult
-   * attention; it only scales the blocks that target the flagged areas (the
-   * generator owns that mapping). Soreness is deliberately NOT part of the
-   * multiple-concern count: it is block-targeted, not a global day status.
-   * Unknown persisted ids are dropped; duplicates collapse into one entry.
+   * Body-map soreness (additive Phase 7, unioned Phase 9.7): targeted,
+   * muscle-level scaling — the missing adjustment the expert review
+   * identified. Unlike the §16 pain path, this never halts a body region
+   * and never triggers adult attention; it only scales the blocks that
+   * target the flagged areas (the generator owns that mapping). Soreness is
+   * deliberately NOT part of the multiple-concern count: it is
+   * block-targeted, not a global day status. The area set unions the
+   * morning's body map with the last session's post-session map.
    */
-  const soreAreas = [...new Set((readiness.soreAreas ?? []).filter(isSoreArea))];
-  if (soreAreas.length > 0) {
-    const sorenessScale: Partial<Record<SoreArea, number>> = {};
-    for (const area of soreAreas) {
-      sorenessScale[area] = thresholds.soreAreaScale;
-    }
+  const effectiveScale = effectiveSorenessScale(input, thresholds.soreAreaScale);
+  if (effectiveScale !== undefined) {
     fired.push({
       status: "YELLOW",
-      restrictions: { ...baselineRestrictions(), sorenessScale },
+      restrictions: { ...baselineRestrictions(), sorenessScale: effectiveScale },
       reason: "SORENESS_FLAGGED",
       recoveryAction:
         "Soreness noted: blocks working the flagged areas are scaled down; everything else runs as planned.",

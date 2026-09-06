@@ -270,6 +270,14 @@ export interface EngineInput {
   objective: TrainingObjective;
   /** Today's check-in, if one exists. Missing ⇒ CHECKIN_REQUIRED precedence. */
   readiness?: ReadinessInput;
+  /**
+   * Phase 9.7 — post-session sore areas carried from the latest workout
+   * BEFORE today (the feedback loop's "after the last workout" input).
+   * Merged with the check-in's own `soreAreas` everywhere the engine prices
+   * soreness — including the CHECKIN_REQUIRED path, where restrictions stop
+   * ignoring the carried body map (status semantics stay untouched).
+   */
+  carriedSoreAreas?: readonly SoreArea[];
   recentActivities: ActivityLog[];
   upcomingEvents: ScheduledEvent[];
   now: Date;

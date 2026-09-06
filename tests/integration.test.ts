@@ -446,3 +446,81 @@ describe("live session loop: check-offs, mid-session rescaling, finish", () => {
     expect(speedView.get("primary-lower-squat")?.scaledVolume).toBe(2);
   });
 });
+
+describe("soreness feedback loop (Phase 9.7) — body map input to prescription", () => {
+  const byId = (list: ReturnType<typeof prescriptionOf>) =>
+    new Map(list.map((entry) => [entry.component.id, entry]));
+
+  it("prices today's plan from a sore morning body map end-to-end", () => {
+    // primary-lower-squat targets QUAD alone; jumps/sprints/COD include QUAD
+    // among other areas — the map input must land on all of them.
+    useAppStore.setState({
+      readinessInputs: [
+        {
+          ...makeCheckIn(today(), { sleep: "OVER_8_HRS", joint: "NO_CONCERN", energy: "HIGH" }),
+          soreAreas: ["QUAD"],
+        },
+      ],
+    });
+
+    const byIdOf = byId(prescriptionOf(derive()));
+    const squat = byIdOf.get("primary-lower-squat");
+    expect(squat?.modification).toBe("REMOVED");
+    expect(squat?.modificationReason).toContain("Quad is sore");
+    for (const id of ["explosive-jumps", "acceleration-sprints", "cod-drills"]) {
+      const entry = byIdOf.get(id);
+      expect(entry?.modification).toBe("REDUCED");
+      expect(entry?.scaledVolume).toBeLessThan(entry?.component.baseVolume ?? 0);
+      expect(entry?.modificationReason).toContain("sore");
+    }
+    // Blocks that do not work the quad are untouched.
+    expect(byIdOf.get("accessory-core")?.modification).toBe("KEPT");
+    expect(byIdOf.get("primary-upper-push")?.modification).toBe("KEPT");
+  });
+
+  it("prices the plan from the last session's close alone — no check-in needed", () => {
+    // Yesterday's two-step Finish flagged the quad; today has NO check-in.
+    // The engine must still scale today's quad work (CHECKIN_REQUIRED status
+    // stays, but the restrictions no longer ignore the carried body map).
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    useAppStore.setState({
+      workoutLogs: [
+        {
+          id: "workout-yesterday",
+          activityDate: toLocalDateString(yesterday, TIMEZONE),
+          soreAreasAfter: ["QUAD"],
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    const view = derive();
+    expect(view.result.status).toBe("CHECKIN_REQUIRED");
+    expect(view.result.reasons).toContain("SORENESS_FLAGGED");
+    expect(view.result.restrictions.sorenessScale).toEqual({ QUAD: 0.6 });
+
+    const byIdOf = byId(prescriptionOf(view));
+    expect(byIdOf.get("primary-lower-squat")?.modification).toBe("REMOVED");
+    expect(byIdOf.get("explosive-jumps")?.modification).toBe("REDUCED");
+    expect(byIdOf.get("accessory-core")?.modification).toBe("KEPT");
+  });
+
+  it("keeps the day locked against its own mid-session body map", () => {
+    // A log recorded TODAY (this session just closed) never reprices today;
+    // with no check-in and no earlier feedback, nothing scales.
+    useAppStore.setState({
+      workoutLogs: [
+        { id: "workout-now", activityDate: today(), soreAreasAfter: ["QUAD"], createdAt: "", updatedAt: "" },
+      ],
+    });
+
+    const view = derive();
+    expect(view.result.status).toBe("CHECKIN_REQUIRED");
+    expect(view.result.reasons).not.toContain("SORENESS_FLAGGED");
+
+    const byIdOf = byId(prescriptionOf(view));
+    expect(byIdOf.get("primary-lower-squat")?.modification).toBe("KEPT");
+    expect(byIdOf.get("explosive-jumps")?.modification).toBe("KEPT");
+  });
+});

@@ -188,7 +188,9 @@ describe("post-session feedback loop (Phase 8.2)", () => {
     );
 
     expect(view.carriedSoreAreas).toEqual(["QUAD", "HAMSTRING"]);
-    expect(view.input.readiness?.soreAreas).toEqual(["QUAD", "HAMSTRING"]);
+    // The carried map rides top-level; the engine unions it with the morning's.
+    expect(view.input.carriedSoreAreas).toEqual(["QUAD", "HAMSTRING"]);
+    expect(view.input.readiness?.soreAreas).toBeUndefined();
     expect(view.result.reasons).toContain("SORENESS_FLAGGED");
     expect(view.result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, HAMSTRING: 0.6 });
   });
@@ -204,8 +206,23 @@ describe("post-session feedback loop (Phase 8.2)", () => {
       NOW,
     );
 
-    expect(view.input.readiness?.soreAreas).toEqual(["QUAD", "ANKLE"]);
+    expect(view.input.carriedSoreAreas).toEqual(["QUAD", "ANKLE"]);
     expect(view.result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, ANKLE: 0.6 });
+  });
+
+  it("prices the day from carried feedback alone when no check-in exists", () => {
+    const view = deriveEngineView(
+      makeSourceState({
+        readinessInputs: [], // the athlete skipped the morning check-in
+        workoutLogs: [makeWorkoutLog("2026-01-01", ["QUAD"])],
+      }),
+      NOW,
+    );
+
+    // Status semantics stay untouched (§27), but the body map still prices.
+    expect(view.result.status).toBe("CHECKIN_REQUIRED");
+    expect(view.result.reasons).toContain("SORENESS_FLAGGED");
+    expect(view.result.restrictions.sorenessScale).toEqual({ QUAD: 0.6 });
   });
 
   it("never carries today's own session — the day stays locked", () => {
@@ -221,7 +238,8 @@ describe("post-session feedback loop (Phase 8.2)", () => {
     );
 
     expect(view.carriedSoreAreas).toEqual(["QUAD"]);
-    expect(view.input.readiness?.soreAreas).toEqual(["QUAD"]);
+    expect(view.input.carriedSoreAreas).toEqual(["QUAD"]);
+    expect(view.input.readiness?.soreAreas).toBeUndefined();
   });
 
   it("carries nothing when the last session closed all-good", () => {

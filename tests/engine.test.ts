@@ -114,6 +114,34 @@ describe("missing check-in (precedence 1)", () => {
     expect(result.requiresAdultAttention).toBe(false);
     expect(result.recoveryActions.length).toBe(1);
   });
+
+  it("still prices carried soreness when no check-in exists (Phase 9.7)", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ readiness: undefined, carriedSoreAreas: ["QUAD"] }),
+    );
+
+    // Status semantics untouched (§27): no GREEN without a check-in — but
+    // the restrictions stop ignoring the athlete's last-known soreness.
+    expect(result.status).toBe("CHECKIN_REQUIRED");
+    expect(result.reasons).toEqual(["CHECKIN_REQUIRED", "SORENESS_FLAGGED"]);
+    expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6 });
+    expect(result.restrictions.lowerBodyAllowed).toBe(true);
+    expect(result.restrictions.lowerBodyScale).toBe(1);
+    expect(result.restrictions.plyometricsAllowed).toBe(true);
+  });
+
+  it("unions the morning map with the carried map for the soreness rule", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({ soreAreas: ["QUAD"] }),
+        carriedSoreAreas: ["QUAD", "ANKLE"],
+      }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toContain("SORENESS_FLAGGED");
+    expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, ANKLE: 0.6 });
+  });
 });
 
 describe("pain concern override (precedence 2, SPEC §16)", () => {

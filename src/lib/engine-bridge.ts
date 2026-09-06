@@ -58,20 +58,16 @@ export interface DerivedEngineView {
 }
 
 /**
- * Phase 8 feedback loop (pure): today's derivation consumes BOTH the
- * morning's body map (check-in) and the sore areas logged when the last
- * workout before today closed — deduplicated, unknown ids dropped. The
- * athlete's own stated model: today's workout is adjusted by the inputs
+ * Phase 8 feedback loop (pure): the derivation consumes BOTH the morning's
+ * body map (check-in) and the sore areas logged when the last workout
+ * before today closed. The engine unions them (Phase 9.7): the check-in's
+ * own areas ride inside `readiness`, the post-session map rides top-level
+ * as `carriedSoreAreas` — so the feedback loop prices today's workout even
+ * when the athlete skips the morning check-in (status semantics untouched).
+ * The athlete's own stated model: today's workout is adjusted by the inputs
  * given after the last workout and before today's workout; it never reacts
  * to anything logged mid-session.
  */
-export function effectiveSoreAreas(
-  checkIn: ReadinessInput | undefined,
-  carried: readonly SoreArea[],
-): readonly SoreArea[] {
-  if (checkIn === undefined) return [];
-  return [...new Set([...(checkIn.soreAreas ?? []), ...carried].filter(isSoreArea))];
-}
 
 /** Pure derivation: store slices + now ⇒ EngineInput + EngineResult. */
 export function deriveEngineView(state: EngineSourceState, now: Date): DerivedEngineView {
@@ -89,18 +85,12 @@ export function deriveEngineView(state: EngineSourceState, now: Date): DerivedEn
     undefined,
   );
   const carriedSoreAreas = (lastSessionBeforeToday?.soreAreasAfter ?? []).filter(isSoreArea);
-  const effective = effectiveSoreAreas(todayCheckIn, carriedSoreAreas);
 
   const input: EngineInput = {
     athlete,
     objective: state.trainingObjective ?? DEFAULT_OBJECTIVE,
-    readiness:
-      todayCheckIn === undefined
-        ? undefined
-        : {
-            ...todayCheckIn,
-            ...(effective.length > 0 ? { soreAreas: effective } : {}),
-          },
+    readiness: todayCheckIn === undefined ? undefined : { ...todayCheckIn },
+    carriedSoreAreas,
     recentActivities: [...state.activityLogs],
     upcomingEvents: [...state.scheduledEvents],
     now,
