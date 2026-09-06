@@ -226,6 +226,23 @@ describe("home hub (app/index)", () => {
     expect(screen.queryByText(ADULT_ATTENTION_MESSAGE)).toBeNull();
   });
 
+  it("keeps the battery full when only a body part is sore (Phase 9.8)", () => {
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(localDate(0), { ...GOOD_ANCHORS, soreAreas: ["ARM"] }),
+      ],
+    });
+
+    render(<Index />);
+
+    // One sore arm is block-targeted: the day itself is GREEN — full battery,
+    // no Power Save recoloring. The sore line carries the signal instead.
+    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getByText("Full Send")).toBeTruthy();
+    expect(screen.queryByText("Power Save")).toBeNull();
+    expect(screen.getByText(/Sore today: Arm — those blocks are scaled\./)).toBeTruthy();
+  });
+
   it("never shows GO without today's check-in (SPEC §27) — battery asks for a charge", () => {
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(-1), GOOD_ANCHORS)] });
 
@@ -939,6 +956,24 @@ describe("game plan screen (app/workout)", () => {
     // Sprints, COD, and optionals are adjusted out for game prep.
     expect(screen.getByText("Adjusted out today")).toBeTruthy();
     expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
+  });
+
+  it("scales the sore arm's work while the battery stays green (Phase 9.8)", () => {
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(localDate(0), { ...GOOD_ANCHORS, soreAreas: ["ARM"] }),
+      ],
+    });
+
+    render(<Workout />);
+
+    // Green day, dialed-down arm work: the primary upper push (partial ARM
+    // overlap) scales to 0.6×; the optional upper accessory strips entirely;
+    // everything non-arm runs as planned at full volume.
+    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getByText("Full Send")).toBeTruthy();
+    expect(screen.getByText("4 → 2 sets")).toBeTruthy(); // primary-upper-push
+    expect(screen.getByText(/1 block was adjusted out today/)).toBeTruthy(); // accessory-upper strips (optional)
   });
 });
 

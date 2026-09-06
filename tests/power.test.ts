@@ -50,6 +50,19 @@ describe("powerLevel — engine status → battery", () => {
     expect(power).toEqual({ percent: 100, tone: "green", label: "Full Send" });
   });
 
+  it("never falls for body-map soreness alone (Phase 9.8)", () => {
+    // One flagged area is block-targeted: the day stays GREEN and the
+    // battery stays full — the arm blocks themselves dial down instead.
+    const sore: ReadinessInput = {
+      ...makeReadiness("2026-01-02"),
+      soreAreas: ["ARM"],
+    };
+    const result = resultFor(sore);
+    expect(result.status).toBe("GREEN");
+    expect(result.restrictions.sorenessScale).toEqual({ ARM: 0.6 });
+    expect(powerLevel(result)).toEqual({ percent: 100, tone: "green", label: "Full Send" });
+  });
+
   it("mirrors the tightest region scale as Power Save on YELLOW", () => {
     const result = resultFor(makeReadiness("2026-01-02"));
     // Force a YELLOW template shape: 0.6 lower / 0.8 upper (workload day).

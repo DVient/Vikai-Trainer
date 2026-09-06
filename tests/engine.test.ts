@@ -138,7 +138,9 @@ describe("missing check-in (precedence 1)", () => {
       }),
     );
 
-    expect(result.status).toBe("YELLOW");
+    // Soreness-only day: status stays GREEN (Phase 9.8); the union prices
+    // every flagged area.
+    expect(result.status).toBe("GREEN");
     expect(result.reasons).toContain("SORENESS_FLAGGED");
     expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6, ANKLE: 0.6 });
   });
@@ -601,13 +603,15 @@ describe("toLocalDateString", () => {
   });
 });
 
-describe("body-map soreness (Phase 7)", () => {
-  it("emits targeted soreness scales without touching region allowances", () => {
+describe("body-map soreness (Phase 7, status-neutral Phase 9.8)", () => {
+  it("emits targeted soreness scales without touching the day status", () => {
     const result = evaluateAutoregulationEngine(
       makeInput({ readiness: makeReadiness({ soreAreas: ["QUAD", "CALF"] }) }),
     );
 
-    expect(result.status).toBe("YELLOW");
+    // Phase 9.8: one flagged area never recolors the whole day — the blocks
+    // that work it scale down; the day itself stays GREEN.
+    expect(result.status).toBe("GREEN");
     expect(result.reasons).toContain("SORENESS_FLAGGED");
     expect(result.requiresAdultAttention).toBe(false);
     expect(result.restrictions.lowerBodyAllowed).toBe(true);
@@ -669,13 +673,14 @@ describe("body-map soreness (Phase 7)", () => {
     expect(result.restrictions.upperBodyAllowed).toBe(false);
   });
 
-  it("respects a custom soreAreaScale threshold", () => {
+  it("respects a custom soreAreaScale threshold — and stays status-neutral", () => {
     const thresholds = { ...DEFAULT_ENGINE_THRESHOLDS, soreAreaScale: 0.5 };
     const result = evaluateAutoregulationEngine(
       makeInput({ readiness: makeReadiness({ soreAreas: ["ABS"] }) }),
       thresholds,
     );
 
+    expect(result.status).toBe("GREEN");
     expect(result.restrictions.sorenessScale).toEqual({ ABS: 0.5 });
   });
 

@@ -537,13 +537,14 @@ export function evaluateAutoregulationEngine(
   }
 
   /*
-   * Body-map soreness (additive Phase 7, unioned Phase 9.7): targeted,
-   * muscle-level scaling — the missing adjustment the expert review
-   * identified. Unlike the §16 pain path, this never halts a body region
-   * and never triggers adult attention; it only scales the blocks that
-   * target the flagged areas (the generator owns that mapping). Soreness is
-   * deliberately NOT part of the multiple-concern count: it is
-   * block-targeted, not a global day status. The area set unions the
+   * Body-map soreness (additive Phase 7, unioned Phase 9.7, status-neutral
+   * Phase 9.8): targeted, muscle-level scaling — the missing adjustment the
+   * expert review identified. Unlike the §16 pain path, this never halts a
+   * body region and never triggers adult attention; it only scales the
+   * blocks that target the flagged areas (the generator owns that mapping),
+   * and it never sets the global status — a flagged area is not a whole-day
+   * state. Soreness is deliberately NOT part of the multiple-concern count:
+   * it is block-targeted, not a global day status. The area set unions the
    * morning's body map with the last session's post-session map.
    */
   const effectiveScale = effectiveSorenessScale(input, thresholds.soreAreaScale);
@@ -597,7 +598,7 @@ export function evaluateAutoregulationEngine(
           maxTrainingDurationMinutes: 60,
         },
         reason: "MULTIPLE_READINESS_CONCERNS",
-        recoveryAction: "Readiness score is low: favor recovery-focused movement today.",
+        recoveryAction: `Readiness score is low (${score}/9): favor recovery-focused movement today.`,
       });
     }
   }
@@ -613,8 +614,17 @@ export function evaluateAutoregulationEngine(
     };
   }
 
+  /*
+   * Phase 9.8 — the global status comes from GLOBAL rules only. Soreness is
+   * block-targeted (its comment above): one flagged area never recolors the
+   * whole day — the blocks that work it scale down, the amber sore line and
+   * per-block reasons carry the signal. A soreness-only day stays GREEN
+   * ("everything else runs as planned"); combined days take their status
+   * from whichever global rule fired (low sleep, games, pain, …).
+   */
   let status: EngineStatus = "GREEN";
   for (const rule of fired) {
+    if (rule.reason === "SORENESS_FLAGGED") continue;
     if (STATUS_SEVERITY[rule.status] > STATUS_SEVERITY[status]) status = rule.status;
   }
 
