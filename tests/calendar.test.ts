@@ -9,7 +9,7 @@ import {
   monthMarks,
   monthMatrix,
   plannedWorkoutEmoji,
-  upcomingEventRows,
+  weekSchedule,
 } from "../src/lib/calendar";
 
 const TZ = "America/New_York";
@@ -252,8 +252,8 @@ describe("time formatting", () => {
   });
 });
 
-describe("upcomingEventRows — the scheduled commitments manage list", () => {
-  const now = new Date("2026-09-12T14:00:00.000Z");
+describe("weekSchedule — the next-7-days Scheduled view", () => {
+  const now = new Date("2026-09-12T14:00:00.000Z"); // Saturday, 10 AM ET
   const events = [
     {
       id: "far",
@@ -264,7 +264,7 @@ describe("upcomingEventRows — the scheduled commitments manage list", () => {
     {
       id: "near",
       eventType: "TEAM_PRACTICE" as const,
-      startAt: "2026-09-15T22:00:00.000Z",
+      startAt: "2026-09-15T22:00:00.000Z", // Tue Sep 15, 6 PM ET
       title: "Fall block",
       seriesId: "series-1",
     },
@@ -282,18 +282,61 @@ describe("upcomingEventRows — the scheduled commitments manage list", () => {
     },
   ];
 
-  it("lists future events soonest-first, skipping past and unparseable ones", () => {
-    const rows = upcomingEventRows(events, now, TZ);
-    expect(rows.map((row) => row.event.id)).toEqual(["near", "far"]);
-    expect(rows[0]?.when).toContain("Sep 15");
-    expect(rows[0]?.when).toContain("6:00 PM");
+  it("returns one row per day starting today, labeling the first two", () => {
+    const week = weekSchedule(events, now, TZ);
+
+    expect(week).toHaveLength(7);
+    expect(week[0]).toMatchObject({ date: "2026-09-12", label: "Today" });
+    expect(week[1]).toMatchObject({ date: "2026-09-13", label: "Tomorrow" });
+    expect(week[6]).toMatchObject({ date: "2026-09-18", label: "Fri, Sep 18" });
   });
 
-  it("respects the limit", () => {
-    expect(upcomingEventRows(events, now, TZ, 1)).toHaveLength(1);
+  it("buckets events into their local day with formatted times", () => {
+    const week = weekSchedule(events, now, TZ);
+
+    const tuesday = week.find((day) => day.date === "2026-09-15");
+    expect(tuesday?.events).toHaveLength(1);
+    expect(tuesday?.events[0]).toMatchObject({
+      id: "near",
+      time: "6:00 PM",
+      text: "🏀 Team practice — Fall block",
+    });
+    // Far-future, past, and unparseable events are excluded everywhere.
+    const withFar = week.flatMap((day) => day.events.map((event) => event.id));
+    expect(withFar).not.toContain("far");
+    expect(withFar).not.toContain("past");
+    expect(withFar).not.toContain("broken");
   });
 
-  it("returns an empty list for quiet schedules", () => {
-    expect(upcomingEventRows([], now, TZ)).toEqual([]);
+  it("carries the planned-workout focus per day via the callback", () => {
+    const week = weekSchedule(events, now, TZ, {
+      plannedLabelFor: (date) => (date === "2026-09-15" ? "Practice + upper primer" : undefined),
+    });
+
+    const tuesday = week.find((day) => day.date === "2026-09-15");
+    expect(tuesday?.planned).toEqual({ emoji: "🏀", label: "Practice + upper primer" });
+    expect(week[0]?.planned).toBeUndefined();
+  });
+
+  it("honors a custom window length and stays deterministic", () => {
+    const three = weekSchedule(events, now, TZ, { days: 3 });
+    expect(three.map((day) => day.date)).toEqual(["2026-09-12", "2026-09-13", "2026-09-14"]);
+
+    expect(weekSchedule(events, now, TZ)).toEqual(weekSchedule(events, now, TZ));
+  });
+
+  it("rolls over month boundaries without shifting", () => {
+    const monthEnd = new Date("2026-01-31T14:00:00.000Z");
+    const week = weekSchedule([], monthEnd, TZ, { days: 7 });
+
+    expect(week.map((day) => day.date)).toEqual([
+      "2026-01-31",
+      "2026-02-01",
+      "2026-02-02",
+      "2026-02-03",
+      "2026-02-04",
+      "2026-02-05",
+      "2026-02-06",
+    ]);
   });
 });

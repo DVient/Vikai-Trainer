@@ -270,37 +270,96 @@ export function formatDateLong(date: string): string {
   }).format(parsed);
 }
 
-/* ─────────────────── Scheduled commitments manage list ────────────────── */
+/* ─────────────────── Scheduled commitments: next-7-days view ───────────── */
 
-export interface UpcomingEventRow {
-  event: Pick<ScheduledEvent, "id" | "eventType" | "startAt" | "title" | "seriesId">;
-  /** "Fri, Jan 2 · 6:30 PM" — the athlete-facing schedule line. */
-  when: string;
+export interface WeekScheduleEvent {
+  id: string;
+  /** Formatted local clock time, e.g. "6:00 PM". */
+  time: string;
+  /** "🏆 Game — Home opener" style row text (same format as timelines). */
+  text: string;
+  /** Total members when the event belongs to a recurring series (🔁 badge). */
+  seriesCount?: number;
+}
+
+export interface WeekScheduleDay {
+  date: string;
+  /** "Today", "Tomorrow", or a "Sat, Jan 10" style label. */
+  label: string;
+  /** Planned workout focus for the day, when one is planned. */
+  planned?: { emoji: string; label: string };
+  /** That day's scheduled events, soonest first. */
+  events: WeekScheduleEvent[];
+}
+
+export interface WeekScheduleOptions {
+  /** Window length in days (default 7, starting today). */
+  days?: number;
+  /** Pure callback supplying the planned-workout focus label for a date. */
+  plannedLabelFor?: (date: string) => string | undefined;
 }
 
 /**
- * All future commitments soonest-first for the Calendar's manage list —
- * the place to fix a moved team practice without hunting for its day on
- * the grid. Pure: no storage, no clock (now is injected).
+ * The forward schedule, day by day: one row per local date starting today,
+ * each with its label, planned-workout focus (when the callback supplies
+ * one), and scheduled events. Pure: no storage, no clock (now is injected).
  */
-export function upcomingEventRows(
+export function weekSchedule(
   events: ReadonlyArray<
-    Pick<ScheduledEvent, "id" | "eventType" | "startAt" | "title" | "seriesId">
+    Pick<ScheduledEvent, "id" | "startAt" | "eventType" | "title"> & { seriesId?: string }
   >,
   now: Date,
   timezone: string,
-  limit = 20,
-): UpcomingEventRow[] {
-  return events
-    .map((event) => ({ event, kickoff: new Date(event.startAt).getTime() }))
-    .filter((entry) => Number.isFinite(entry.kickoff) && entry.kickoff > now.getTime())
-    .sort((a, b) => a.kickoff - b.kickoff)
-    .slice(0, limit)
-    .map(({ event }) => {
-      const localDate = eventDate(event.startAt, timezone);
-      const dateLabel = localDate === "" ? "—" : formatDateLong(localDate);
-      const timeLabel = formatTimeOfDay(event.startAt, timezone);
-      const time = timeLabel === "" ? "" : ` · ${timeLabel}`;
-      return { event, when: `${dateLabel}${time}` };
+  options: WeekScheduleOptions = {},
+): WeekScheduleDay[] {
+  const days = options.days ?? 7;
+  const today = toLocalDateString(now, timezone);
+  const parts = today.split("-");
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const firstDay = Number(parts[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(firstDay)) {
+    return [];
+  }
+
+  const seriesCounts = new Map<string, number>();
+  for (const event of events) {
+    if (event.seriesId !== undefined) {
+      seriesCounts.set(event.seriesId, (seriesCounts.get(event.seriesId) ?? 0) + 1);
+    }
+  }
+
+  const rows: WeekScheduleDay[] = [];
+  for (let offset = 0; offset < days; offset += 1) {
+    const date = utcDateKey(year, month, firstDay + offset);
+    const label =
+      offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : formatDateLong(date);
+
+    const dayEvents = events
+      .map((event) => ({ event, kickoff: new Date(event.startAt).getTime() }))
+      .filter((entry) => Number.isFinite(entry.kickoff) && eventDate(entry.event.startAt, timezone) === date)
+      .sort((a, b) => a.kickoff - b.kickoff)
+      .map(({ event }) => {
+        const eventLabel = SCHEDULED_EVENT_LABELS[event.eventType] ?? "📅 Event";
+        return {
+          id: event.id,
+          time: formatTimeOfDay(event.startAt, timezone),
+          text: event.title ? `${eventLabel} — ${event.title}` : eventLabel,
+          seriesCount:
+            event.seriesId !== undefined ? seriesCounts.get(event.seriesId) : undefined,
+        };
+      });
+
+    const plannedLabel = options.plannedLabelFor?.(date);
+    rows.push({
+      date,
+      label,
+      planned:
+        plannedLabel !== undefined
+          ? { emoji: plannedWorkoutEmoji(plannedLabel), label: plannedLabel }
+          : undefined,
+      events: dayEvents,
     });
+  }
+  return rows;
 }

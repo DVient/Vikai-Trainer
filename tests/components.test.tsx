@@ -476,7 +476,11 @@ describe("calendar (app/history)", () => {
     fireEvent.click(screen.getByLabelText("Add event"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/event-form");
 
-    fireEvent.click(screen.getByLabelText("Edit event: 🏆 Game — Home opener"));
+    // The game is reachable from the Today timeline and the week list.
+    const gameRows = screen.getAllByLabelText("Edit event: 🏆 Game — Home opener");
+    const gameRow = gameRows[0];
+    if (!gameRow) throw new Error("expected an editable game row");
+    fireEvent.click(gameRow);
     expect(routerMock.navigate).toHaveBeenCalledWith("/event-form?eventId=g1");
   });
 
@@ -489,9 +493,86 @@ describe("calendar (app/history)", () => {
     if (!firstDay) throw new Error("expected calendar day cells");
     fireEvent.click(firstDay);
 
+    // The chosen day's contents render inside the Scheduled card.
     expect(
-      screen.getByText("Nothing logged yet — your first session starts today."),
+      screen.getByText("Nothing scheduled or logged for this day."),
     ).toBeTruthy();
+  });
+
+  it("defaults the Scheduled section to the next 7 days", () => {
+    useAppStore.setState({
+      scheduledEvents: [
+        {
+          id: "p1",
+          eventType: "TEAM_PRACTICE",
+          startAt: "2026-01-07T23:00:00.000Z", // Wed Jan 7, 6 PM ET
+          title: "Team practice",
+          createdAt: "",
+          updatedAt: "",
+        },
+        {
+          id: "far",
+          eventType: "GAME",
+          startAt: "2026-02-15T23:00:00.000Z", // far beyond the 7-day window
+          title: "Away game",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<History />);
+
+    // Week rows: Today / Tomorrow labels, then formatted day labels.
+    expect(screen.getAllByText("Today").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Tomorrow")).toBeTruthy();
+    expect(screen.getByText("Wed, Jan 7")).toBeTruthy();
+    expect(screen.getByText("Thu, Jan 8")).toBeTruthy(); // a quiet day still shows
+
+    // Every day carries its planned focus from the weekday template.
+    expect(screen.getAllByText("Planned: Strength + speed").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Planned: Practice + upper primer").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Planned: Recovery & skills")).toBeTruthy();
+
+    // The Wednesday practice sits under its day with its local time.
+    expect(screen.getByText("🏀 Team practice — Team practice")).toBeTruthy();
+    expect(screen.getByText("6:00 PM")).toBeTruthy();
+
+    // Events beyond the window stay off the week list.
+    expect(screen.queryByText(/Away game/)).toBeNull();
+  });
+
+  it("shows the chosen day's contents in the Scheduled card, with a way back", () => {
+    useAppStore.setState({
+      scheduledEvents: [
+        {
+          id: "g1",
+          eventType: "GAME",
+          startAt: "2026-01-09T23:00:00.000Z", // Fri Jan 9, 6 PM ET
+          title: "Rivalry night",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<History />);
+
+    // Default view is the week list — the Friday game is inside the window.
+    expect(screen.getByText("Fri, Jan 9")).toBeTruthy();
+
+    // Choose Friday the 9th: its contents land in the Scheduled card.
+    fireEvent.click(screen.getByLabelText("Day 2026-01-09"));
+    expect(screen.getByText("Fri, Jan 9")).toBeTruthy(); // sub-header + week label
+    expect(screen.getByText("🏆 Game — Rivalry night")).toBeTruthy();
+    expect(
+      screen.getAllByText("Planned: Strength + speed — Base template").length,
+    ).toBeGreaterThanOrEqual(1); // Today card + chosen-day planned row
+
+    // Back to the default week view.
+    fireEvent.click(screen.getByLabelText("Show next 7 days"));
+    expect(screen.getByText("Tomorrow")).toBeTruthy();
+    expect(screen.getByText("🏆 Game — Rivalry night")).toBeTruthy();
   });
 
   it("shows the planned workout for today and future days (Phase B)", () => {
@@ -511,13 +592,15 @@ describe("calendar (app/history)", () => {
     render(<History />);
 
     // Today (frozen Monday) — full template day, nothing logged yet.
-    expect(screen.getByText("Planned: Strength + speed — Base template")).toBeTruthy();
+    expect(
+      screen.getAllByText("Planned: Strength + speed — Base template").length,
+    ).toBeGreaterThanOrEqual(1); // Today card + week list, both show today's focus
     expect(screen.getByText("Planned workout")).toBeTruthy();
 
     // Wednesday practice night — the primer is planned, the practice is booked.
     fireEvent.click(screen.getByLabelText("Day 2026-01-07"));
     expect(screen.getByText("Planned: Practice + upper primer — Base template")).toBeTruthy();
-    // The practice shows in the day timeline AND the Scheduled manage list.
+    // The practice shows in the chosen-day timeline inside the Scheduled card.
     expect(screen.getAllByText(/Team practice/).length).toBeGreaterThanOrEqual(1);
 
     // Sunday — recovery-only plan.
@@ -1022,7 +1105,7 @@ describe("editable entries: scheduled list, reschedule resync, activity edit", (
 
     // One list, regardless of which day the grid shows.
     expect(screen.getByText("Scheduled — tap to change time or day")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText("Edit event: 🏀 Team practice"));
+    fireEvent.click(screen.getByLabelText("Edit event: 🏀 Team practice — Fall block"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/event-form?eventId=p1");
   });
 
