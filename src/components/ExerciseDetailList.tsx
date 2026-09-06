@@ -4,8 +4,10 @@ import type { ComponentDetail } from "../plans/fall2026";
 
 /**
  * The "See the work" panel (Fall 2026 detail overlay): the exercises behind
- * a Game Plan block — name, prescription, one-line cue, and a ▶ Watch form
- * button that opens the plan's video link.
+ * a Game Plan block — name, prescription, numbered technique steps (the
+ * offline guidance layer), one-line cue, and an optional "Watch a demo"
+ * button. Demo videos are a curated online-only supplement — the badge says
+ * so; the steps work with zero network.
  */
 export function ExerciseDetailList({ detail }: { detail: ComponentDetail }) {
   return (
@@ -22,6 +24,16 @@ export function ExerciseDetailList({ detail }: { detail: ComponentDetail }) {
           {exercise.cue !== undefined ? (
             <Text className="mt-0.5 text-xs text-faint">{exercise.cue}</Text>
           ) : null}
+          {exercise.steps !== undefined && exercise.steps.length > 0 ? (
+            <View className="mt-1.5 gap-1">
+              {exercise.steps.map((step, index) => (
+                <View key={`${index}`} className="flex-row gap-1.5">
+                  <Text className="text-xs font-bold text-go">{index + 1}.</Text>
+                  <Text className="flex-1 text-xs text-body">{step}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {exercise.videoUrl !== undefined ? (
             <Pressable
               accessibilityRole="link"
@@ -29,9 +41,12 @@ export function ExerciseDetailList({ detail }: { detail: ComponentDetail }) {
               onPress={() => {
                 void Linking.openURL(exercise.videoUrl as string);
               }}
-              className="mt-2 h-12 flex-row items-center justify-center rounded-lg bg-go-soft"
+              className="mt-2 h-12 flex-row items-center justify-center gap-2 rounded-lg bg-go-soft"
             >
-              <Text className="text-sm font-bold text-go">▶ Watch form</Text>
+              <Text className="text-sm font-bold text-go">▶ Watch a demo</Text>
+              <Text className="rounded-full bg-card px-2 py-0.5 text-[10px] font-bold text-faint">
+                Needs internet
+              </Text>
             </Pressable>
           ) : null}
         </View>

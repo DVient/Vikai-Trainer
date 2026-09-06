@@ -1025,9 +1025,11 @@ describe("exercise detail + video library (Fall 2026 plan)", () => {
     expect(screen.getByText(/Saturday is your primary strength day/)).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("Watch form: Trap Bar Deadlift"));
+    // Phase 9.10 — curated specific video, never a search page.
     expect(linkingOpenSpy).toHaveBeenCalledWith(
-      expect.stringContaining("youtube.com/results?search_query=trap+bar+deadlift"),
+      expect.stringContaining("youtube.com/watch?v="),
     );
+    expect(screen.getAllByText("Needs internet").length).toBeGreaterThanOrEqual(1);
   });
 
   it("explains engine scaling inside the expanded block", () => {

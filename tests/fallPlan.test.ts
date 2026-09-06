@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_BASE_PLAN } from "../src/plans/basePlan";
+import { BLOCK_LIBRARY } from "../src/plans/library";
 import {
   exerciseDetailsFor,
   FALL_COMPONENT_DETAILS,
   FALL_2026_PHASES,
   seasonPhaseFor,
-  videoSearchUrl,
   weekdayOf,
 } from "../src/plans/fall2026";
 
@@ -59,6 +59,8 @@ describe("exercise detail lookup", () => {
           for (const exercise of detail?.exercises ?? []) {
             expect(exercise.name.trim()).not.toBe("");
             expect(exercise.prescription.trim()).not.toBe("");
+            // Phase 9.10 — the offline steps layer is guaranteed everywhere.
+            expect(exercise.steps?.length ?? 0).toBeGreaterThanOrEqual(2);
             if (exercise.videoUrl !== undefined) {
               expect(exercise.videoUrl.startsWith("https://www.youtube.com/")).toBe(true);
             }
@@ -93,13 +95,13 @@ describe("exercise detail lookup", () => {
     expect(tuesday?.exercises[0]?.prescription).toBe("2 × 4");
   });
 
-  it("resolves skill work with the plan's video links", () => {
+  it("resolves skill work with curated demo videos (online-only supplement)", () => {
     const detail = exerciseDetailsFor("skill-ballhandling", "2026-09-12");
-    // In-season Saturday block: off-dribble pull-ups carry the punch-drag video.
+    // In-season Saturday block: the skill exercises carry curated watch URLs.
     const pullUps = detail?.exercises.find((exercise) => exercise.name.includes("Off-Dribble"));
-    expect(pullUps?.videoUrl).toContain("punch+drag+space+creation+basketball");
+    expect(pullUps?.videoUrl?.startsWith("https://www.youtube.com/watch?v=")).toBe(true);
     const finishes = detail?.exercises.find((exercise) => exercise.name.includes("Two-Foot"));
-    expect(finishes?.videoUrl).toContain("stride+stop+vs+jump+stop");
+    expect(finishes?.videoUrl?.startsWith("https://www.youtube.com/watch?v=")).toBe(true);
   });
 
   it("still resolves default detail outside the Fall 2026 window", () => {
@@ -107,23 +109,15 @@ describe("exercise detail lookup", () => {
     expect(detail?.exercises.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("keeps every seeded video link a valid https YouTube URL", () => {
+  it("bans search-page links — every seeded video is a specific watch URL", () => {
     for (const entry of FALL_COMPONENT_DETAILS) {
       for (const exercise of entry.exercises) {
         if (exercise.videoUrl !== undefined) {
-          expect(exercise.videoUrl.startsWith("https://www.youtube.com/")).toBe(true);
-        }
-        if (exercise.videoQuery !== undefined) {
-          expect(exercise.videoQuery.trim()).not.toBe("");
+          expect(exercise.videoUrl.startsWith("https://www.youtube.com/watch?v=")).toBe(true);
+          expect(exercise.videoUrl).not.toContain("results?search_query");
         }
       }
     }
-  });
-
-  it("builds encoded search URLs", () => {
-    expect(videoSearchUrl("goblet front squat form")).toBe(
-      "https://www.youtube.com/results?search_query=goblet%20front%20squat%20form",
-    );
   });
 
   it("keeps all detail copy free of banned clinical language", () => {
@@ -132,5 +126,31 @@ describe("exercise detail lookup", () => {
       const match = text.match(MEDICAL_TERM);
       expect(match).toBeNull();
     }
+  });
+});
+
+describe("phase 9.10 — offline technique steps in the block library", () => {
+  it("gives every library exercise offline steps (the guaranteed layer)", () => {
+    for (const block of BLOCK_LIBRARY) {
+      for (const variant of [...block.pool.A, ...block.pool.B, ...block.pool.staple]) {
+        expect(variant.steps.length, `${block.component.id}: ${variant.name}`).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it("never ships a search-page link in the library", () => {
+    for (const block of BLOCK_LIBRARY) {
+      for (const variant of [...block.pool.A, ...block.pool.B, ...block.pool.staple]) {
+        if (variant.videoUrl !== undefined) {
+          expect(variant.videoUrl.startsWith("https://www.youtube.com/watch?v=")).toBe(true);
+          expect(variant.videoUrl).not.toContain("results?search_query");
+        }
+      }
+    }
+  });
+
+  it("keeps the library copy free of banned clinical language", () => {
+    const text = JSON.stringify(BLOCK_LIBRARY);
+    expect(text.match(MEDICAL_TERM)).toBeNull();
   });
 });

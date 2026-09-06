@@ -88,7 +88,8 @@ export default function Workout() {
             name: exercise.name,
             prescription: exercise.prescription,
             cue: exercise.cue,
-            videoQuery: exercise.videoQuery,
+            steps: exercise.steps,
+            videoUrl: exercise.videoUrl,
           })),
         };
       }
