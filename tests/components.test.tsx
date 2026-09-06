@@ -161,6 +161,16 @@ function makeCheckIn(
 const GOOD_ANCHORS = { sleep: "OVER_8_HRS", joint: "NO_CONCERN", energy: "HIGH" } as const;
 const PAIN_ANCHORS = { sleep: "OVER_8_HRS", joint: "PAIN_CONCERN", energy: "HIGH" } as const;
 
+/**
+ * Re-clocks the frozen fake Date to Tuesday 2026-01-06 — a pre-season FULL
+ * (high) day under the week structure. Tests that exercise full-template
+ * blocks (the squat, the speed stack) re-clock; Monday/Wednesday/Friday are
+ * pre-season LOW days and Sunday is recovery.
+ */
+function reClockToFullDay(): void {
+  vi.setSystemTime(new Date("2026-01-06T15:00:00.000Z"));
+}
+
 function resetStore(): void {
   useAppStore.setState({
     profile: DEFAULT_ATHLETE_PROFILE,
@@ -221,7 +231,7 @@ describe("home hub (app/index)", () => {
     expect(screen.queryByText("GO 🟢")).toBeNull();
     // The Game Plan summary opens the full session on /workout.
     expect(screen.getByText("Today's Game Plan")).toBeTruthy();
-    expect(screen.getByText("0/9 checked off")).toBeTruthy();
+    expect(screen.getByText("0/5 checked off")).toBeTruthy(); // pre-season Monday = low day
     expect(screen.getByLabelText("Open today's session")).toBeTruthy();
     expect(screen.queryByText(ADULT_ATTENTION_MESSAGE)).toBeNull();
   });
@@ -295,7 +305,7 @@ describe("home hub (app/index)", () => {
     // The full checklist moved to /workout; Home shows the summary card
     // with everything adjusted out.
     expect(screen.queryByText("Adjusted out today")).toBeNull();
-    expect(screen.getByText(/9 blocks adjusted out today/)).toBeTruthy();
+    expect(screen.getByText(/5 blocks adjusted out today/)).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
@@ -330,6 +340,7 @@ describe("home hub (app/index)", () => {
 
 describe("game plan session screen — check-offs and mid-session rescaling", () => {
   it("checks off a component: persists progress and freezes the completed sets", () => {
+    reClockToFullDay(); // the squat lives on pre-season high days (Tue/Thu/Sat)
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
     render(<Workout />);
@@ -344,6 +355,7 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
   });
 
   it("undoes a mistaken check-off and re-checks at the current volume", () => {
+    reClockToFullDay();
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
     render(<Workout />);
@@ -363,6 +375,7 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
   });
 
   it("allows correcting check-offs after the session is finished", () => {
+    reClockToFullDay(); // the GREEN-flow correction expects the squat present
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), PAIN_ANCHORS)] });
 
     render(<Workout />);
@@ -403,6 +416,7 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
   });
 
   it("re-scales remaining rows after an activity log lands mid-session", () => {
+    reClockToFullDay();
     useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
 
     render(<Workout />);
@@ -547,8 +561,9 @@ describe("calendar (app/history)", () => {
     expect(screen.getByText("Thu, Jan 8")).toBeTruthy(); // a quiet day still shows
 
     // Every day carries its planned focus from the weekday template.
+    // January is pre-season: Mon/Wed/Fri low, Tue/Thu/Sat high.
     expect(screen.getAllByText("Planned: Strength + speed").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("Planned: Practice + upper primer").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Planned: Skills + tempo primer").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Planned: Recovery & skills")).toBeTruthy();
 
     // The Wednesday practice sits under its day with its local time.
@@ -583,8 +598,8 @@ describe("calendar (app/history)", () => {
     expect(screen.getByText("Fri, Jan 9")).toBeTruthy(); // sub-header + week label
     expect(screen.getByText("🏆 Game — Rivalry night")).toBeTruthy();
     expect(
-      screen.getAllByText("Planned: Strength + speed — Base template").length,
-    ).toBeGreaterThanOrEqual(1); // Today card + chosen-day planned row
+      screen.getAllByText("Planned: Skills + tempo primer — Base template").length,
+    ).toBeGreaterThanOrEqual(1); // Friday is a pre-season low day; Monday matches
 
     // Back to the default week view.
     fireEvent.click(screen.getByLabelText("Show next 7 days"));
@@ -608,15 +623,17 @@ describe("calendar (app/history)", () => {
 
     render(<History />);
 
-    // Today (frozen Monday) — full template day, nothing logged yet.
+    // Today (frozen Monday, pre-season low day) — the low-day template runs.
     expect(
-      screen.getAllByText("Planned: Strength + speed — Base template").length,
-    ).toBeGreaterThanOrEqual(1); // Today card + week list, both show today's focus
+      screen.getAllByText("Planned: Skills + tempo primer — Base template").length,
+    ).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Planned workout")).toBeTruthy();
 
-    // Wednesday practice night — the primer is planned, the practice is booked.
+    // Wednesday (pre-season low day) — skills + tempo primer planned.
     fireEvent.click(screen.getByLabelText("Day 2026-01-07"));
-    expect(screen.getByText("Planned: Practice + upper primer — Base template")).toBeTruthy();
+    expect(
+      screen.getAllByText("Planned: Skills + tempo primer — Base template").length,
+    ).toBeGreaterThanOrEqual(1); // Today card (Monday) + chosen Wednesday
     // The practice shows in the chosen-day timeline inside the Scheduled card.
     expect(screen.getAllByText(/Team practice/).length).toBeGreaterThanOrEqual(1);
 
@@ -900,13 +917,14 @@ describe("game plan screen (app/workout)", () => {
     expect(screen.getByText("SHIELD 🔴")).toBeTruthy();
     expect(screen.getByText("0%")).toBeTruthy();
     expect(screen.getByText("Shielded")).toBeTruthy();
-    expect(screen.getAllByText("Not part of today's plan")).toHaveLength(9);
+    expect(screen.getAllByText("Not part of today's plan")).toHaveLength(5); // pre-season Monday low day
     expect(screen.getByText(/were adjusted out today/)).toBeTruthy();
     // The banner carries the safety message now — exactly once.
     expect(screen.getAllByText(ADULT_ATTENTION_MESSAGE)).toHaveLength(1);
   });
 
   it("shares check-off state with Home and finishes the session", () => {
+    reClockToFullDay(); // the seeded squat progress needs a full-template day
     useAppStore.setState({
       readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
       workoutProgress: {
@@ -937,6 +955,7 @@ describe("game plan screen (app/workout)", () => {
   });
 
   it("renders the game-plan multiplier, REDUCED sets, and the adjusted-out group", () => {
+    reClockToFullDay(); // primer-day geometry needs a full-template day
     useAppStore.setState({
       readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
       scheduledEvents: [

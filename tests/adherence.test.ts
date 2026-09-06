@@ -47,12 +47,12 @@ describe("adherenceSamplesFor", () => {
   it("aggregates planned vs completed blocks per goal across the window", () => {
     const progress = {
       "2026-01-06": { "strength-a": done("strength-a"), "strength-b": done("strength-b"), jumps: done("jumps"), sprints: done("sprints") },
-      "2026-01-04": { "strength-a": done("strength-a"), jumps: done("jumps") },
+      "2026-01-03": { "strength-a": done("strength-a"), jumps: done("jumps") }, // Saturday — full-template day
     };
-    const samples = adherenceSamplesFor(makePlan(), [makeLog("2026-01-06"), makeLog("2026-01-04")], progress, TODAY);
+    const samples = adherenceSamplesFor(makePlan(), [makeLog("2026-01-06"), makeLog("2026-01-03")], progress, TODAY);
 
     const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
-    // 3 sessions... two logs, 3 strength blocks per session: planned 6, completed 3.
+    // Two logs on full-template days, 3 strength blocks per session: planned 6, completed 3.
     expect(byGoal.get("STRENGTH")).toEqual({ goal: "STRENGTH", plannedBlocks: 6, completedBlocks: 3 });
     expect(byGoal.get("EXPLOSIVENESS")).toEqual({ goal: "EXPLOSIVENESS", plannedBlocks: 2, completedBlocks: 2 });
     expect(byGoal.get("SPEED")).toEqual({ goal: "SPEED", plannedBlocks: 2, completedBlocks: 1 });
@@ -68,26 +68,27 @@ describe("adherenceSamplesFor", () => {
   it("respects the lookback window on both ends", () => {
     const samples = adherenceSamplesFor(
       makePlan(),
-      [makeLog("2025-12-31"), makeLog("2026-01-01"), makeLog("2026-01-07"), makeLog(TODAY)],
+      [makeLog("2025-12-31"), makeLog("2026-01-01"), makeLog("2026-01-06"), makeLog(TODAY)],
       {},
       TODAY,
     );
 
     const strength = samples.find((sample) => sample.goal === "STRENGTH");
-    // 2026-01-01 and 2026-01-07 are inside the 7-day window; 2025-12-31 is not.
+    // 2026-01-01 (Thu) and 2026-01-06 (Tue) are full-template days inside
+    // the 7-day window; 2025-12-31 is not.
     expect(strength?.plannedBlocks).toBe(6);
   });
 
   it("falls back to the default template when no plan is active", () => {
-    // Monday, Jan 5 2026 — a full-template day (not a practice night).
-    const progress = { "2026-01-05": { "primary-lower-squat": done("primary-lower-squat"), "skill-ballhandling": done("skill-ballhandling") } };
+    // Monday, Jan 5 2026 — a pre-season LOW day: upper + skills + easy work.
+    const progress = { "2026-01-05": { "skill-ballhandling": done("skill-ballhandling") } };
     const samples = adherenceSamplesFor(null, [makeLog("2026-01-05")], progress, TODAY);
 
     const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
-    expect(byGoal.get("STRENGTH")?.plannedBlocks).toBe(4); // 4 strength blocks, recovery excluded
-    expect(byGoal.get("STRENGTH")?.completedBlocks).toBe(1);
+    expect(byGoal.get("STRENGTH")?.plannedBlocks).toBe(3); // upper push + two accessories, recovery excluded
+    expect(byGoal.get("STRENGTH")?.completedBlocks).toBe(0);
     // Skills are typed EXPLOSIVENESS in the library — the exempt goal absorbs them.
-    expect(byGoal.get("EXPLOSIVENESS")).toEqual({ goal: "EXPLOSIVENESS", plannedBlocks: 2, completedBlocks: 1 });
+    expect(byGoal.get("EXPLOSIVENESS")).toEqual({ goal: "EXPLOSIVENESS", plannedBlocks: 1, completedBlocks: 1 });
   });
 });
 

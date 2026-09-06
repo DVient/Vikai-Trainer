@@ -11,11 +11,51 @@
  * stays light, and the remaining days carry the full strength/speed template.
  */
 
-import { DEFAULT_SEASON_CONFIG } from "../config/defaults";
-import { weekdayOf } from "./fall2026";
 import type { TrainingComponent } from "../types";
+import { componentsForRole, dayRoleFor } from "./weekStructure";
 
+/**
+ * The default template, ordered speed-power first: the athlete is freshest
+ * at the top of the session, so acceleration work, jumps, and COD render
+ * before any lifting (Charlie Francis's non-negotiable sequencing).
+ */
 export const DEFAULT_BASE_PLAN = [
+  {
+    id: "acceleration-sprints",
+    type: "SPEED",
+    stress: "HIGH",
+    priority: 2,
+    baseVolume: 3,
+    minimumVolume: 1,
+    optional: false,
+    bodyRegion: "FULL",
+    estimatedMinutes: 8,
+    muscleGroups: ["QUAD", "HAMSTRING", "CALF", "ANKLE", "FOOT"],
+  },
+  {
+    id: "explosive-jumps",
+    type: "EXPLOSIVENESS",
+    stress: "HIGH",
+    priority: 2,
+    baseVolume: 4,
+    minimumVolume: 2,
+    optional: false,
+    bodyRegion: "LOWER",
+    estimatedMinutes: 10,
+    muscleGroups: ["QUAD", "CALF", "ANKLE"],
+  },
+  {
+    id: "cod-drills",
+    type: "CHANGE_OF_DIRECTION",
+    stress: "HIGH",
+    priority: 3,
+    baseVolume: 3,
+    minimumVolume: 1,
+    optional: false,
+    bodyRegion: "FULL",
+    estimatedMinutes: 8,
+    muscleGroups: ["QUAD", "ANKLE", "KNEE", "CALF"],
+  },
   {
     id: "primary-lower-squat",
     type: "STRENGTH",
@@ -39,42 +79,6 @@ export const DEFAULT_BASE_PLAN = [
     bodyRegion: "UPPER",
     estimatedMinutes: 16,
     muscleGroups: ["ARM", "SHOULDER"],
-  },
-  {
-    id: "explosive-jumps",
-    type: "EXPLOSIVENESS",
-    stress: "HIGH",
-    priority: 2,
-    baseVolume: 4,
-    minimumVolume: 2,
-    optional: false,
-    bodyRegion: "LOWER",
-    estimatedMinutes: 10,
-    muscleGroups: ["QUAD", "CALF", "ANKLE"],
-  },
-  {
-    id: "acceleration-sprints",
-    type: "SPEED",
-    stress: "HIGH",
-    priority: 2,
-    baseVolume: 3,
-    minimumVolume: 1,
-    optional: false,
-    bodyRegion: "FULL",
-    estimatedMinutes: 8,
-    muscleGroups: ["QUAD", "HAMSTRING", "CALF", "ANKLE", "FOOT"],
-  },
-  {
-    id: "cod-drills",
-    type: "CHANGE_OF_DIRECTION",
-    stress: "HIGH",
-    priority: 3,
-    baseVolume: 3,
-    minimumVolume: 1,
-    optional: false,
-    bodyRegion: "FULL",
-    estimatedMinutes: 8,
-    muscleGroups: ["QUAD", "ANKLE", "KNEE", "CALF"],
   },
   {
     id: "skill-ballhandling",
@@ -135,48 +139,29 @@ export const BASE_PLAN_TITLES: Record<string, string> = {
 
 /* ─────────────────── Weekday-structured default templates ─────────────── */
 
-/** Blocks kept on practice nights: top-half and technique only — legs are
- * saved for the 6 PM practice (no high-stress lower-body loading). */
-const PRACTICE_DAY_IDS: ReadonlySet<string> = new Set([
-  "primary-upper-push",
-  "skill-ballhandling",
-  "accessory-upper",
-  "accessory-core",
-  "mobility-recovery",
-]);
-
-/** Sunday stays light: skill touch-up plus the recovery flow. */
-const RECOVERY_DAY_IDS: ReadonlySet<string> = new Set([
-  "skill-ballhandling",
-  "mobility-recovery",
-]);
-
-function pickByIds(ids: ReadonlySet<string>): readonly TrainingComponent[] {
-  return (DEFAULT_BASE_PLAN as readonly TrainingComponent[]).filter((component) =>
-    ids.has(component.id),
-  );
-}
-
 /**
- * The default plan for a local date: practice nights (Tue/Wed/Thu) run the
- * practice-day template, Sunday runs recovery, other days the full template.
- * A built plan (`activePlan`) always wins at the call site.
+ * The default plan for a local date: the shared week-structure role decides
+ * which blocks the day keeps (Sunday recovery, practice nights leg-free,
+ * pre-season low days, post-practice Friday without speed), and the array's
+ * speed-first order carries through. A built plan (`activePlan`) always
+ * wins at the call site and is shaped by the same roles.
  */
 export function defaultPlanForDate(localDate: string): readonly TrainingComponent[] {
-  const weekday = weekdayOf(localDate);
-  if (weekday === 0) return pickByIds(RECOVERY_DAY_IDS);
-  if (DEFAULT_SEASON_CONFIG.practiceWeekdays.includes(weekday)) {
-    return pickByIds(PRACTICE_DAY_IDS);
-  }
-  return DEFAULT_BASE_PLAN as readonly TrainingComponent[];
+  return componentsForRole(dayRoleFor(localDate), DEFAULT_BASE_PLAN);
 }
 
 /** One-line focus label for the day's default plan (calendar + Game Plan). */
 export function defaultPlanFocusLabel(localDate: string): string {
-  const weekday = weekdayOf(localDate);
-  if (weekday === 0) return "Recovery & skills";
-  if (DEFAULT_SEASON_CONFIG.practiceWeekdays.includes(weekday)) {
-    return "Practice + upper primer";
+  switch (dayRoleFor(localDate)) {
+    case "recovery":
+      return "Recovery & skills";
+    case "practice":
+      return "Practice + upper primer";
+    case "post-practice":
+      return "Strength + tempo";
+    case "low":
+      return "Skills + tempo primer";
+    case "full":
+      return "Strength + speed";
   }
-  return "Strength + speed";
 }

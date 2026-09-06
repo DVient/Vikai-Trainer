@@ -127,22 +127,62 @@ describe("progression — activePlanForDay", () => {
   });
 
   it("applies the week scale to every block, respecting minimum volumes", () => {
-    const week2 = activePlanForDay(plan, "2026-09-08"); // week 1 → 1.08
+    const week2 = activePlanForDay(plan, "2026-09-12"); // Saturday, week 1 → 1.08
     const base = plan.components[0];
-    expect(week2[0]?.baseVolume).toBe(
+    const dayBlock = week2.find((component) => component.id === base?.id);
+    expect(dayBlock?.baseVolume).toBe(
       Math.max(base?.minimumVolume ?? 1, Math.round((base?.baseVolume ?? 0) * 1.08)),
     );
   });
 
   it("deload week actually reduces volume below week 1", () => {
-    const week1 = activePlanForDay(plan, "2026-09-01");
-    const week4 = activePlanForDay(plan, "2026-09-22"); // week 3 → deload
+    const week1 = activePlanForDay(plan, "2026-09-05"); // Saturday, week 0
+    const week4 = activePlanForDay(plan, "2026-09-26"); // Saturday, week 3 → deload
     const first = plan.components[0];
     const expected = Math.max(first?.minimumVolume ?? 1, Math.round((first?.baseVolume ?? 0) * 0.6));
-    expect(week4[0]?.baseVolume).toBe(expected);
-    if (expected < (week1[0]?.baseVolume ?? 0)) {
-      expect(week4[0]?.baseVolume).toBeLessThan(week1[0]?.baseVolume ?? 0);
+    expect(week4.find((component) => component.id === first?.id)?.baseVolume).toBe(expected);
+    const week1Volume = week1.find((component) => component.id === first?.id)?.baseVolume ?? 0;
+    if (expected < week1Volume) {
+      expect(expected).toBeLessThan(week1Volume);
     }
+  });
+});
+
+describe("week structure — built plans shape by weekday too", () => {
+  const plan = buildPlan(makeInput({ periodWeeks: 8, startDate: "2026-09-01" }));
+
+  it("saves the legs on practice nights", () => {
+    const tuesday = activePlanForDay(plan, "2026-09-15");
+    expect(
+      tuesday.every((block) => block.stress !== "HIGH" || block.bodyRegion === "UPPER"),
+    ).toBe(true);
+  });
+
+  it("keeps strength but drops speed/plyo/COD on post-practice Fridays", () => {
+    const friday = activePlanForDay(plan, "2026-09-18");
+    expect(friday.some((block) => block.type === "STRENGTH")).toBe(true);
+    expect(
+      friday.every(
+        (block) =>
+          !(
+            block.stress === "HIGH" &&
+            ["SPEED", "CHANGE_OF_DIRECTION", "DECELERATION", "EXPLOSIVENESS"].includes(block.type)
+          ),
+      ),
+    ).toBe(true);
+  });
+
+  it("runs a low Sunday — skill and recovery work only", () => {
+    const sunday = activePlanForDay(plan, "2026-09-20");
+    expect(sunday.every((block) => block.stress !== "HIGH")).toBe(true);
+  });
+
+  it("renders speed-power work first on full days", () => {
+    const saturday = activePlanForDay(plan, "2026-09-12");
+    expect(saturday[0]?.stress).toBe("HIGH");
+    expect(["SPEED", "CHANGE_OF_DIRECTION", "DECELERATION", "EXPLOSIVENESS"]).toContain(
+      saturday[0]?.type,
+    );
   });
 });
 

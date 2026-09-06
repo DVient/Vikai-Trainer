@@ -27,6 +27,7 @@ import type {
 } from "../types";
 import { BLOCK_LIBRARY, type BlockKind, type ExerciseVariantTag, libraryBlockById } from "./library";
 import { personaById } from "./personas";
+import { componentsForRole, dayRoleFor, sessionOrder } from "./weekStructure";
 
 export const MIN_PERIOD_WEEKS = 4;
 export const MAX_PERIOD_WEEKS = 12;
@@ -211,19 +212,23 @@ export function weekScaleFor(weekIndex: number, periodWeeks: number): number {
 
 /**
  * The day's base plan from a built plan: the week's progression applied to
- * the stored template. Pure — call per day; the generator then maps
- * restrictions onto this exactly as it does for the default plan.
+ * the stored template, then shaped by the shared week structure — practice
+ * nights save the legs, Sundays stay low, post-practice Fridays skip
+ * speed/plyo/COD, and speed/power renders first. Pure — call per day; the
+ * generator then maps restrictions onto this exactly as it does for the
+ * default plan.
  */
 export function activePlanForDay(
   plan: BuiltPlan,
   localDate: string,
-): TrainingComponent[] {
+): readonly TrainingComponent[] {
   const weekIndex = weekIndexOf(plan, localDate);
   const scale = weekScaleFor(weekIndex, plan.periodWeeks);
-  return plan.components.map((component) => ({
+  const scaled = plan.components.map((component) => ({
     ...component,
     baseVolume: Math.max(component.minimumVolume ?? 1, Math.round(component.baseVolume * scale)),
   }));
+  return sessionOrder(componentsForRole(dayRoleFor(localDate), scaled));
 }
 
 /** Where the plan is in its life, from date + period alone. */

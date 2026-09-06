@@ -22,26 +22,51 @@ import { weekdayOfIsoDate } from "../src/lib/recurrence";
 const TZ = "America/New_York";
 
 describe("weekday-structured default plan", () => {
-  it("runs the full template on Monday, Friday, and Saturday", () => {
-    for (const date of ["2026-01-05", "2026-01-09", "2026-01-10"]) {
-      const plan = defaultPlanForDate(date);
+  it("pre-season splits high/low: Tue/Thu/Sat full, Mon/Wed/Fri low", () => {
+    // January 2026 — before the practice season starts (2026-09-14) there
+    // are no team practices, so the week runs the classic high/low split.
+    for (const date of ["2026-01-06", "2026-01-08", "2026-01-10"]) {
+      const plan = defaultPlanForDate(date); // Tue, Thu, Sat
       expect(plan).toHaveLength(9);
-      expect(plan.some((block) => block.id === "primary-lower-squat")).toBe(true);
+      expect(plan[0]?.id).toBe("acceleration-sprints"); // speed first
       expect(defaultPlanFocusLabel(date)).toBe("Strength + speed");
+    }
+    for (const date of ["2026-01-05", "2026-01-07", "2026-01-09"]) {
+      const plan = defaultPlanForDate(date); // Mon, Wed, Fri
+      expect(plan).toHaveLength(5);
+      // No high-stress work outside the upper body on low days.
+      expect(
+        plan.every((block) => block.stress !== "HIGH" || block.bodyRegion === "UPPER"),
+      ).toBe(true);
+      expect(defaultPlanFocusLabel(date)).toBe("Skills + tempo primer");
     }
   });
 
-  it("saves the legs on practice nights (Tue, Wed, Thu)", () => {
-    for (const date of ["2026-01-06", "2026-01-07", "2026-01-08"]) {
-      expect(weekdayOfIsoDate(date)).toBeGreaterThanOrEqual(2); // sanity: Tue–Thu
+  it("practice season saves the legs on practice nights (Tue, Wed, Thu)", () => {
+    for (const date of ["2026-09-15", "2026-09-16", "2026-09-17"]) {
       const plan = defaultPlanForDate(date);
       expect(plan).toHaveLength(5);
-      expect(plan.every((block) => block.bodyRegion !== "LOWER")).toBe(true);
       expect(plan.some((block) => block.id === "primary-upper-push")).toBe(true);
       expect(plan.some((block) => block.id === "skill-ballhandling")).toBe(true);
       expect(plan.some((block) => block.id === "mobility-recovery")).toBe(true);
       expect(defaultPlanFocusLabel(date)).toBe("Practice + upper primer");
     }
+  });
+
+  it("practice-season Friday is a post-practice strength day — no speed/plyo/COD", () => {
+    const plan = defaultPlanForDate("2026-09-18"); // Friday, practice season
+    expect(plan).toHaveLength(6); // full minus sprints, jumps, COD
+    expect(plan.some((block) => block.id === "primary-lower-squat")).toBe(true);
+    expect(
+      plan.every(
+        (block) =>
+          !(
+            block.stress === "HIGH" &&
+            ["SPEED", "CHANGE_OF_DIRECTION", "DECELERATION", "EXPLOSIVENESS"].includes(block.type)
+          ),
+      ),
+    ).toBe(true);
+    expect(defaultPlanFocusLabel("2026-09-18")).toBe("Strength + tempo");
   });
 
   it("keeps Sunday light — skills plus recovery only", () => {
@@ -50,15 +75,19 @@ describe("weekday-structured default plan", () => {
     expect(defaultPlanFocusLabel("2026-01-04")).toBe("Recovery & skills");
   });
 
+  it("orders speed-power work first on high days", () => {
+    const ids = defaultPlanForDate("2026-01-06").map((block) => block.id);
+    expect(ids.slice(0, 3)).toEqual(["acceleration-sprints", "explosive-jumps", "cod-drills"]);
+  });
+
   it("matches the season config's practice weekdays", () => {
     expect(DEFAULT_SEASON_CONFIG.practiceWeekdays).toEqual([2, 3, 4]);
     expect(DEFAULT_SEASON_CONFIG.practiceTime).toBe("18:00");
-    for (const weekday of DEFAULT_SEASON_CONFIG.practiceWeekdays) {
-      const plan = defaultPlanForDate(
-        ["2026-01-04", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-10"][weekday] ??
-          "2026-01-06",
-      );
-      expect(plan.every((block) => block.bodyRegion !== "LOWER")).toBe(true);
+    for (const date of ["2026-09-15", "2026-09-16", "2026-09-17"]) {
+      const plan = defaultPlanForDate(date);
+      expect(
+        plan.every((block) => block.stress !== "HIGH" || block.bodyRegion === "UPPER"),
+      ).toBe(true);
     }
   });
 });

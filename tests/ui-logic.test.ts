@@ -442,7 +442,7 @@ describe("§1.2 default season configuration", () => {
       practiceWeekdays: [2, 3, 4],
       practiceTime: "18:00",
       seasonStart: "2026-09-14",
-      firstGame: "2026-10-15",
+      firstGame: "2026-10-17",
       schoolStartTime: "09:00",
       schoolEndTime: "15:30",
       commuteMinutes: 40,

@@ -336,12 +336,26 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   },
   {
     componentId: "explosive-jumps",
+    phaseId: "competition",
+    weekdays: [6],
+    note: "Game day — perform. Jumping lives earlier in the week, on fresh legs.",
+    exercises: [],
+  },
+  {
+    componentId: "explosive-jumps",
     exercises: [
       { name: "Box Jumps", prescription: "3 × 3", cue: "Land soft and quiet.", videoQuery: "box jump soft landing technique" },
     ],
   },
 
   /* ── Acceleration / max speed ── */
+  {
+    componentId: "acceleration-sprints",
+    phaseId: "pre-season",
+    weekdays: [1, 3, 5],
+    note: "Low-energy day — tempo and skill work only. Speed lives on fresh days.",
+    exercises: [],
+  },
   {
     componentId: "acceleration-sprints",
     phaseId: "pre-season",
@@ -376,6 +390,13 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
   },
 
   /* ── Change of direction ── */
+  {
+    componentId: "cod-drills",
+    phaseId: "pre-season",
+    weekdays: [1, 3, 5],
+    note: "Low-energy day — cutting lives on the high-energy days.",
+    exercises: [],
+  },
   {
     componentId: "cod-drills",
     phaseId: "pre-season",
