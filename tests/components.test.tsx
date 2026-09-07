@@ -42,6 +42,33 @@ const notificationsSpy = vi.hoisted(() => ({
   cancel: vi.fn<(id: string) => Promise<void>>(async () => undefined),
 }));
 
+// Phase 9.12 export — capture what the share sheet would deliver.
+const sharingSpy = vi.hoisted(() => ({
+  shareAsync: vi.fn<(uri: string, options?: unknown) => Promise<void>>(async () => undefined),
+  isAvailableAsync: vi.fn<() => Promise<boolean>>(async () => true),
+}));
+const fileWrites = vi.hoisted(() => ({
+  list: [] as Array<{ uri: string; content: string }>,
+}));
+
+vi.mock("expo-file-system", () => ({
+  Paths: { cache: { uri: "file:///cache/" } },
+  File: class {
+    uri: string;
+    constructor(base: { uri: string }, name: string) {
+      this.uri = `${base.uri}${name}`;
+    }
+    write(content: string): void {
+      fileWrites.list.push({ uri: this.uri, content });
+    }
+  },
+}));
+
+vi.mock("expo-sharing", () => ({
+  shareAsync: sharingSpy.shareAsync,
+  isAvailableAsync: sharingSpy.isAvailableAsync,
+}));
+
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: AsyncStorageMock,
 }));
@@ -191,6 +218,10 @@ function resetStore(): void {
   });
   searchParamsMock.eventId = undefined;
   searchParamsMock.date = undefined;
+  sharingSpy.shareAsync.mockClear();
+  sharingSpy.isAvailableAsync.mockClear();
+  sharingSpy.isAvailableAsync.mockResolvedValue(true);
+  fileWrites.list.length = 0;
 }
 
 beforeEach(() => {
@@ -1803,11 +1834,51 @@ describe("missed-day backfill (Phase 9.12)", () => {
     useAppStore.getState().logActivity({
       activityDate: localDate(-1),
       timezone: TIMEZONE,
-      activityType: "OTHER_TRAINING",
+      activityType: "OTHER",
       sessionRpe: 5,
       durationMinutes: 30,
     });
     render(<Index />);
     expect(screen.queryByText("Did anything happen yesterday?")).toBeNull();
+  });
+
+  it("exports the JSON backup and CSV through the share sheet", async () => {
+    useAppStore.getState().logActivity({
+      activityDate: localDate(0),
+      timezone: TIMEZONE,
+      activityType: "TEAM_PRACTICE",
+      sessionRpe: 6,
+      durationMinutes: 60,
+    });
+
+    render(<History />);
+
+    fireEvent.click(screen.getByLabelText("Export all data as a JSON backup"));
+    await waitFor(() => expect(sharingSpy.shareAsync).toHaveBeenCalledTimes(1));
+    const [jsonUri, jsonOptions] = sharingSpy.shareAsync.mock.calls[0] as [string, { mimeType: string }];
+    expect(jsonUri).toContain("vikai-export-2026-01-05.json");
+    expect(jsonOptions.mimeType).toBe("application/json");
+    const written = fileWrites.list.at(-1);
+    expect(JSON.parse(written?.content ?? "{}")).toMatchObject({ schema: "vikai-export/1" });
+
+    fireEvent.click(screen.getByLabelText("Export all data as a spreadsheet CSV"));
+    await waitFor(() => expect(sharingSpy.shareAsync).toHaveBeenCalledTimes(2));
+    const [csvUri, csvOptions] = sharingSpy.shareAsync.mock.calls[1] as [string, { mimeType: string }];
+    expect(csvUri).toContain("vikai-export-2026-01-05.csv");
+    expect(csvOptions.mimeType).toBe("text/csv");
+    const csvContent = fileWrites.list.at(-1)?.content ?? "";
+    expect(csvContent).toContain("# ACTIVITIES");
+    expect(csvContent).toContain("TEAM_PRACTICE,6,60,360");
+  });
+
+  it("explains itself when the share sheet is unavailable", async () => {
+    sharingSpy.isAvailableAsync.mockResolvedValue(false);
+    render(<History />);
+
+    fireEvent.click(screen.getByLabelText("Export all data as a spreadsheet CSV"));
+    await waitFor(() =>
+      expect(screen.getByText("Sharing isn't available on this device.")).toBeTruthy(),
+    );
+    expect(sharingSpy.shareAsync).not.toHaveBeenCalled();
   });
 });

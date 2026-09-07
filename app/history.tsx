@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { useRouter } from "expo-router";
 
 import { CalendarGrid } from "../src/components/CalendarGrid";
@@ -14,7 +16,8 @@ import {
   type PlannedWorkoutEntry,
   type WeekScheduleDay,
 } from "../src/lib/calendar";
-import { tapLight } from "../src/lib/haptics";
+import { buildExport } from "../src/lib/export";
+import { tapLight, tapSuccess } from "../src/lib/haptics";
 import { defaultPlanFocusLabel } from "../src/plans/basePlan";
 import { planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
 import { personaById } from "../src/plans/personas";
@@ -128,6 +131,46 @@ export default function History() {
       const next = new Date(Date.UTC(current.year, current.month - 1 + delta, 1));
       return { year: next.getUTCFullYear(), month: next.getUTCMonth() + 1 };
     });
+  };
+
+  // Phase 9.12 — data export: the whole local store as JSON (complete
+  // backup) or a sectioned CSV (spreadsheet), delivered through the share
+  // sheet. Files land in the cache dir; the athlete saves or sends them.
+  const [exportNote, setExportNote] = useState<string | null>(null);
+  const shareExport = async (kind: "json" | "csv") => {
+    setExportNote(null);
+    const available = await Sharing.isAvailableAsync();
+    if (!available) {
+      setExportNote("Sharing isn't available on this device.");
+      return;
+    }
+    try {
+      const state = useAppStore.getState();
+      const { json, csv, dateKey } = buildExport(
+        {
+          profile: state.profile,
+          trainingObjective: state.trainingObjective,
+          readinessInputs: state.readinessInputs,
+          activityLogs: state.activityLogs,
+          workoutLogs: state.workoutLogs,
+          workoutProgress: state.workoutProgress,
+          scheduledEvents: state.scheduledEvents,
+          personalBests: state.personalBests,
+          activePlan: state.activePlan,
+        },
+        new Date(),
+      );
+      const extension = kind === "json" ? "json" : "csv";
+      const file = new File(Paths.cache, `vikai-export-${dateKey}.${extension}`);
+      file.write(kind === "json" ? json : csv);
+      await Sharing.shareAsync(file.uri, {
+        mimeType: kind === "json" ? "application/json" : "text/csv",
+        dialogTitle: "Export Vikai Trainer data",
+      });
+      tapSuccess();
+    } catch {
+      setExportNote("Export didn't finish — try again.");
+    }
   };
 
   const renderTimelineRows = (entries: ReturnType<typeof dayTimeline>) => (
@@ -286,6 +329,37 @@ export default function History() {
             Nothing scheduled this week — tap ＋ Add to plan your season.
           </Text>
         )}
+      </View>
+
+      <View className="rounded-2xl border border-edge bg-card p-4">
+        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
+          Your data — everything stays on this phone
+        </Text>
+        <View className="mt-2 flex-row gap-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Export all data as a JSON backup"
+            onPress={() => {
+              void shareExport("json");
+            }}
+            className="h-12 flex-1 items-center justify-center rounded-xl border-2 border-edge bg-app"
+          >
+            <Text className="text-xs font-black text-body">⬇ JSON backup</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Export all data as a spreadsheet CSV"
+            onPress={() => {
+              void shareExport("csv");
+            }}
+            className="h-12 flex-1 items-center justify-center rounded-xl border-2 border-edge bg-app"
+          >
+            <Text className="text-xs font-black text-body">⬇ Spreadsheet (CSV)</Text>
+          </Pressable>
+        </View>
+        {exportNote !== null ? (
+          <Text className="mt-2 text-xs font-semibold text-shield">{exportNote}</Text>
+        ) : null}
       </View>
 
       <View className="flex-row flex-wrap gap-2 pb-2">
