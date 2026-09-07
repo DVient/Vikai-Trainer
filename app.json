@@ -5,16 +5,10 @@
     "version": "1.0.0",
     "scheme": "vikai-trainer",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
-    },
     "android": {
       "package": "com.kaivic.vikaitrainer",
       "adaptiveIcon": {
@@ -22,10 +16,6 @@
         "backgroundColor": "#0F172A"
       },
       "permissions": [
-        "POST_NOTIFICATIONS",
-        "USE_EXACT_ALARM",
-        "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS",
         "USE_EXACT_ALARM",
         "VIBRATE",
@@ -41,10 +31,13 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-notifications", { "color": "#22C55E" }],
       [
-        "expo-notifications",
+        "expo-splash-screen",
         {
-          "color": "#22C55E"
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0F172A"
         }
       ]
     ],
