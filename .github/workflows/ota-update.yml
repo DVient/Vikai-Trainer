@@ -1,0 +1,59 @@
+# VIKAI — OTA update on every push to main (Phase 9.12).
+#
+# JS/asset-only changes ship as an Expo OTA update to the `preview` channel —
+# the channel the Android APK installers listen on. Athletes get the new
+# version on their next app launch, no reinstall, no store.
+#
+# NATIVE changes (new native module, app.json plugin/permission changes,
+# SDK bump) can NOT ride OTA — those need a manual `eas build`. The workflow
+# still publishes the OTA (harmless), but remember to cut a new APK.
+#
+# One-time setup (repo owner): add the `EXPO_TOKEN` secret
+# (GitHub repo → Settings → Secrets and variables → Actions → New repository
+# secret). Create the token with `eas login` + `eas whoami` context at
+# https://expo.dev/accounts/dvient/settings/access-tokens.
+
+name: OTA Update (preview channel)
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ota-preview
+  cancel-in-progress: true
+
+jobs:
+  ota-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Test gate
+        run: pnpm exec vitest run
+
+      - name: Publish OTA update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx eas-cli@latest update \
+            --channel preview \
+            --non-interactive \
+            --message "OTA $GITHUB_SHA: $(git log -1 --pretty=%s)"

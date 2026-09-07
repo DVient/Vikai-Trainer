@@ -8,11 +8,10 @@ support is prepared and can be switched on later** (see the last section).
 
 ## Android phones — install in about 5 minutes
 
-Send the Android users this exact message (replace the link with the real
-one from the latest build):
+Send the Android users this exact message:
 
 > **Install Vikai Trainer (basketball training app)**
-> 1. Open this link on your phone: **[APK DOWNLOAD LINK]**
+> 1. Open this link on your phone: **https://expo.dev/artifacts/eas/4EBlftglsyc0ZeM6ewt_Go_EjUknMZexoij-mjzu1F4.apk**
 > 2. Tap **Download**. If a small banner says "this file might be harmful,"
 >    choose **Download anyway** — it's our private app, not from the store.
 > 3. Open the downloaded file (swipe down from the top of the screen and tap
@@ -61,10 +60,26 @@ marks a build as expiring (the app keeps working until then).
 
 ---
 
-## How updates reach installed phones
+## How updates reach installed phones (automatic)
 
-- **Everything app-logic related** (training plan, engine, screens) updates
-  over the air: `npx eas update --branch production` (or the preview
-  channel) — users get it at next app launch. No reinstall, no new link.
-- **Native-level changes** (rare) need a new build: re-run
-  `eas build`, share the new APK link (Android) or TestFlight build (iOS).
+App improvements ship themselves — the person updating the app never
+messages the users:
+
+1. Code is pushed to the `main` branch on GitHub.
+2. A GitHub Action (`.github/workflows/ota-update.yml`) runs the full test
+   suite, and if everything passes, publishes an **over-the-air update** to
+   the `preview` channel — the channel the installed APK listens on.
+3. Every athlete gets the new version the **next time they open the app**.
+   No reinstall, no new link, nothing to do.
+
+**One-time setup for this to work** (repo owner):
+- Push the repository to GitHub.
+- Create an access token at expo.dev → Accounts → dvient → **Access tokens**.
+- On the GitHub repo: Settings → Secrets and variables → Actions → New
+  repository secret → name `EXPO_TOKEN`, paste the token.
+
+**The one exception:** changes that touch native code (a brand-new native
+module, SDK upgrade, or app permission changes) can't ride an over-the-air
+update. Those are rare — when they happen, run `eas build -p android
+--profile preview` and share the new APK link the same way as above. iPhone
+TestFlight builds get the same OTA updates once that channel is switched on.
