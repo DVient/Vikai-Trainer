@@ -42,6 +42,8 @@ export default function Index() {
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const workoutProgress = useAppStore((state) => state.workoutProgress);
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
+  const backfillNudgesDismissed = useAppStore((state) => state.backfillNudgesDismissed);
+  const dismissBackfillNudge = useAppStore((state) => state.dismissBackfillNudge);
   const profile = useAppStore((state) => state.profile);
   const trainingObjective = useAppStore((state) => state.trainingObjective);
   const activePlan = useAppStore((state) => state.activePlan);
@@ -76,6 +78,18 @@ export default function Index() {
   const upcoming = nextUpcomingEvents(scheduledEvents, now, 3);
   const nextGame = upcoming.find((view) => view.event.eventType === "GAME");
   const soreAreasToday = Object.keys(result.restrictions.sorenessScale ?? {}).filter(isSoreArea);
+
+  // Phase 9.12 — missed-day nudge: yesterday with nothing logged gets one
+  // quiet card (per-date dismissible) pointing at the backfill editor.
+  const yesterday = toLocalDateString(
+    new Date(new Date(`${today}T12:00:00.000Z`).getTime() - 24 * 60 * 60 * 1000),
+    profile.timezone,
+  );
+  const yesterdayLogged =
+    activityLogs.some((entry) => entry.activityDate === yesterday) ||
+    workoutLogs.some((entry) => entry.activityDate === yesterday);
+  const showMissedDayNudge =
+    !yesterdayLogged && !backfillNudgesDismissed.includes(yesterday);
 
   const finish = () => {
     tapHeavy();
@@ -186,6 +200,41 @@ export default function Index() {
       </Pressable>
 
       <DayStepper steps={steps} onStepPress={(_id, route) => router.navigate(route)} />
+
+      {showMissedDayNudge ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Did anything happen yesterday? Add it so it shapes today's plan"
+          onPress={() => {
+            tapLight();
+            router.navigate(`/practice-log?date=${yesterday}`);
+          }}
+          className="min-h-[56px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-3"
+        >
+          <Text className="text-lg">🕰️</Text>
+          <View className="flex-1">
+            <Text className="text-sm font-bold text-strong">
+              Did anything happen yesterday?
+            </Text>
+            <Text className="text-xs text-faint">
+              Add it now — forgotten activities and body feedback still shape
+              today's plan.
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss the missed-day reminder"
+            onPress={() => {
+              tapLight();
+              dismissBackfillNudge(yesterday);
+            }}
+            hitSlop={12}
+            className="h-12 w-12 items-center justify-center rounded-lg bg-edge"
+          >
+            <Text className="text-sm font-bold text-faint">✕</Text>
+          </Pressable>
+        </Pressable>
+      ) : null}
 
       <Pressable
         accessibilityRole="button"

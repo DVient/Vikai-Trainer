@@ -39,6 +39,7 @@ const INITIAL_SLICES = {
   personalBests: [],
   defaultScheduleSeeded: false,
   teamColors: DEFAULT_TEAM_COLORS,
+  backfillNudgesDismissed: [],
 } satisfies Partial<VikaiTrainerAppState>;
 
 function resetStore(): void {
@@ -290,6 +291,30 @@ describe("workout logs", () => {
     expect(log.id).toMatch(/^workout-/);
     expect(useAppStore.getState().workoutLogs).toHaveLength(1);
   });
+
+  it("backfills a session record in place (Phase 9.12) — id and createdAt immutable", () => {
+    const log = useAppStore.getState().recordWorkoutLog({
+      activityDate: "2026-01-02",
+      notes: "Felt fresh",
+    });
+
+    useAppStore.getState().updateWorkoutLog(log.id, {
+      soreAreasAfter: ["QUAD", "ANKLE"],
+      notes: "Felt fresh; left ankle tight after practice",
+    });
+
+    const stored = useAppStore.getState().workoutLogs.find((entry) => entry.id === log.id);
+    expect(stored?.soreAreasAfter).toEqual(["QUAD", "ANKLE"]);
+    expect(stored?.notes).toContain("left ankle tight");
+    expect(stored?.id).toBe(log.id);
+    expect(stored?.createdAt).toBe(log.createdAt);
+    expect(stored?.updatedAt).toBeTypeOf("string");
+  });
+
+  it("ignores backfill patches for unknown records", () => {
+    useAppStore.getState().updateWorkoutLog("workout-none", { notes: "ghost" });
+    expect(useAppStore.getState().workoutLogs).toHaveLength(0);
+  });
 });
 
 describe("notification identifier tracking (SPEC §35)", () => {
@@ -480,5 +505,17 @@ describe("team colors (Phase C)", () => {
       primary: "#001F3F",
       secondary: "#FFD700",
     });
+  });
+});
+
+describe("missed-day nudge dismissals (Phase 9.12)", () => {
+  it("records one dismissal per date and never duplicates", () => {
+    useAppStore.getState().dismissBackfillNudge("2026-01-04");
+    useAppStore.getState().dismissBackfillNudge("2026-01-04");
+    useAppStore.getState().dismissBackfillNudge("2026-01-03");
+    expect(useAppStore.getState().backfillNudgesDismissed).toEqual([
+      "2026-01-04",
+      "2026-01-03",
+    ]);
   });
 });

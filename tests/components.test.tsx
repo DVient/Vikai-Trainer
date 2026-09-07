@@ -77,7 +77,10 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-const searchParamsMock = vi.hoisted(() => ({ eventId: undefined as string | undefined }));
+const searchParamsMock = vi.hoisted(() => ({
+  eventId: undefined as string | undefined,
+  date: undefined as string | undefined,
+}));
 
 vi.mock("react-native", async () => {
   const rnw = await import("react-native-web");
@@ -184,8 +187,10 @@ function resetStore(): void {
     activePlan: null,
     personalBests: [],
     teamColors: DEFAULT_TEAM_COLORS,
+    backfillNudgesDismissed: [],
   });
   searchParamsMock.eventId = undefined;
+  searchParamsMock.date = undefined;
 }
 
 beforeEach(() => {
@@ -1135,8 +1140,8 @@ describe("workout-relative activity logging", () => {
     render(<PracticeLog />);
 
     expect(screen.getByText("Today's log (2 entries)")).toBeTruthy();
-    expect(screen.getByText("Before today's session — already shaped today")).toBeTruthy();
-    expect(screen.getByText("After today's session — shapes your next workout")).toBeTruthy();
+    expect(screen.getByText("Before the session — already shaped that day")).toBeTruthy();
+    expect(screen.getByText("After the session — shapes the next workout")).toBeTruthy();
   });
 });
 
@@ -1715,5 +1720,94 @@ describe("event form (app/event-form)", () => {
 
     expect(screen.queryByText("Every week")).toBeNull();
     expect(screen.queryByLabelText("Repeat on Tuesday")).toBeNull();
+  });
+});
+
+describe("missed-day backfill (Phase 9.12)", () => {
+  it("practice-log ?date= past day: header, dated entry, body map, block check-offs", () => {
+    const yesterday = localDate(-1); // 2026-01-04, Sunday (recovery role)
+    searchParamsMock.date = yesterday;
+    useAppStore
+      .getState()
+      .logActivity({
+        activityDate: yesterday,
+        timezone: TIMEZONE,
+        activityType: "TEAM_PRACTICE",
+        sessionRpe: 7,
+        durationMinutes: 60,
+      });
+    useAppStore.getState().recordWorkoutLog({ activityDate: yesterday });
+
+    render(<PracticeLog />);
+
+    expect(screen.getByText(/Updating Sun, Jan 4/)).toBeTruthy();
+
+    // A new entry lands on the BACKFILL date, not today.
+    fireEvent.change(screen.getByDisplayValue("60"), { target: { value: "45" } });
+    fireEvent.click(screen.getByText("Save activity"));
+    const added = useAppStore.getState().activityLogs.at(-1);
+    expect(added?.activityDate).toBe(yesterday);
+    expect(useAppStore.getState().activityLogs).toHaveLength(2);
+
+    // Post-session body map edits yesterday's session record.
+    expect(screen.getByText("After that session, how did the body feel?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Legs" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quad" }));
+    const stored = useAppStore.getState().workoutLogs[0];
+    expect(stored?.soreAreasAfter).toEqual(["QUAD"]);
+
+    // Block check-offs land on the backfill date's progress record.
+    fireEvent.click(screen.getByLabelText(/Check off .*Ball-handling/i));
+    const progress = useAppStore.getState().workoutProgress[yesterday];
+    expect(Object.keys(progress ?? {}).length).toBeGreaterThanOrEqual(1);
+
+    // Done returns to the calendar (back navigation), not replace to home.
+    fireEvent.click(screen.getByText("Done — back to the calendar"));
+    expect(routerMock.back).toHaveBeenCalled();
+  });
+
+  it("blocks that day use the recovery-role plan (no leg lifting on Sunday)", () => {
+    const yesterday = localDate(-1);
+    searchParamsMock.date = yesterday;
+    render(<PracticeLog />);
+
+    expect(screen.getByText("Blocks that day — check off what you finished")).toBeTruthy();
+    expect(screen.queryByText(/Squat pattern strength/i)).toBeNull();
+    expect(screen.getByLabelText(/Check off .*Ball-handling/i)).toBeTruthy();
+  });
+
+  it("practice-log without a date keeps the today flow (no backfill header)", () => {
+    render(<PracticeLog />);
+    expect(screen.queryByText(/Updating /)).toBeNull();
+    expect(screen.getByText("What did you do?")).toBeTruthy();
+  });
+
+  it("calendar: a past day offers 'Update this day' and routes to the editor", () => {
+    render(<History />);
+
+    fireEvent.click(screen.getByLabelText("Day 2026-01-04"));
+    const button = screen.getByLabelText("Update the day Sun, Jan 4");
+    fireEvent.click(button);
+    expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log?date=2026-01-04");
+  });
+
+  it("home: nudges when yesterday is empty, dismisses per date, hides when logged", () => {
+    render(<Index />);
+    expect(screen.getByText("Did anything happen yesterday?")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Dismiss the missed-day reminder"));
+    expect(useAppStore.getState().backfillNudgesDismissed).toEqual([localDate(-1)]);
+
+    // Logged yesterday ⇒ no nudge even after a reset of dismissals.
+    useAppStore.setState({ backfillNudgesDismissed: [] });
+    useAppStore.getState().logActivity({
+      activityDate: localDate(-1),
+      timezone: TIMEZONE,
+      activityType: "OTHER_TRAINING",
+      sessionRpe: 5,
+      durationMinutes: 30,
+    });
+    render(<Index />);
+    expect(screen.queryByText("Did anything happen yesterday?")).toBeNull();
   });
 });

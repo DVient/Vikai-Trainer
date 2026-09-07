@@ -79,6 +79,11 @@ export interface VikaiTrainerAppState {
   defaultScheduleSeeded: boolean;
   /** The athlete's two team colors driving the screen skin (additive §33). */
   teamColors: TeamColors;
+  /**
+   * Phase 9.12 — local dates whose missed-day nudge the athlete dismissed
+   * (one quiet reminder per forgotten day, never nagged twice).
+   */
+  backfillNudgesDismissed: string[];
 
   /* ── Actions ── */
   /** Replaces the profile on confirmation (SPEC §32 overwrite semantics). */
@@ -110,6 +115,15 @@ export interface VikaiTrainerAppState {
   /** Removes every member of a recurring series; returns what was removed. */
   removeEventSeries: (seriesId: string) => ScheduledEvent[];
   recordWorkoutLog: (draft: WorkoutLogDraft) => WorkoutLog;
+  /**
+   * Phase 9.12 backfill: corrects a session record in place — notes or the
+   * post-session body map — when the athlete updates a missed day. Same
+   * shape rules as updateActivityLog; id/createdAt are immutable.
+   */
+  updateWorkoutLog: (
+    id: string,
+    patch: Partial<Omit<WorkoutLog, "id" | "createdAt">>,
+  ) => void;
   /** Checks off (or un-checks) one Game Plan component for a local date. */
   toggleComponentDone: (localDate: string, componentId: string, sets: number) => void;
   /** Tracks (or clears, with null) a scheduled notification identifier. */
@@ -135,6 +149,8 @@ export interface VikaiTrainerAppState {
   seedDefaultSchedule: () => void;
   /** Applies a new team-color pair (drives the screen skin instantly). */
   setTeamColors: (colors: TeamColors) => void;
+  /** Silences the missed-day nudge for one local date (Phase 9.12). */
+  dismissBackfillNudge: (localDate: string) => void;
 }
 
 export const useAppStore = create<VikaiTrainerAppState>()(
@@ -152,6 +168,7 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       personalBests: [],
       defaultScheduleSeeded: false,
       teamColors: DEFAULT_TEAM_COLORS,
+      backfillNudgesDismissed: [],
 
       setProfile: (profile) => {
         set({ profile });
@@ -348,6 +365,14 @@ export const useAppStore = create<VikaiTrainerAppState>()(
         set({ teamColors: { ...colors } });
       },
 
+      dismissBackfillNudge: (localDate) => {
+        set((state) =>
+          state.backfillNudgesDismissed.includes(localDate)
+            ? state
+            : { backfillNudgesDismissed: [...state.backfillNudgesDismissed, localDate] },
+        );
+      },
+
       recordWorkoutLog: (draft) => {
         const now = new Date().toISOString();
         const record: WorkoutLog = {
@@ -358,6 +383,14 @@ export const useAppStore = create<VikaiTrainerAppState>()(
         };
         set((state) => ({ workoutLogs: [...state.workoutLogs, record] }));
         return record;
+      },
+
+      updateWorkoutLog: (id, patch) => {
+        set((state) => ({
+          workoutLogs: state.workoutLogs.map((entry) =>
+            entry.id === id ? { ...entry, ...patch, updatedAt: new Date().toISOString() } : entry,
+          ),
+        }));
       },
 
       toggleComponentDone: (localDate, componentId, sets) => {

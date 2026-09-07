@@ -263,6 +263,21 @@ export default function History() {
             ) : (
               renderTimelineRows(selectedTimeline)
             )}
+            {selected < today ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Update the day ${formatDateLong(selected)}`}
+                onPress={() => {
+                  tapLight();
+                  router.navigate(`/practice-log?date=${selected}`);
+                }}
+                className="mt-3 h-12 items-center justify-center rounded-xl border-2 border-accent bg-soft"
+              >
+                <Text className="text-sm font-black text-go">
+                  ＋ Update this day — it shapes today's plan
+                </Text>
+              </Pressable>
+            ) : null}
           </>
         ) : weekHasContent ? (
           <View className="mt-1">{week.map((day, index) => renderWeekDay(day, index))}</View>
