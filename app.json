@@ -6,7 +6,9 @@
     "scheme": "vikai-trainer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "runtimeVersion": { "policy": "appVersion" },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -23,6 +25,10 @@
         "POST_NOTIFICATIONS",
         "USE_EXACT_ALARM",
         "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "USE_EXACT_ALARM",
+        "VIBRATE",
         "RECEIVE_BOOT_COMPLETED"
       ]
     },
@@ -35,7 +41,22 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-notifications", { "color": "#22C55E" }]
-    ]
+      [
+        "expo-notifications",
+        {
+          "color": "#22C55E"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "355a5bbc-026b-495f-8164-39d868f056ca"
+      }
+    },
+    "owner": "dvient",
+    "updates": {
+      "url": "https://u.expo.dev/355a5bbc-026b-495f-8164-39d868f056ca"
+    }
   }
 }
