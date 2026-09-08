@@ -101,20 +101,20 @@ export default function RootLayout() {
             title: "3-Tap Check-In",
             presentation: "modal",
             headerBackVisible: false,
-            headerLeft: () => <HeaderBack />,
+            headerLeft: () => <HeaderBack color={roles.onAccent} />,
           }}
         />
         <Stack.Screen
           name="practice-log"
-          options={{ title: "Practice Log", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+          options={{ title: "Practice Log", headerBackVisible: false, headerLeft: () => <HeaderBack color={roles.onAccent} /> }}
         />
         <Stack.Screen
           name="workout"
-          options={{ title: "Today's Game Plan", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+          options={{ title: "Today's Game Plan", headerBackVisible: false, headerLeft: () => <HeaderBack color={roles.onAccent} /> }}
         />
         <Stack.Screen
           name="history"
-          options={{ title: "Calendar", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+          options={{ title: "Calendar", headerBackVisible: false, headerLeft: () => <HeaderBack color={roles.onAccent} /> }}
         />
         <Stack.Screen
           name="event-form"
@@ -122,16 +122,16 @@ export default function RootLayout() {
             title: "Add Event",
             presentation: "modal",
             headerBackVisible: false,
-            headerLeft: () => <HeaderBack />,
+            headerLeft: () => <HeaderBack color={roles.onAccent} />,
           }}
         />
         <Stack.Screen
           name="about"
-          options={{ title: "About Vikai Trainer", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+          options={{ title: "About Vikai Trainer", headerBackVisible: false, headerLeft: () => <HeaderBack color={roles.onAccent} /> }}
         />
         <Stack.Screen
           name="plan"
-          options={{ title: "My Plan", headerBackVisible: false, headerLeft: () => <HeaderBack /> }}
+          options={{ title: "My Plan", headerBackVisible: false, headerLeft: () => <HeaderBack color={roles.onAccent} /> }}
         />
         <Stack.Screen
           name="settings"
@@ -139,7 +139,7 @@ export default function RootLayout() {
             title: "Team Skin",
             presentation: "modal",
             headerBackVisible: false,
-            headerLeft: () => <HeaderBack />,
+            headerLeft: () => <HeaderBack color={roles.onAccent} />,
           }}
         />
       </Stack>
