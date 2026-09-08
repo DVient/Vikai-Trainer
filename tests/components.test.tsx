@@ -935,6 +935,25 @@ describe("practice log (app/practice-log)", () => {
     expect(screen.getAllByText(ACTIVITY_TYPE_LABELS.TEAM_PRACTICE).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("9/10 · 45 min · load 405")).toBeTruthy();
   });
+
+  it("reaches every effort number 1–10 — the high end stays on-screen and pressable", () => {
+    // Regression: ten 48px buttons in one row overflowed a phone width, so
+    // 8/9/10 sat past the right edge. The picker is two rows of five now —
+    // all ten buttons render and the top of the scale is recordable.
+    render(<PracticeLog />);
+
+    for (const rpe of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      expect(screen.getByLabelText(`Effort ${rpe} of 10`)).toBeTruthy();
+    }
+
+    fireEvent.click(screen.getByLabelText("Effort 8 of 10"));
+    expect(screen.getByText("How hard was it? (effort 8/10)")).toBeTruthy();
+    fireEvent.click(screen.getByText("Save activity"));
+
+    const entries = useAppStore.getState().activityLogs;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.sessionRpe).toBe(8);
+  });
 });
 
 describe("game plan screen (app/workout)", () => {

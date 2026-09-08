@@ -40,6 +40,11 @@ import type { ActivityType, SoreArea } from "../src/types";
 const ACTIVITY_TYPES = Object.keys(ACTIVITY_TYPE_LABELS) as ActivityType[];
 const DURATION_CHIPS = [30, 45, 60, 90, 120] as const;
 const SAVED_TOAST = "Logged ✓ — add another or head back";
+/** Two rows of five: one row of ten 48px targets doesn't fit a phone. */
+const EFFORT_ROWS: ReadonlyArray<ReadonlyArray<number>> = [
+  [1, 2, 3, 4, 5],
+  [6, 7, 8, 9, 10],
+];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -199,35 +204,40 @@ export default function PracticeLog() {
         <Text className="text-sm font-bold text-strong">
           How hard was it? (effort {sessionRpe}/10)
         </Text>
-        <View className="flex-row gap-1">
-          {Array.from({ length: 10 }, (_, index) => index + 1).map((rpe) => {
-            const selected = sessionRpe === rpe;
-            return (
-              <Pressable
-                key={rpe}
-                accessibilityRole="button"
-                accessibilityLabel={`Effort ${rpe} of 10`}
-                onPress={() => {
-                  tapLight();
-                  setSessionRpe(rpe);
-                }}
-                className={`h-14 min-w-[48px] flex-1 items-center justify-center rounded-lg border-2 ${
-                  selected
-                    ? `${band.colorClass} border-transparent`
-                    : "border-edge bg-card"
-                }`}
-              >
-                <Text
-                  className={`text-sm font-black ${
-                    selected ? "text-onaccent" : "text-body"
+        {/* Two rows of five: ten 48px-tap targets need ~550px in one row,
+            wider than any phone — 8/9/10 fell off the right edge. Five per
+            row keeps every button ≥48px and fully on-screen. */}
+        {EFFORT_ROWS.map((row) => (
+          <View key={row[0]} className="flex-row gap-1">
+            {row.map((rpe) => {
+              const selected = sessionRpe === rpe;
+              return (
+                <Pressable
+                  key={rpe}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Effort ${rpe} of 10`}
+                  onPress={() => {
+                    tapLight();
+                    setSessionRpe(rpe);
+                  }}
+                  className={`h-14 min-w-[48px] flex-1 items-center justify-center rounded-lg border-2 ${
+                    selected
+                      ? `${band.colorClass} border-transparent`
+                      : "border-edge bg-card"
                   }`}
                 >
-                  {rpe}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text
+                    className={`text-sm font-black ${
+                      selected ? "text-onaccent" : "text-body"
+                    }`}
+                  >
+                    {rpe}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
         <View className="flex-row items-center justify-between">
           <Text className="text-xs text-faint">😴 Chilling</Text>
           <Text className="text-xs font-bold text-body">
