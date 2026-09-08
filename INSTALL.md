@@ -11,7 +11,7 @@ support is prepared and can be switched on later** (see the last section).
 Send the Android users this exact message:
 
 > **Install Vikai Trainer (basketball training app)**
-> 1. Open this link on your phone: **https://expo.dev/artifacts/eas/4EBlftglsyc0ZeM6ewt_Go_EjUknMZexoij-mjzu1F4.apk**
+> 1. Open this link on your phone: **https://expo.dev/artifacts/eas/0Gju3chdfvuS2Nu8hruWWKE-qJ1s-sxmV6dM-30NH_s.apk**
 > 2. Tap **Download**. If a small banner says "this file might be harmful,"
 >    choose **Download anyway** — it's our private app, not from the store.
 > 3. Open the downloaded file (swipe down from the top of the screen and tap
