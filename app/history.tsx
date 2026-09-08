@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { File, Paths } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 import { useRouter } from "expo-router";
 
 import { CalendarGrid } from "../src/components/CalendarGrid";
@@ -136,15 +134,25 @@ export default function History() {
   // Phase 9.12 — data export: the whole local store as JSON (complete
   // backup) or a sectioned CSV (spreadsheet), delivered through the share
   // sheet. Files land in the cache dir; the athlete saves or sends them.
+  //
+  // The share plumbing carries NATIVE modules (expo-file-system /
+  // expo-sharing). OTA updates can add JavaScript to an installed APK but
+  // never native code, so the imports stay dynamic: APKs built before those
+  // modules existed render this screen normally, and pressing export rejects
+  // lazily into a friendly note instead of crashing the screen at load.
   const [exportNote, setExportNote] = useState<string | null>(null);
   const shareExport = async (kind: "json" | "csv") => {
     setExportNote(null);
-    const available = await Sharing.isAvailableAsync();
-    if (!available) {
-      setExportNote("Sharing isn't available on this device.");
-      return;
-    }
     try {
+      const [{ File, Paths }, Sharing] = await Promise.all([
+        import("expo-file-system"),
+        import("expo-sharing"),
+      ]);
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        setExportNote("Sharing isn't available on this device.");
+        return;
+      }
       const state = useAppStore.getState();
       const { json, csv, dateKey } = buildExport(
         {
@@ -169,7 +177,7 @@ export default function History() {
       });
       tapSuccess();
     } catch {
-      setExportNote("Export didn't finish — try again.");
+      setExportNote("Sharing isn't available on this device.");
     }
   };
 

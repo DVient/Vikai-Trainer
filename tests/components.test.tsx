@@ -42,7 +42,9 @@ const notificationsSpy = vi.hoisted(() => ({
   cancel: vi.fn<(id: string) => Promise<void>>(async () => undefined),
 }));
 
-// Phase 9.12 export — capture what the share sheet would deliver.
+// Phase 9.12 export — capture what the share sheet would deliver. (The
+// missing-native-module simulation lives in export-crash-guard.test.tsx,
+// where the throwing vi.mock factory can't be cached by earlier tests.)
 const sharingSpy = vi.hoisted(() => ({
   shareAsync: vi.fn<(uri: string, options?: unknown) => Promise<void>>(async () => undefined),
   isAvailableAsync: vi.fn<() => Promise<boolean>>(async () => true),
