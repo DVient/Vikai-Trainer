@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo } from "react";
 import { View } from "react-native";
 import { vars } from "nativewind";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   configureNotificationHandler,
@@ -13,6 +14,19 @@ import {
 import { HeaderBack } from "../src/components/HeaderBack";
 import { themeRoles } from "../src/lib/theme";
 import { useAppStore } from "../src/stores/useAppStore";
+
+/**
+ * Android 15+ draws apps edge-to-edge: scrolled content runs behind the
+ * system navigation bar (the minimize/back/recents row). This spacer shrinks
+ * every screen by exactly the bar's height so nothing hides beneath it, and
+ * paints it in the app background so it reads as part of the screen. Top
+ * insets need no help — the Stack header already sits below the status bar.
+ */
+function BottomSystemBarSpacer() {
+  const insets = useSafeAreaInsets();
+  if (insets.bottom <= 0) return null;
+  return <View style={{ height: insets.bottom }} className="bg-app" />;
+}
 
 export default function RootLayout() {
   const teamColors = useAppStore((state) => state.teamColors);
@@ -129,6 +143,7 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      <BottomSystemBarSpacer />
     </View>
   );
 }
