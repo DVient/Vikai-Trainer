@@ -146,6 +146,12 @@ function ChecklistRow({
           detail={detail}
           locked={locked}
           reduced={row.modification === "REDUCED"}
+          setsScale={
+            row.modification === "REDUCED" && row.baseSets > 0
+              ? row.sets / row.baseSets
+              : undefined
+          }
+          scaledSets={row.modification === "REDUCED" ? row.sets : undefined}
         />
       ) : null}
     </View>
@@ -162,12 +168,18 @@ function ExpandableWork({
   detail,
   locked,
   reduced,
+  setsScale,
+  scaledSets,
 }: {
   rowKey: string;
   title: string;
   detail: ComponentDetail;
   locked: boolean;
   reduced: boolean;
+  /** Block scaling ratio on REDUCED rows — scales each prescription. */
+  setsScale?: number;
+  /** The engine's scaled set target on REDUCED rows — for the intro line. */
+  scaledSets?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -195,14 +207,14 @@ function ExpandableWork({
       <Text className={`text-xs font-semibold ${locked ? "text-faint" : "text-go"}`}>
         {locked
           ? "Not part of today's plan — study it anyway."
-          : reduced
-            ? "Volume scaled — keep the weight, drop the extra sets."
+          : reduced && scaledSets !== undefined
+            ? `Volume scaled — do ${scaledSets} ${scaledSets === 1 ? "set" : "sets"} of each exercise; keep the weight.`
             : detail.exercises.length > 0
               ? "Full prescription today — quality over quantity."
               : "Nothing heavy here today."}
       </Text>
       <View className="mt-2">
-        <ExerciseDetailList detail={detail} />
+        <ExerciseDetailList detail={detail} setsScale={setsScale} />
       </View>
       <Pressable
         accessibilityRole="button"

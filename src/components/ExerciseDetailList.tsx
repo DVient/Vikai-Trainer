@@ -1,5 +1,6 @@
 import { Linking, Pressable, Text, View } from "react-native";
 
+import { scalePrescriptionSets } from "../lib/session";
 import type { ComponentDetail } from "../plans/fall2026";
 
 /**
@@ -8,8 +9,21 @@ import type { ComponentDetail } from "../plans/fall2026";
  * offline guidance layer), one-line cue, and an optional "Watch a demo"
  * button. Demo videos are a curated online-only supplement — the badge says
  * so; the steps work with zero network.
+ *
+ * `setsScale` carries the block's engine scaling ratio on REDUCED rows:
+ * each prescription's leading set count scales by the same proportion the
+ * engine applied to the block ("3 × 6" under a 4 → 2 block reads "2 × 6"),
+ * so the sub-card can never contradict the block's scaled target. KEPT rows
+ * (no scale) render the plan's authored prescriptions unchanged.
  */
-export function ExerciseDetailList({ detail }: { detail: ComponentDetail }) {
+export function ExerciseDetailList({
+  detail,
+  setsScale,
+}: {
+  detail: ComponentDetail;
+  setsScale?: number;
+}) {
+  const ratio = setsScale ?? 1;
   return (
     <View className="gap-2">
       {detail.note !== undefined ? (
@@ -19,7 +33,9 @@ export function ExerciseDetailList({ detail }: { detail: ComponentDetail }) {
         <View key={exercise.name} className="rounded-lg bg-edge-mid p-2.5">
           <View className="flex-row items-baseline justify-between gap-2">
             <Text className="flex-1 text-sm font-bold text-strong">{exercise.name}</Text>
-            <Text className="text-xs font-semibold text-go">{exercise.prescription}</Text>
+            <Text className="text-xs font-semibold text-go">
+              {scalePrescriptionSets(exercise.prescription, ratio)}
+            </Text>
           </View>
           {exercise.cue !== undefined ? (
             <Text className="mt-0.5 text-xs text-faint">{exercise.cue}</Text>

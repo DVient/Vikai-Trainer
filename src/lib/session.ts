@@ -12,6 +12,27 @@ import type { CompletedComponent } from "../types";
 
 export type SessionRowState = "done" | "remaining" | "skipped";
 
+/**
+ * Rewrites an exercise prescription's leading set count by the block's
+ * scaling ratio ("3 × 6" at ratio 0.5 → "2 × 6") — the same proportional
+ * cut the engine applies to time estimates. Only the leading "N ×" is
+ * touched: reps, ranges ("6–8"), per-side/per-leg qualifiers, distances
+ * ("× 15m", "× 100m at 60–65%"), and durations ("× 45 sec") survive
+ * verbatim. Ratio ≥ 1 (KEPT rows) and strings without a leading count pass
+ * through untouched — the authored prescription is the truth on full days.
+ * Pure and deterministic.
+ */
+export function scalePrescriptionSets(prescription: string, ratio: number): string {
+  if (ratio >= 1) return prescription;
+  const match = /^(\d+)\s*×/.exec(prescription);
+  if (match === null) return prescription;
+  const authoredSets = Number(match[1]);
+  if (!Number.isFinite(authoredSets) || authoredSets <= 0) return prescription;
+  const scaled = Math.max(1, Math.round(authoredSets * ratio));
+  if (scaled === authoredSets) return prescription;
+  return prescription.replace(/^(\d+)/, String(scaled));
+}
+
 export interface SessionRow {
   componentId: string;
   modification: ScaledComponent["modification"];

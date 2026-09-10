@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSessionView } from "../src/lib/session";
+import { buildSessionView, scalePrescriptionSets } from "../src/lib/session";
 import type { ScaledComponent } from "../src/engine/generator";
 import type { TrainingComponent } from "../src/types";
 
@@ -127,5 +127,28 @@ describe("buildSessionView — the checkable workout", () => {
       state: "done",
       sets: 4,
     });
+  });
+});
+
+describe("scalePrescriptionSets — sub-card prescriptions track the block's scaling", () => {
+  it("leaves prescriptions untouched when the ratio is 1 (KEPT rows)", () => {
+    expect(scalePrescriptionSets("3 × 6–8", 1)).toBe("3 × 6–8");
+    expect(scalePrescriptionSets("3 × 6–8", 1.2)).toBe("3 × 6–8");
+  });
+
+  it("scales the leading set count and preserves reps, ranges, and qualifiers", () => {
+    expect(scalePrescriptionSets("3 × 6", 0.5)).toBe("2 × 6");
+    expect(scalePrescriptionSets("3 × 6–8", 0.5)).toBe("2 × 6–8");
+    expect(scalePrescriptionSets("3 × 10 per leg", 0.5)).toBe("2 × 10 per leg");
+    expect(scalePrescriptionSets("3 × 20s per side", 0.5)).toBe("2 × 20s per side");
+    // Proportional, like the engine's time scaling — tempo volume cuts too.
+    expect(scalePrescriptionSets("10 × 100m at 60–65%", 2 / 3)).toBe("7 × 100m at 60–65%");
+    expect(scalePrescriptionSets("4 × 15m", 2 / 3)).toBe("3 × 15m");
+    expect(scalePrescriptionSets("2 × court length", 0.5)).toBe("1 × court length");
+  });
+
+  it("floors at one set and passes through strings without a leading count", () => {
+    expect(scalePrescriptionSets("3 × 20s per side", 0.2)).toBe("1 × 20s per side");
+    expect(scalePrescriptionSets("Ball-handling circuit", 0.5)).toBe("Ball-handling circuit");
   });
 });

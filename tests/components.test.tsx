@@ -1051,6 +1051,30 @@ describe("game plan screen (app/workout)", () => {
     expect(screen.getByText("4 → 2 sets")).toBeTruthy(); // primary-upper-push
     expect(screen.getByText(/1 block was adjusted out today/)).toBeTruthy(); // accessory-upper strips (optional)
   });
+
+  it("scales the reduced block's prescriptions with it — sub-cards match the block", () => {
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(localDate(0), { ...GOOD_ANCHORS, soreAreas: ["ARM"] }),
+      ],
+    });
+
+    render(<Workout />);
+
+    // The reduced block: block card and exercises tell one story.
+    fireEvent.click(screen.getByLabelText("See the work: Upper push strength"));
+    expect(
+      screen.getByText("Volume scaled — do 2 sets of each exercise; keep the weight."),
+    ).toBeTruthy();
+    expect(screen.getAllByText("2 × 6–8").length).toBe(2);
+
+    // A KEPT block on the same day keeps the authored prescription (strings
+    // without a leading set count pass through the scaler untouched).
+    fireEvent.click(screen.getByLabelText("Hide the work: Upper push strength"));
+    fireEvent.click(screen.getByLabelText("See the work: Ball-handling technique"));
+    expect(screen.getByText("Full prescription today — quality over quantity.")).toBeTruthy();
+    expect(screen.getByText("50–100 makes")).toBeTruthy();
+  });
 });
 
 describe("exercise detail + video library (Fall 2026 plan)", () => {
@@ -1101,7 +1125,11 @@ describe("exercise detail + video library (Fall 2026 plan)", () => {
 
     expect(screen.getAllByText("4 → 2 sets").length).toBeGreaterThanOrEqual(1);
     fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
-    expect(screen.getByText("Volume scaled — keep the weight, drop the extra sets.")).toBeTruthy();
+    expect(screen.getByText("Volume scaled — do 2 sets of each exercise; keep the weight.")).toBeTruthy();
+    // The exercises scale with the block — no contradictory set counts.
+    expect(screen.getAllByText("2 × 5").length).toBe(2);
+    expect(screen.getByText("2 × 8")).toBeTruthy();
+    expect(screen.getByText("2 × 10 per leg")).toBeTruthy();
   });
 
   it("keeps locked blocks studyable without making them checkable", () => {
