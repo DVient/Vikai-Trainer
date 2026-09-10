@@ -240,8 +240,8 @@ export default function History() {
       className="flex-1 bg-app"
       contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
     >
-      <View className="flex-row items-center justify-between">
-        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
+      <View className="flex-row items-center gap-3">
+        <Text className="flex-1 text-xs font-bold uppercase tracking-widest text-faint">
           Add your commitments — they shape the plan
         </Text>
         <Pressable
@@ -283,8 +283,8 @@ export default function History() {
       </View>
 
       <View className="rounded-2xl border border-edge bg-card p-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-xs font-bold uppercase tracking-widest text-faint">
+        <View className="flex-row items-center gap-3">
+          <Text className="flex-1 text-xs font-bold uppercase tracking-widest text-faint">
             Scheduled — tap to change time or day
           </Text>
           {choosingOtherDay ? (

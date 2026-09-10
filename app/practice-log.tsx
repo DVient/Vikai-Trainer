@@ -165,11 +165,12 @@ export default function PracticeLog() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-app"
     >
       <ScrollView
         className="flex-1 bg-app"
+        keyboardShouldPersistTaps="handled"
         contentContainerClassName="w-full max-w-md self-center gap-5 p-4"
       >
       {isBackfill ? (

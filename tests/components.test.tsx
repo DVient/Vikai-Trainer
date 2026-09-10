@@ -139,6 +139,7 @@ import Workout from "../app/workout";
 import History from "../app/history";
 import EventForm from "../app/event-form";
 import { HeaderBack } from "../src/components/HeaderBack";
+import { Toast } from "../src/components/Toast";
 import Settings from "../app/settings";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { toLocalDateString } from "../src/engine/autoregulation";
@@ -1656,7 +1657,42 @@ describe("header back control — every sub-page can be exited", () => {
   });
 });
 
+describe("toast overlay guard — never blocks native touches", () => {
+  it("renders nothing for a null or empty message (the dead-save-button bug)", () => {
+    // Regression: an empty-string message used to mount the absolutely
+    // positioned empty pill (z-10) over whatever button sat at the bottom of
+    // the screen — and the pill swallowed its touches.
+    const empty = render(<Toast message="" />);
+    expect(empty.container.children.length).toBe(0);
+
+    const hidden = render(<Toast message={null} />);
+    expect(hidden.container.children.length).toBe(0);
+  });
+
+  it("renders its message pill once a message is set", () => {
+    render(<Toast message="Event saved offline · Syncs when back online ✅" />);
+    expect(screen.getByText("Event saved offline · Syncs when back online ✅")).toBeTruthy();
+  });
+});
+
 describe("event form (app/event-form)", () => {
+  it("renders no toast until a successful save, then confirms the save", () => {
+    render(<EventForm />);
+
+    // The toast state must start as null — never an empty string.
+    expect(screen.queryByText("Event saved offline · Syncs when back online ✅")).toBeNull();
+
+    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
+      target: { value: "2100-01-15" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("18:00"), {
+      target: { value: "10:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    expect(screen.getByText("Event saved offline · Syncs when back online ✅")).toBeTruthy();
+  });
+
   it("adds a future competition to the calendar via the store", () => {
     render(<EventForm />);
 

@@ -90,7 +90,10 @@ export default function EventForm() {
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const [weeksText, setWeeksText] = useState("6");
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
+  // Must start null, not "": Toast hides on null only, and an empty-string
+  // toast renders a permanent white pill over the Save button that swallows
+  // its touches (the "dead save button" bug).
+  const [toast, setToast] = useState<string | null>(null);
 
   const editable = !existing || isEventEditable(existing.startAt, new Date());
   const today = toLocalDateString(new Date(), profile.timezone);
@@ -225,11 +228,12 @@ export default function EventForm() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-app"
     >
       <ScrollView
         className="flex-1 bg-app"
+        keyboardShouldPersistTaps="handled"
         contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
       >
       <Text className="text-sm text-faint">
