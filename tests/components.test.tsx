@@ -36,6 +36,20 @@ const linkingOpenSpy = vi.hoisted(() =>
   vi.fn<(url: string) => Promise<void>>(async () => undefined),
 );
 
+// Phase 9.15 — version & updates card: capture the manual OTA flow surface.
+const updatesSpy = vi.hoisted(() => ({
+  checkForUpdateAsync: vi.fn<() => Promise<{ isAvailable: boolean }>>(async () => ({
+    isAvailable: false,
+  })),
+  fetchUpdateAsync: vi.fn<() => Promise<{ isNew: boolean }>>(async () => ({ isNew: true })),
+  reloadAsync: vi.fn<() => Promise<void>>(async () => undefined),
+  updateId: null as string | null,
+  channel: "preview" as string | null,
+  runtimeVersion: "1.0.0" as string | null,
+  isEmbeddedLaunch: true,
+  createdAt: null as Date | null,
+}));
+
 // expo-notifications surface used by the reminder pipeline under test.
 const notificationsSpy = vi.hoisted(() => ({
   schedule: vi.fn<(request: unknown) => Promise<string>>(async () => "notif-id-1"),
@@ -76,6 +90,12 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 vi.mock("expo-haptics", () => hapticsMock);
+
+vi.mock("expo-updates", () => updatesSpy);
+
+vi.mock("expo-constants", () => ({
+  default: { nativeApplicationVersion: "1.0.0", nativeBuildVersion: "3" },
+}));
 
 // ReminderStatusChip + event-form reminder sync import expo-notifications;
 // keep web tests hermetic with a full service surface.
@@ -225,6 +245,15 @@ function resetStore(): void {
   sharingSpy.isAvailableAsync.mockClear();
   sharingSpy.isAvailableAsync.mockResolvedValue(true);
   fileWrites.list.length = 0;
+  updatesSpy.checkForUpdateAsync.mockClear();
+  updatesSpy.checkForUpdateAsync.mockResolvedValue({ isAvailable: false });
+  updatesSpy.fetchUpdateAsync.mockClear();
+  updatesSpy.reloadAsync.mockClear();
+  updatesSpy.updateId = null;
+  updatesSpy.channel = "preview";
+  updatesSpy.runtimeVersion = "1.0.0";
+  updatesSpy.isEmbeddedLaunch = true;
+  updatesSpy.createdAt = null;
 }
 
 beforeEach(() => {
@@ -1860,6 +1889,52 @@ describe("event form (app/event-form)", () => {
 
     expect(screen.queryByText("Every week")).toBeNull();
     expect(screen.queryByLabelText("Repeat on Tuesday")).toBeNull();
+  });
+});
+
+describe("version & updates card (Phase 9.15)", () => {
+  it("shows the exact version the device is running", async () => {
+    render(<About />);
+
+    expect(await screen.findByText("Version 1.0.0 (build 3)")).toBeTruthy();
+    expect(screen.getByText("Running the app as installed.")).toBeTruthy();
+    expect(screen.getByText("Runtime 1.0.0 · channel preview")).toBeTruthy();
+  });
+
+  it("shows when the session is running a published OTA update", async () => {
+    updatesSpy.isEmbeddedLaunch = false;
+    updatesSpy.createdAt = new Date("2026-09-10T14:00:00.000Z");
+    updatesSpy.updateId = "5703bcf2bd52ef1df54251254f254019977a027a";
+
+    render(<About />);
+
+    expect(
+      await screen.findByText("Running an update published 2026-09-10."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Runtime 1.0.0 · channel preview · update 5703bcf2…"),
+    ).toBeTruthy();
+  });
+
+  it("checks, downloads, and restarts to apply a new update on demand", async () => {
+    updatesSpy.checkForUpdateAsync.mockResolvedValue({ isAvailable: true });
+
+    render(<About />);
+
+    fireEvent.click(await screen.findByLabelText("Check for update now"));
+    await waitFor(() => expect(updatesSpy.fetchUpdateAsync).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByLabelText("Restart to apply the downloaded update"));
+    await waitFor(() => expect(updatesSpy.reloadAsync).toHaveBeenCalledTimes(1));
+  });
+
+  it("reports latest when the server has nothing new", async () => {
+    render(<About />);
+
+    fireEvent.click(await screen.findByLabelText("Check for update now"));
+    await waitFor(() =>
+      expect(screen.getByText("You're on the latest version.")).toBeTruthy(),
+    );
   });
 });
 

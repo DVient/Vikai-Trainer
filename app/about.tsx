@@ -1,11 +1,14 @@
 import { ScrollView, Text, View } from "react-native";
 
+import { VersionCard } from "../src/components/VersionCard";
+
 /**
  * "How this app works" — the athlete-facing tour of everything built into
  * Vikai Trainer, written for a teenager: short sentences, the app's own
  * vocabulary (Full Send / Power Save / SHIELD / Game Plan / Ready State),
- * zero engine or clinical terminology. Pure static content — no state;
- * the stack header's back control provides the way out.
+ * zero engine or clinical terminology. Pure static content plus the
+ * version/updates card at the bottom; the stack header's back control
+ * provides the way out.
  */
 
 interface Section {
@@ -92,6 +95,8 @@ export default function About() {
         {SECTIONS.map((section) => (
           <SectionCard key={section.title} section={section} />
         ))}
+
+        <VersionCard />
 
         <Text className="text-center text-xs text-faint">
           Made for hoopers who want to play long — not just hard. 🏀

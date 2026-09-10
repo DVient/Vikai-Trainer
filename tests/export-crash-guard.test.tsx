@@ -56,6 +56,9 @@ vi.mock("expo-file-system", () => {
 vi.mock("expo-sharing", () => {
   throw new Error("Cannot find native module 'ExpoSharing'.");
 });
+vi.mock("expo-updates", () => {
+  throw new Error("Cannot find native module 'ExpoUpdates'.");
+});
 
 vi.mock("react-native", async () => {
   const rnw = await import("react-native-web");
@@ -74,6 +77,7 @@ vi.mock("react-native", async () => {
 
 import History from "../app/history";
 import Workout from "../app/workout";
+import About from "../app/about";
 import { useAppStore } from "../src/stores/useAppStore";
 
 describe("export on an APK without the export native modules (OTA crash guard)", () => {
@@ -118,5 +122,15 @@ describe("export on an APK without the export native modules (OTA crash guard)",
     await waitFor(() =>
       expect(screen.getByText("Sharing isn't available on this device.")).toBeTruthy(),
     );
+  });
+
+  it("about screen renders, the version card degrades to a note, no crash", async () => {
+    render(<About />);
+
+    // The card's dynamic expo-updates import throws like an old binary
+    // would — the card shows the one-line note instead of crashing.
+    expect(
+      await screen.findByText("Updates aren't available on this install."),
+    ).toBeTruthy();
   });
 });
