@@ -73,6 +73,7 @@ vi.mock("react-native", async () => {
 });
 
 import History from "../app/history";
+import Workout from "../app/workout";
 import { useAppStore } from "../src/stores/useAppStore";
 
 describe("export on an APK without the export native modules (OTA crash guard)", () => {
@@ -103,6 +104,17 @@ describe("export on an APK without the export native modules (OTA crash guard)",
 
     // …and the export press rejects lazily into the friendly note.
     fireEvent.click(screen.getByLabelText("Export all data as a JSON backup"));
+    await waitFor(() =>
+      expect(screen.getByText("Sharing isn't available on this device.")).toBeTruthy(),
+    );
+  });
+
+  it("workout screen renders, share degrades to a note, no crash", async () => {
+    render(<Workout />);
+
+    // The share press rejects lazily into the friendly note — the screen
+    // never crashes on an APK without the share native modules.
+    fireEvent.click(screen.getByLabelText("Share this workout"));
     await waitFor(() =>
       expect(screen.getByText("Sharing isn't available on this device.")).toBeTruthy(),
     );

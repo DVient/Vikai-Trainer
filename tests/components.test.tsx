@@ -502,6 +502,30 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
     expect(useAppStore.getState().workoutLogs[0]?.activityDate).toBe(localDate(0));
     expect(screen.getByText(/Session complete 🎉/)).toBeTruthy();
   });
+
+  it("shares the day's Game Plan as an HTML document through the share sheet", async () => {
+    reClockToFullDay();
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Workout />);
+
+    fireEvent.click(screen.getByLabelText("Share this workout"));
+    await waitFor(() => expect(sharingSpy.shareAsync).toHaveBeenCalledTimes(1));
+
+    const [uri, options] = sharingSpy.shareAsync.mock.calls[0] as [
+      string,
+      { mimeType: string },
+    ];
+    expect(uri.endsWith(".html")).toBe(true);
+    expect(options.mimeType).toBe("text/html");
+
+    // The document carries the real plan: block title + exercise detail.
+    const content = fileWrites.list.at(-1)?.content ?? "";
+    expect(content).toContain("Game Plan");
+    expect(content).toContain("Squat pattern strength");
+    expect(content).toContain("Goblet Front Squat");
+    expect(fileWrites.list.at(-1)?.uri).toContain("vikai-game-plan-");
+  });
 });
 
 describe("calendar (app/history)", () => {

@@ -10,15 +10,21 @@ import { toLocalDateString } from "../src/engine/autoregulation";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { soreAreaLabel } from "../src/lib/bodyMap";
-import { buildSessionView } from "../src/lib/session";
+import { formatDateLong } from "../src/lib/calendar";
+import { buildSessionView, scalePrescriptionSets } from "../src/lib/session";
+import {
+  buildWorkoutShareHtml,
+  type WorkoutShareBlock,
+} from "../src/lib/workoutShare";
 import { seasonPhaseFor, exerciseDetailsFor } from "../src/plans/fall2026";
 import { powerLevel } from "../src/lib/power";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
 import { computePerformanceScales } from "../src/plans/adherence";
-import { defaultPlanForDate } from "../src/plans/basePlan";
-import { activePlanForDay, blockVariant } from "../src/plans/planBuilder";
-import { libraryExerciseDetail } from "../src/plans/library";
+import { BASE_PLAN_TITLES, defaultPlanForDate } from "../src/plans/basePlan";
+import { activePlanForDay, blockVariant, planPhaseLabel, weekIndexOf } from "../src/plans/planBuilder";
+import { libraryBlockById, libraryExerciseDetail } from "../src/plans/library";
+import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
 import { isSoreArea, type SoreArea } from "../src/types";
 
@@ -95,6 +101,103 @@ export default function Workout() {
       }
     }
     return exerciseDetailsFor(componentId, localToday);
+  };
+
+  // Phase 9.14 — share the day's Game Plan as a self-contained HTML
+  // document via the OS share sheet. Same OTA-safe pattern as the export
+  // card: dynamic imports, guarded — APKs built before these native modules
+  // existed degrade to a friendly note instead of crashing the screen.
+  const [shareNote, setShareNote] = useState<string | null>(null);
+
+  const shareWorkout = async () => {
+    setShareNote(null);
+    try {
+      const [{ File, Paths }, Sharing] = await Promise.all([
+        import("expo-file-system"),
+        import("expo-sharing"),
+      ]);
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        setShareNote("Sharing isn't available on this device.");
+        return;
+      }
+
+      const blocks: WorkoutShareBlock[] = session.rows.map((row) => {
+        const title =
+          BASE_PLAN_TITLES[row.componentId] ??
+          libraryBlockById(row.componentId)?.title ??
+          row.componentId;
+        const detail = resolveDetail(row.componentId);
+        // Same scaling the screen shows: REDUCED rows rewrite the leading
+        // set count proportionally; done/KEPT rows keep authored volumes.
+        const ratio =
+          row.modification === "REDUCED" && row.baseSets > 0 ? row.sets / row.baseSets : 1;
+        const setsLine =
+          row.state === "skipped"
+            ? "Not part of today's plan"
+            : row.state === "done"
+              ? `You did ${row.sets} ${row.sets === 1 ? "set" : "sets"}`
+              : row.modification === "REDUCED"
+                ? `${row.baseSets} → ${row.sets} sets`
+                : `${row.sets} ${row.sets === 1 ? "set" : "sets"}`;
+        return {
+          title,
+          status:
+            row.state === "done" ? "done" : row.state === "skipped" ? "adjusted-out" : "up-next",
+          setsLine,
+          ...(row.state === "remaining" && row.modification === "REDUCED"
+            ? {
+                intro: `Volume scaled — do ${row.sets} ${row.sets === 1 ? "set" : "sets"} of each exercise; keep the weight.`,
+              }
+            : {}),
+          exercises:
+            detail?.exercises.map((exercise) => ({
+              name: exercise.name,
+              prescription: scalePrescriptionSets(exercise.prescription, ratio),
+              ...(exercise.cue !== undefined ? { cue: exercise.cue } : {}),
+              ...(exercise.steps !== undefined ? { steps: exercise.steps } : {}),
+            })) ?? [],
+        };
+      });
+
+      const persona =
+        activePlan?.personaId !== undefined ? personaById(activePlan.personaId) : undefined;
+      const seasonLabel =
+        activePlan && persona !== undefined
+          ? `${persona.label} · Week ${weekIndexOf(activePlan, localToday) + 1}`
+          : seasonPhase !== undefined
+            ? `Fall 2026 · ${seasonPhase.label}`
+            : undefined;
+
+      const { html, fileName } = buildWorkoutShareHtml(
+        {
+          dateKey: localToday,
+          dateLabel: formatDateLong(localToday),
+          intensityLabel: power.label,
+          ...(seasonLabel !== undefined ? { seasonLabel } : {}),
+          focusLabel: trainingObjective.primaryGoals
+            .map((goal) => TRAINING_GOAL_LABELS[goal])
+            .join(" · "),
+          blocks,
+          counts: {
+            done: session.doneCount,
+            remaining: session.remainingCount,
+            skipped: session.skippedCount,
+          },
+        },
+        new Date(),
+      );
+
+      const file = new File(Paths.cache, fileName);
+      file.write(html);
+      await Sharing.shareAsync(file.uri, {
+        mimeType: "text/html",
+        dialogTitle: "Share the Game Plan",
+      });
+      tapSuccess();
+    } catch {
+      setShareNote("Sharing isn't available on this device.");
+    }
   };
 
   return (
@@ -240,6 +343,25 @@ export default function Workout() {
             The engine only pauses training — it never pushes through pain.
           </Text>
         </View>
+      ) : null}
+
+      {session.rows.length > 0 ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share this workout"
+            onPress={() => {
+              tapLight();
+              void shareWorkout();
+            }}
+            className="h-14 items-center justify-center rounded-xl border-2 border-accent bg-soft"
+          >
+            <Text className="text-base font-black text-go">⤴ Share this workout</Text>
+          </Pressable>
+          {shareNote !== null ? (
+            <Text className="text-xs font-semibold text-shield">{shareNote}</Text>
+          ) : null}
+        </>
       ) : null}
 
       <Pressable
