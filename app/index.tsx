@@ -403,6 +403,20 @@ export default function Index() {
         <Text className="text-xl text-faint">›</Text>
       </Pressable>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open calendar"
+        onPress={() => router.navigate("/history")}
+        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
+      >
+        <Text className="text-3xl">📅</Text>
+        <View className="flex-1">
+          <Text className="text-base font-bold text-strong">Calendar</Text>
+          <Text className="text-sm text-faint">Past sessions & upcoming events</Text>
+        </View>
+        <Text className="text-xl text-faint">›</Text>
+      </Pressable>
+
       {upcoming.length > 0 ? (
         <View className="rounded-2xl bg-card border border-edge p-4">
           {nextGame ? (
@@ -451,20 +465,6 @@ export default function Index() {
           ))}
         </View>
       ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open calendar"
-        onPress={() => router.navigate("/history")}
-        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
-      >
-        <Text className="text-3xl">📅</Text>
-        <View className="flex-1">
-          <Text className="text-base font-bold text-strong">Calendar</Text>
-          <Text className="text-sm text-faint">Past sessions & upcoming events</Text>
-        </View>
-        <Text className="text-xl text-faint">›</Text>
-      </Pressable>
     </ScrollView>
     </>
   );

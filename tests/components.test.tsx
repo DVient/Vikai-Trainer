@@ -160,11 +160,13 @@ import History from "../app/history";
 import EventForm from "../app/event-form";
 import { HeaderBack } from "../src/components/HeaderBack";
 import { Toast } from "../src/components/Toast";
+import { ScreenErrorBoundary } from "../src/components/ScreenErrorBoundary";
+import { hourChipLabel } from "../src/components/EventDateTimePicker";
 import Settings from "../app/settings";
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import { monthLabel } from "../src/lib/calendar";
-import { prefillFromIso } from "../src/lib/eventForm";
+import { formatWallClock, prefillFromIso, splitTimeText } from "../src/lib/eventForm";
 import { ACTIVITY_TYPE_LABELS } from "../src/lib/format";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { DEFAULT_TEAM_COLORS } from "../src/lib/theme";
@@ -1325,12 +1327,9 @@ describe("editable entries: scheduled list, reschedule resync, activity edit", (
 
     const newDay = new Date(Date.now() + 96 * 60 * 60 * 1000);
     const prefill = prefillFromIso(newDay.toISOString(), TIMEZONE);
-    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
-      target: { value: prefill.dateText },
-    });
-    fireEvent.change(screen.getByPlaceholderText("18:00"), {
-      target: { value: prefill.timeText },
-    });
+    // Pick the new day on the in-form date grid (the form opens on the
+    // existing event's month, so the cell is visible without navigating).
+    fireEvent.click(screen.getByLabelText(`Day ${prefill.dateText}`));
     // The reminder resync is fire-and-forget async — wait for it to land.
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Save event" }));
@@ -1735,12 +1734,9 @@ describe("event form (app/event-form)", () => {
     // The toast state must start as null — never an empty string.
     expect(screen.queryByText("Event saved offline · Syncs when back online ✅")).toBeNull();
 
-    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
-      target: { value: "2100-01-15" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("18:00"), {
-      target: { value: "10:00" },
-    });
+    // The date grid + time chips drive the save — no typing needed.
+    fireEvent.click(screen.getByLabelText("Day 2026-01-15"));
+    fireEvent.click(screen.getByLabelText("Start hour 10 AM"));
     fireEvent.click(screen.getByRole("button", { name: "Save event" }));
 
     expect(screen.getByText("Event saved offline · Syncs when back online ✅")).toBeTruthy();
@@ -1750,12 +1746,8 @@ describe("event form (app/event-form)", () => {
     render(<EventForm />);
 
     fireEvent.click(screen.getByText("🥅 Other sport game"));
-    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
-      target: { value: "2100-01-15" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("18:00"), {
-      target: { value: "18:00" },
-    });
+    fireEvent.click(screen.getByLabelText("Day 2026-01-15"));
+    fireEvent.click(screen.getByLabelText("Start hour 6 PM"));
     fireEvent.change(screen.getByPlaceholderText("Home opener"), {
       target: { value: "Away lacrosse match" },
     });
@@ -1765,19 +1757,19 @@ describe("event form (app/event-form)", () => {
     expect(events).toHaveLength(1);
     expect(events[0]?.eventType).toBe("OTHER_SPORTS_GAME");
     expect(events[0]?.title).toBe("Away lacrosse match");
-    // Far-future date: the exact instant depends on DST, so assert the date.
-    expect(events[0]?.startAt.startsWith("2100-01-15T")).toBe(true);
+    expect(events[0]?.startAt.startsWith("2026-01-15T")).toBe(true);
   });
 
-  it("rejects a malformed date with a readable error", () => {
+  it("rejects a past-day pick with a readable error (the grid's only trap)", () => {
     render(<EventForm />);
 
-    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
-      target: { value: "tomorrow" },
-    });
+    // Real dates are now guaranteed by the grid — the remaining failure
+    // mode is navigating to a previous month and picking a past day.
+    fireEvent.click(screen.getByLabelText("Previous month"));
+    fireEvent.click(screen.getByLabelText("Day 2025-12-25"));
     fireEvent.click(screen.getByRole("button", { name: "Save event" }));
 
-    expect(screen.getByText("Use a date like 2026-01-15")).toBeTruthy();
+    expect(screen.getByText("Pick today or a future date")).toBeTruthy();
     expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
   });
 
@@ -1800,11 +1792,14 @@ describe("event form (app/event-form)", () => {
     render(<EventForm />);
 
     expect(screen.getByText("Save changes")).toBeTruthy();
-    const dateInput = screen.getByPlaceholderText("2026-01-15") as HTMLInputElement;
-    const timeInput = screen.getByPlaceholderText("18:00") as HTMLInputElement;
+    // The summaries speak for the prefilled state.
     const prefill = prefillFromIso(future, TIMEZONE);
-    expect(dateInput.value).toBe(prefill.dateText);
-    expect(timeInput.value).toBe(prefill.timeText);
+    const split = splitTimeText(prefill.timeText);
+    if (split === null) throw new Error("expected a parsable prefill time");
+    expect(screen.getByText(new RegExp(`· ${prefill.dateText}`))).toBeTruthy();
+    expect(
+      screen.getByText(`Starts at ${formatWallClock(split.hours, split.minutes)}`),
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete event" }));
     expect(useAppStore.getState().scheduledEvents).toHaveLength(0);
@@ -1813,21 +1808,22 @@ describe("event form (app/event-form)", () => {
   it("creates a six-week two-day practice series in one submission", () => {
     render(<EventForm />);
 
+    // 2026-01-05 is a Monday — switching to "Every week" pre-checks it
+    // (Google-style start-weekday shortcut), so deselect it first.
     fireEvent.click(screen.getByText("Every week"));
-    // Pre-checked weekday comes from the (empty) date field; pick Tue + Thu.
+    fireEvent.click(screen.getByLabelText("Repeat on Monday"));
     fireEvent.click(screen.getByLabelText("Repeat on Tuesday"));
     fireEvent.click(screen.getByLabelText("Repeat on Thursday"));
-    fireEvent.change(screen.getByPlaceholderText("2026-01-15"), {
-      target: { value: "2100-09-12" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("18:00"), {
-      target: { value: "17:30" },
-    });
+    // Start date: 2026-02-08 (Sunday) — one "Next month" from the grid.
+    fireEvent.click(screen.getByLabelText("Next month"));
+    fireEvent.click(screen.getByLabelText("Day 2026-02-08"));
+    fireEvent.click(screen.getByLabelText(`Start hour ${hourChipLabel(17)}`));
+    fireEvent.click(screen.getByLabelText("Start minute :30"));
     // Weeks input defaults to 6 — leave it.
 
     // Live preview reflects the expansion before saving.
-    // 2100-09-12 is a Sunday → first Tue = Sep 14, last series day = Oct 21.
-    expect(screen.getByText(/Creates 12 events · Tue, Sep 14 – Thu, Oct 21/)).toBeTruthy();
+    // First Tue = Feb 10, last series day = Thu, Mar 19.
+    expect(screen.getByText(/Creates 12 events · Tue, Feb 10 – Thu, Mar 19/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Save event" }));
 
@@ -1839,10 +1835,14 @@ describe("event form (app/event-form)", () => {
     const dates = events
       .map((event) => event.startAt.slice(0, 10))
       .sort();
-    expect(dates[0]).toBe("2100-09-14");
-    expect(dates[dates.length - 1]).toBe("2100-10-21");
-    // Every member keeps the same typed wall-clock time.
-    const timeParts = new Set(events.map((event) => event.startAt.slice(10)));
+    expect(dates[0]).toBe("2026-02-10");
+    expect(dates[dates.length - 1]).toBe("2026-03-19");
+    // Every member keeps the same typed wall-clock time — asserted in the
+    // athlete's timezone because the series spans the March DST change
+    // (the UTC string legitimately shifts across it).
+    const timeParts = new Set(
+      events.map((event) => prefillFromIso(event.startAt, TIMEZONE).timeText),
+    );
     expect(timeParts.size).toBe(1);
   });
 
@@ -1889,6 +1889,62 @@ describe("event form (app/event-form)", () => {
 
     expect(screen.queryByText("Every week")).toBeNull();
     expect(screen.queryByLabelText("Repeat on Tuesday")).toBeNull();
+  });
+
+  it("saves with zero typing — add-mode defaults to today · 6:00 PM", () => {
+    render(<EventForm />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    const events = useAppStore.getState().scheduledEvents;
+    expect(events).toHaveLength(1);
+    const prefill = prefillFromIso(events[0]!.startAt, TIMEZONE);
+    expect(prefill.dateText).toBe(localDate(0));
+    expect(prefill.timeText).toBe("18:00");
+  });
+
+  it("drives the exact wall-clock instant from the chips", () => {
+    render(<EventForm />);
+
+    fireEvent.click(screen.getByLabelText("Day 2026-01-08"));
+    fireEvent.click(screen.getByLabelText(`Start hour ${hourChipLabel(19)}`));
+    fireEvent.click(screen.getByLabelText("Start minute :45"));
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    const events = useAppStore.getState().scheduledEvents;
+    expect(events).toHaveLength(1);
+    const prefill = prefillFromIso(events[0]!.startAt, TIMEZONE);
+    expect(prefill.dateText).toBe("2026-01-08");
+    expect(prefill.timeText).toBe("19:45");
+  });
+});
+
+describe("screen error boundary (Phase 9.16)", () => {
+  it("catches a crashing screen and offers a way back", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    function Boom(): ReactElement {
+      throw new Error("boom — the grid exploded");
+    }
+
+    render(
+      <ScreenErrorBoundary label="calendar">
+        <Boom />
+      </ScreenErrorBoundary>,
+    );
+
+    expect(screen.getByText("The calendar couldn't load.")).toBeTruthy();
+    expect(screen.getByText("boom — the grid exploded")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Try again: calendar"));
+    // Reset re-renders the subtree — Boom throws again, the fallback holds.
+    expect(screen.getByText("The calendar couldn't load.")).toBeTruthy();
+    consoleError.mockRestore();
+  });
+
+  it("wraps the calendar screen without changing its healthy output", () => {
+    render(<History />);
+
+    // The boundary is invisible when nothing throws — the calendar renders.
+    expect(screen.getByLabelText("Add event")).toBeTruthy();
   });
 });
 

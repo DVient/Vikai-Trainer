@@ -8,8 +8,9 @@
  */
 
 import { isCompetitionEvent, toLocalDateString } from "../engine/autoregulation";
+import { planStatus } from "../plans/planBuilder";
 import { ACTIVITY_TYPE_LABELS, SCHEDULED_EVENT_LABELS } from "./format";
-import type { ScheduledEvent, ScheduledEventType } from "../types";
+import type { BuiltPlan, ScheduledEvent, ScheduledEventType } from "../types";
 
 /* ───────────────────────────── Month matrix ───────────────────────────── */
 
@@ -115,6 +116,32 @@ export function monthMarks(
     }
   }
   return marks;
+}
+
+/* ────────────────────── Planned-session dates ─────────────────────────── */
+
+/**
+ * Today/future dates a plan (default or built) still covers and that have
+ * no completed session yet — the violet "planned workout" dots. Pure, and
+ * shared by the calendar screen and the event form's date picker so both
+ * agree on which days carry a session.
+ */
+export function plannedWorkoutDatesFor(
+  weeks: ReadonlyArray<ReadonlyArray<string | null>>,
+  today: string,
+  activePlan: Readonly<Pick<BuiltPlan, "startDate" | "periodWeeks">> | null,
+  workoutLogs: ReadonlyArray<{ activityDate: string }>,
+): string[] {
+  const logged = new Set(workoutLogs.map((entry) => entry.activityDate));
+  const dates: string[] = [];
+  for (const week of weeks) {
+    for (const cell of week) {
+      if (cell === null || cell < today || logged.has(cell)) continue;
+      if (activePlan && planStatus(activePlan, cell) === "ended") continue;
+      dates.push(cell);
+    }
+  }
+  return dates;
 }
 
 /* ──────────────────────────── Day timeline ────────────────────────────── */

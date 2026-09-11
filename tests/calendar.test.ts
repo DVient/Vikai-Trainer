@@ -8,11 +8,36 @@ import {
   monthLabel,
   monthMarks,
   monthMatrix,
+  plannedWorkoutDatesFor,
   plannedWorkoutEmoji,
   weekSchedule,
 } from "../src/lib/calendar";
 
 const TZ = "America/New_York";
+
+describe("plannedWorkoutDatesFor — violet dots (shared by calendar + event form)", () => {
+  const weeks = monthMatrix(2026, 1);
+  const plan = { startDate: "2026-01-01", periodWeeks: 8 };
+
+  it("keeps today/future unlogged days and drops past or completed ones", () => {
+    const dates = plannedWorkoutDatesFor(
+      weeks,
+      "2026-01-15",
+      plan,
+      [{ activityDate: "2026-01-20" }],
+    );
+
+    expect(dates).toContain("2026-01-16");
+    expect(dates).not.toContain("2026-01-14"); // past
+    expect(dates).not.toContain("2026-01-20"); // already completed
+  });
+
+  it("drops days an ended plan no longer covers", () => {
+    const ended = { startDate: "2025-12-01", periodWeeks: 4 };
+
+    expect(plannedWorkoutDatesFor(weeks, "2026-01-15", ended, [])).toEqual([]);
+  });
+});
 
 describe("monthMatrix — Sunday-start calendar weeks", () => {
   it("pads January 2026 (starts on a Thursday) and ends on a full week", () => {

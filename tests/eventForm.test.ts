@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatWallClock,
   isEventEditable,
   parseEventDateTime,
   prefillFromIso,
+  splitTimeText,
 } from "../src/lib/eventForm";
 
 const TZ = "America/New_York";
@@ -62,5 +64,29 @@ describe("isEventEditable — past events lock", () => {
     expect(isEventEditable("2026-01-15T23:00:00.000Z", now)).toBe(true);
     expect(isEventEditable("2026-01-05T23:00:00.000Z", now)).toBe(false);
     expect(isEventEditable("not-a-date", now)).toBe(false);
+  });
+});
+
+describe("formatWallClock + splitTimeText — picker display helpers", () => {
+  it("renders 12-hour wall clocks with the right suffix at the edges", () => {
+    expect(formatWallClock(18, 0)).toBe("6:00 PM");
+    expect(formatWallClock(0, 15)).toBe("12:15 AM");
+    expect(formatWallClock(12, 0)).toBe("12:00 PM");
+    expect(formatWallClock(23, 59)).toBe("11:59 PM");
+  });
+
+  it("round-trips a 24-hour chip selection through the parser", () => {
+    const split = splitTimeText("19:45");
+    if (split === null) throw new Error("expected a parsable time");
+
+    expect(split).toEqual({ hours: 19, minutes: 45 });
+    expect(formatWallClock(split.hours, split.minutes)).toBe("7:45 PM");
+  });
+
+  it("rejects impossible clock times", () => {
+    expect(splitTimeText("24:00")).toBeNull();
+    expect(splitTimeText("18:60")).toBeNull();
+    expect(splitTimeText("18:00 PM")).toBeNull();
+    expect(splitTimeText("")).toBeNull();
   });
 });

@@ -1,14 +1,21 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
+import { DateGridSection, TimeChipSection } from "../src/components/EventDateTimePicker";
 import { OptionCard } from "../src/components/OptionCard";
 import { Toast } from "../src/components/Toast";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import {
+  monthMarks,
+  monthMatrix,
+  plannedWorkoutDatesFor,
+} from "../src/lib/calendar";
+import {
   isEventEditable,
   parseEventDateTime,
   prefillFromIso,
+  splitTimeText,
 } from "../src/lib/eventForm";
 import { tapSuccess } from "../src/lib/haptics";
 import { SCHEDULED_EVENT_LABELS } from "../src/lib/format";
@@ -66,6 +73,10 @@ export default function EventForm() {
   const params = useLocalSearchParams<{ eventId?: string }>();
   const scheduledEvents = useAppStore((state) => state.scheduledEvents);
   const profile = useAppStore((state) => state.profile);
+  const activePlan = useAppStore((state) => state.activePlan);
+  const readinessInputs = useAppStore((state) => state.readinessInputs);
+  const activityLogs = useAppStore((state) => state.activityLogs);
+  const workoutLogs = useAppStore((state) => state.workoutLogs);
   const scheduleEvent = useAppStore((state) => state.scheduleEvent);
   const scheduleEventSeries = useAppStore((state) => state.scheduleEventSeries);
   const updateScheduledEvent = useAppStore((state) => state.updateScheduledEvent);
@@ -76,16 +87,25 @@ export default function EventForm() {
     ? scheduledEvents.find((event) => event.id === params.eventId)
     : undefined;
 
-  const prefill = existing
-    ? prefillFromIso(existing.startAt, profile.timezone)
-    : { dateText: "", timeText: "" };
+  const prefill = existing ? prefillFromIso(existing.startAt, profile.timezone) : undefined;
+  const today = toLocalDateString(new Date(), profile.timezone);
 
+  // Add-mode starts at today · 6:00 PM (the seeded default practice time)
+  // so a save can succeed with zero typing; the grid and chips adjust it.
   const [eventType, setEventType] = useState<ScheduledEventType>(
     existing?.eventType ?? "TEAM_PRACTICE",
   );
   const [title, setTitle] = useState(existing?.title ?? "");
-  const [dateText, setDateText] = useState(prefill.dateText);
-  const [timeText, setTimeText] = useState(prefill.timeText);
+  const [dateText, setDateText] = useState(prefill?.dateText ?? today);
+  const [hour, setHour] = useState(
+    () => splitTimeText(prefill?.timeText ?? "")?.hours ?? 18,
+  );
+  const [minute, setMinute] = useState(
+    () => splitTimeText(prefill?.timeText ?? "")?.minutes ?? 0,
+  );
+  // The pickers speak "HH:MM" internally — parseEventDateTime, the series
+  // expansion, and the DST guard are untouched; only the input changed.
+  const timeText = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const [weeksText, setWeeksText] = useState("6");
@@ -96,7 +116,38 @@ export default function EventForm() {
   const [toast, setToast] = useState<string | null>(null);
 
   const editable = !existing || isEventEditable(existing.startAt, new Date());
-  const today = toLocalDateString(new Date(), profile.timezone);
+
+  // The date grid mirrors the Calendar screen: same matrix, same mark dots
+  // (existing events, planned sessions) so double-booking is visible while
+  // picking. Cursor opens on the selected date's month.
+  const [cursor, setCursor] = useState(() => ({
+    year: Number(dateText.slice(0, 4)),
+    month: Number(dateText.slice(5, 7)),
+  }));
+  const weeks = useMemo(() => monthMatrix(cursor.year, cursor.month), [cursor]);
+  const plannedWorkoutDates = useMemo(
+    () => plannedWorkoutDatesFor(weeks, today, activePlan, workoutLogs),
+    [weeks, today, activePlan, workoutLogs],
+  );
+  const sources = useMemo(
+    () => ({
+      readiness: readinessInputs,
+      activities: activityLogs,
+      workoutLogs,
+      events: scheduledEvents,
+    }),
+    [readinessInputs, activityLogs, workoutLogs, scheduledEvents],
+  );
+  const marks = useMemo(
+    () => monthMarks({ ...sources, plannedWorkoutDates }, weeks, profile.timezone),
+    [sources, plannedWorkoutDates, weeks, profile.timezone],
+  );
+  const shiftMonth = (delta: number) => {
+    setCursor((current) => {
+      const next = new Date(Date.UTC(current.year, current.month - 1 + delta, 1));
+      return { year: next.getUTCFullYear(), month: next.getUTCMonth() + 1 };
+    });
+  };
 
   const seriesSize =
     existing?.seriesId !== undefined
@@ -251,39 +302,35 @@ export default function EventForm() {
         ))}
       </View>
 
-      <View className="gap-1">
-        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
-          Date
-        </Text>
-        <TextInput
-          value={dateText}
-          onChangeText={(text) => {
-            setDateText(text);
-            setError("");
-          }}
-          editable={editable}
-          placeholder="2026-01-15"
-          placeholderTextColor="#64748B"
-          className="h-14 rounded-xl border border-edge bg-card px-4 text-base text-strong"
-        />
-      </View>
+      <DateGridSection
+        dateText={dateText}
+        today={today}
+        year={cursor.year}
+        month={cursor.month}
+        weeks={weeks}
+        marks={marks}
+        editable={editable}
+        onSelect={(date) => {
+          setDateText(date);
+          setError("");
+        }}
+        onPrevMonth={() => shiftMonth(-1)}
+        onNextMonth={() => shiftMonth(1)}
+      />
 
-      <View className="gap-1">
-        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
-          Start time
-        </Text>
-        <TextInput
-          value={timeText}
-          onChangeText={(text) => {
-            setTimeText(text);
-            setError("");
-          }}
-          editable={editable}
-          placeholder="18:00"
-          placeholderTextColor="#64748B"
-          className="h-14 rounded-xl border border-edge bg-card px-4 text-base text-strong"
-        />
-      </View>
+      <TimeChipSection
+        hours={hour}
+        minutes={minute}
+        editable={editable}
+        onHours={(nextHour) => {
+          setHour(nextHour);
+          setError("");
+        }}
+        onMinutes={(nextMinute) => {
+          setMinute(nextMinute);
+          setError("");
+        }}
+      />
 
       <View className="gap-1">
         <Text className="text-xs font-bold uppercase tracking-widest text-faint">

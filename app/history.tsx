@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { CalendarGrid } from "../src/components/CalendarGrid";
+import { ScreenErrorBoundary } from "../src/components/ScreenErrorBoundary";
 import { TimelineRow } from "../src/components/TimelineRow";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import {
@@ -10,6 +11,7 @@ import {
   formatDateLong,
   monthMarks,
   monthMatrix,
+  plannedWorkoutDatesFor,
   weekSchedule,
   type PlannedWorkoutEntry,
   type WeekScheduleDay,
@@ -31,6 +33,16 @@ import { useAppStore } from "../src/stores/useAppStore";
  * commitments with the ＋ button.
  */
 export default function History() {
+  // The boundary wraps the whole screen component from outside so even a
+  // throw inside the screen's own hooks becomes an actionable message.
+  return (
+    <ScreenErrorBoundary label="calendar">
+      <HistoryScreen />
+    </ScreenErrorBoundary>
+  );
+}
+
+function HistoryScreen() {
   const router = useRouter();
   const profile = useAppStore((state) => state.profile);
   const readinessInputs = useAppStore((state) => state.readinessInputs);
@@ -63,18 +75,10 @@ export default function History() {
 
   // Planned sessions: today/future days the plan (default or built) still
   // covers and that have no completed session yet.
-  const plannedWorkoutDates = useMemo(() => {
-    const logged = new Set(workoutLogs.map((entry) => entry.activityDate));
-    const dates: string[] = [];
-    for (const week of weeks) {
-      for (const cell of week) {
-        if (cell === null || cell < today || logged.has(cell)) continue;
-        if (activePlan && planStatus(activePlan, cell) === "ended") continue;
-        dates.push(cell);
-      }
-    }
-    return dates;
-  }, [weeks, today, activePlan, workoutLogs]);
+  const plannedWorkoutDates = useMemo(
+    () => plannedWorkoutDatesFor(weeks, today, activePlan, workoutLogs),
+    [weeks, today, activePlan, workoutLogs],
+  );
 
   const marks = useMemo(
     () => monthMarks({ ...sources, plannedWorkoutDates }, weeks, profile.timezone),

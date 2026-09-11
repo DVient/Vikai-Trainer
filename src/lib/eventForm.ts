@@ -110,3 +110,22 @@ export function isEventEditable(startAt: string, now: Date): boolean {
   const kickoff = new Date(startAt).getTime();
   return Number.isFinite(kickoff) && kickoff > now.getTime();
 }
+
+/** Friendly 12-hour wall clock for the picker's summary: 18:0 → "6:00 PM". */
+export function formatWallClock(hours: number, minutes: number): string {
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  const suffix = hours < 12 ? "AM" : "PM";
+  return `${hour12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+/** "18:30" → { hours: 18, minutes: 30 }; null when not a real clock time. */
+export function splitTimeText(
+  timeText: string,
+): { hours: number; minutes: number } | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(timeText.trim());
+  if (match === null) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return { hours, minutes };
+}
