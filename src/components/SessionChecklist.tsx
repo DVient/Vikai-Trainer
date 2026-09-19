@@ -5,6 +5,8 @@ import { BASE_PLAN_TITLES } from "../plans/basePlan";
 import { libraryBlockById } from "../plans/library";
 import { exerciseDetailsFor, type ComponentDetail } from "../plans/fall2026";
 import { tapLight } from "../lib/haptics";
+import { scaleStoryLine } from "../lib/scaleStory";
+import type { ScaleFactors } from "../engine/generator";
 import type { SessionRow, SessionView } from "../lib/session";
 import { ExerciseDetailList } from "./ExerciseDetailList";
 
@@ -152,6 +154,7 @@ function ChecklistRow({
               : undefined
           }
           scaledSets={row.modification === "REDUCED" ? row.sets : undefined}
+          scaleFactors={row.scaleFactors}
         />
       ) : null}
     </View>
@@ -170,6 +173,7 @@ function ExpandableWork({
   reduced,
   setsScale,
   scaledSets,
+  scaleFactors,
 }: {
   rowKey: string;
   title: string;
@@ -180,6 +184,8 @@ function ExpandableWork({
   setsScale?: number;
   /** The engine's scaled set target on REDUCED rows — for the intro line. */
   scaledSets?: number;
+  /** Phase 10.6 — global × local decomposition for the composed intro. */
+  scaleFactors?: ScaleFactors;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -202,16 +208,26 @@ function ExpandableWork({
     );
   }
 
+  // Phase 10.6 — when two or more channels priced this block (global dial ×
+  // local sore-area/completion pricing), the intro names the composition.
+  // Single-channel days keep the long-standing one-line explanations.
+  const composedIntro =
+    !locked && reduced && scaleFactors !== undefined
+      ? scaleStoryLine(scaleFactors, scaledSets)
+      : undefined;
+
   return (
     <View className="border-t border-edge p-3">
       <Text className={`text-xs font-semibold ${locked ? "text-faint" : "text-go"}`}>
         {locked
           ? "Not part of today's plan — study it anyway."
-          : reduced && scaledSets !== undefined
-            ? `Volume scaled — do ${scaledSets} ${scaledSets === 1 ? "set" : "sets"} of each exercise; keep the weight.`
-            : detail.exercises.length > 0
-              ? "Full prescription today — quality over quantity."
-              : "Nothing heavy here today."}
+          : composedIntro !== undefined
+            ? composedIntro
+            : reduced && scaledSets !== undefined
+              ? `Volume scaled — do ${scaledSets} ${scaledSets === 1 ? "set" : "sets"} of each exercise; keep the weight.`
+              : detail.exercises.length > 0
+                ? "Full prescription today — quality over quantity."
+                : "Nothing heavy here today."}
       </Text>
       <View className="mt-2">
         <ExerciseDetailList detail={detail} setsScale={setsScale} />

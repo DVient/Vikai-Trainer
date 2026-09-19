@@ -706,3 +706,71 @@ describe("performance-based loading (Phase 8.3)", () => {
     expect(prescription[0]?.modificationReason).toContain("completion pattern");
   });
 });
+
+describe("scale decomposition (Phase 10.6 surfacing)", () => {
+  it("decomposes global region × local soreness on a combined day", () => {
+    const plan = [
+      makeComponent({ id: "leg-block", baseVolume: 4, bodyRegion: "LOWER", muscleGroups: ["HAMSTRING", "QUAD"] }),
+      makeComponent({ id: "healthy", baseVolume: 4, bodyRegion: "LOWER", muscleGroups: ["ANKLE"] }),
+    ];
+    const restrictions = makeRestrictions({
+      lowerBodyScale: 0.7,
+      sorenessScale: { QUAD: 0.6 },
+    });
+
+    const prescription = applyRestrictionsToBasePlan(plan, restrictions);
+    const byId = new Map(prescription.map((entry) => [entry.component.id, entry]));
+
+    // The sore-overlap block: region 0.7 × soreness 0.6.
+    expect(byId.get("leg-block")?.scaleFactors).toEqual({
+      region: 0.7,
+      sorenessScale: 0.6,
+      sorenessAreas: ["QUAD"],
+    });
+    // The non-sore block carries only the global dial.
+    expect(byId.get("healthy")?.scaleFactors).toEqual({ region: 0.7 });
+    expect(byId.get("healthy")?.scaleFactors?.sorenessScale).toBeUndefined();
+  });
+
+  it("carries no decomposition on a clean full-volume day", () => {
+    const plan = [
+      makeComponent({ id: "leg-block", baseVolume: 4 }),
+      makeComponent({ id: "upper", baseVolume: 3, bodyRegion: "UPPER" }),
+    ];
+
+    const prescription = applyRestrictionsToBasePlan(plan, BASELINE);
+
+    expect(prescription.every((entry) => entry.scaleFactors === undefined)).toBe(true);
+  });
+
+  it("carries the completion-pattern factor alongside the region dial", () => {
+    const plan = [makeComponent({ id: "leg", type: "STRENGTH", baseVolume: 10 })];
+
+    const prescription = applyRestrictionsToBasePlan(
+      plan,
+      makeRestrictions({ lowerBodyScale: 0.7 }),
+      { performanceScales: { STRENGTH: 0.8 } },
+    );
+
+    expect(firstOf(prescription).scaleFactors).toEqual({
+      region: 0.7,
+      performanceScale: 0.8,
+    });
+  });
+
+  it("lists every overlapping sore area in the decomposition", () => {
+    const plan = [
+      makeComponent({ id: "block", baseVolume: 10, muscleGroups: ["QUAD", "ANKLE", "FOOT"] }),
+    ];
+    const restrictions = makeRestrictions({ sorenessScale: { QUAD: 0.6, ANKLE: 0.8 } });
+
+    const prescription = applyRestrictionsToBasePlan(plan, restrictions);
+
+    // Sorest overlap 0.6 (QUAD); both overlapping areas ride the record.
+    expect(firstOf(prescription).scaleFactors).toEqual({
+      region: 1,
+      sorenessScale: 0.6,
+      sorenessAreas: ["QUAD", "ANKLE"],
+    });
+  });
+});

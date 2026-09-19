@@ -7,7 +7,7 @@
  * engine adjusted out. Pure: no storage, no clock.
  */
 
-import type { ScaledComponent } from "../engine/generator";
+import type { ScaledComponent, ScaleFactors } from "../engine/generator";
 import type { CompletedComponent } from "../types";
 
 export type SessionRowState = "done" | "remaining" | "skipped";
@@ -41,6 +41,11 @@ export interface SessionRow {
   baseSets: number;
   state: SessionRowState;
   completedAt?: string;
+  /**
+   * Phase 10.6 — why the volume is what it is: the global dial × local
+   * pricing decomposition, present when anything was dialed below full.
+   */
+  scaleFactors?: ScaleFactors;
 }
 
 export interface SessionView {
@@ -68,6 +73,8 @@ export function buildSessionView(
   const skipped: SessionRow[] = [];
 
   for (const entry of prescription) {
+    const factors = entry.scaleFactors;
+    const carry = factors !== undefined ? { scaleFactors: factors } : {};
     const completed = progress[entry.component.id];
     if (completed !== undefined) {
       done.push({
@@ -77,6 +84,7 @@ export function buildSessionView(
         baseSets: entry.component.baseVolume,
         state: "done",
         completedAt: completed.completedAt,
+        ...carry,
       });
     } else if (entry.modification === "REMOVED") {
       skipped.push({
@@ -93,6 +101,7 @@ export function buildSessionView(
         sets: entry.scaledVolume,
         baseSets: entry.component.baseVolume,
         state: "remaining",
+        ...carry,
       });
     }
   }

@@ -178,6 +178,7 @@ import {
 import {
   DEFAULT_OBJECTIVE,
   type EnergyAnchor,
+  type FingerTapTrial,
   type JointStatus,
   type ReadinessInput,
   type SleepAnchor,
@@ -216,6 +217,22 @@ function makeCheckIn(
 
 const GOOD_ANCHORS = { sleep: "OVER_8_HRS", joint: "NO_CONCERN", energy: "HIGH" } as const;
 const PAIN_ANCHORS = { sleep: "OVER_8_HRS", joint: "PAIN_CONCERN", energy: "HIGH" } as const;
+
+/** SIGNIFICANT tap day (Phase 10): 3 baseline days at 80 taps, today 67. */
+function significantTapTrials(): FingerTapTrial[] {
+  const baselineDays = [-2, -3, -4].map((offset, index) =>
+    makeTapTrial(`tap-b${index}`, localDate(offset), 80),
+  );
+  return [...baselineDays, makeTapTrial("tap-today", localDate(0), 67)];
+}
+
+function makeTapTrial(
+  id: string,
+  localDateKey: string,
+  tapCount: number,
+): FingerTapTrial {
+  return { id, localDate: localDateKey, timezone: TIMEZONE, recordedAt: "", tapCount };
+}
 
 /**
  * Re-clocks the frozen fake Date to Tuesday 2026-01-06 — a pre-season FULL
@@ -1203,6 +1220,58 @@ describe("game plan screen (app/workout)", () => {
     fireEvent.click(screen.getByLabelText("See the work: Ball-handling technique"));
     expect(screen.getByText("Full prescription today — quality over quantity.")).toBeTruthy();
     expect(screen.getByText("50–100 makes")).toBeTruthy();
+  });
+
+  it("tells the two-signal story when the tap test and soreness both fire (Phase 10.6)", async () => {
+    // SIGNIFICANT tap (67/80 = 0.8375 < 0.85) on a clean-survey day:
+    // upper body dials to 0.8 — and the sore ARM block is priced on top.
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(localDate(0), { ...GOOD_ANCHORS, soreAreas: ["ARM"] }),
+      ],
+      fingerTapTrials: significantTapTrials(),
+    });
+
+    render(<Workout />);
+
+    // The two-signals card replaces the plain soreness line — the old
+    // "everything else runs as planned" tail would be false here.
+    expect(screen.getByText("Two signals today 🎛️")).toBeTruthy();
+    expect(screen.getByText(/dialed the whole day down, and Arm is sore/)).toBeTruthy();
+    expect(screen.queryByText(/Everything else runs as planned/)).toBeNull();
+
+    // The composed math inside the affected block's work panel:
+    // region 0.8 × soreness 0.6 = 0.48 → round(4 × 0.48) = 2 sets.
+    fireEvent.click(screen.getByLabelText("See the work: Upper push strength"));
+    expect(
+      screen.getByText(
+        "Today's readiness ×0.8 · sore Arm ×0.6 — do 2 sets of each exercise; keep the weight.",
+      ),
+    ).toBeTruthy();
+
+    // The shared document carries the same composed line.
+    fireEvent.click(screen.getByLabelText("Share this workout"));
+    await waitFor(() => expect(sharingSpy.shareAsync).toHaveBeenCalledTimes(1));
+    expect((fileWrites.list.at(-1)?.content ?? "")).toContain("×0.8");
+  });
+
+  it("names the blended signals on Home when both channels flag today", () => {
+    useAppStore.setState({
+      readinessInputs: [
+        makeCheckIn(localDate(0), { ...GOOD_ANCHORS, soreAreas: ["ARM"] }),
+      ],
+      fingerTapTrials: significantTapTrials(),
+    });
+
+    render(<Index />);
+
+    expect(
+      screen.getByText(
+        "Tap test and soreness both flag today — blocks working sore areas scale on top of the lighter plan.",
+      ),
+    ).toBeTruthy();
+    // The plain sore line still lists the areas underneath.
+    expect(screen.getByText("Sore today: Arm — those blocks are scaled.")).toBeTruthy();
   });
 });
 

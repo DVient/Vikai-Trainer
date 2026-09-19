@@ -11,6 +11,7 @@ import { applyRestrictionsToBasePlan } from "../src/engine/generator";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { soreAreaLabel } from "../src/lib/bodyMap";
 import { formatDateLong } from "../src/lib/calendar";
+import { isGloballyDialed, scaleStoryLine } from "../src/lib/scaleStory";
 import { buildSessionView, scalePrescriptionSets } from "../src/lib/session";
 import {
   buildWorkoutShareHtml,
@@ -147,7 +148,13 @@ export default function Workout() {
           setsLine,
           ...(row.state === "remaining" && row.modification === "REDUCED"
             ? {
-                intro: `Volume scaled — do ${row.sets} ${row.sets === 1 ? "set" : "sets"} of each exercise; keep the weight.`,
+                // Phase 10.6 — the composed "global × local" line when two or
+                // more channels priced this block; the generic line otherwise.
+                intro:
+                  (row.scaleFactors !== undefined
+                    ? scaleStoryLine(row.scaleFactors, row.sets)
+                    : undefined) ??
+                  `Volume scaled — do ${row.sets} ${row.sets === 1 ? "set" : "sets"} of each exercise; keep the weight.`,
               }
             : {}),
           exercises:
@@ -214,10 +221,28 @@ export default function Workout() {
 
       <StatusBanner status={result.status} reasons={result.reasons} />
 
-      {result.reasons.includes("SORENESS_FLAGGED") && soreAreasToday.length > 0 ? (
+      {/* Phase 10.6 — when the global dial (tap test et al.) and the athlete's
+          sore-area pricing both act today, say so explicitly: the composed
+          model is "global × local", and the old soreness line's "everything
+          else runs as planned" would be false here. */}
+      {result.reasons.includes("CNS_FATIGUE_FLAGGED") && soreAreasToday.length > 0 ? (
+        <View className="rounded-xl border border-modulate-line bg-modulate-soft p-3">
+          <Text className="text-sm font-black text-strong">Two signals today 🎛️</Text>
+          <Text className="mt-1 text-xs text-body">
+            {`Your tap test dialed the whole day down, and ${soreAreasToday
+              .map(soreAreaLabel)
+              .join(", ")} ${
+              soreAreasToday.length > 1 ? "are" : "is"
+            } sore. Sore-area blocks are scaled on top of the lighter plan — the list below already blends both.`}
+          </Text>
+        </View>
+      ) : result.reasons.includes("SORENESS_FLAGGED") && soreAreasToday.length > 0 ? (
         <Text className="rounded-xl bg-modulate-soft px-3 py-2 text-xs font-semibold text-modulate">
-          Sore today: {soreAreasToday.map(soreAreaLabel).join(", ")} — blocks targeting them are
-          scaled. Everything else runs as planned.
+          {`Sore today: ${soreAreasToday.map(soreAreaLabel).join(", ")} — blocks targeting them are scaled.${
+            isGloballyDialed(result.restrictions)
+              ? " On top of today's lighter plan."
+              : " Everything else runs as planned."
+          }`}
         </Text>
       ) : null}
 

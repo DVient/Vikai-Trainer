@@ -51,6 +51,22 @@ export function scaleSets(baseSets: number, scale: number): number {
 
 export type ComponentModification = "KEPT" | "REDUCED" | "REMOVED";
 
+/**
+ * How ONE surviving block's volume was priced (Phase 10 surfacing): the
+ * global readiness dial (region scale from any global rule — tap test,
+ * workload, sleep/energy, games), the local sore-area pricing for the areas
+ * the block targets, and the completion-pattern pricing. Purely descriptive
+ * — the product already lives in `scaledVolume`. Raw `SoreArea` ids; labels
+ * are a presentation concern. Present on REDUCED/KEPT rows only when at
+ * least one factor is below 1.
+ */
+export interface ScaleFactors {
+  region: number;
+  sorenessScale?: number;
+  sorenessAreas?: readonly SoreArea[];
+  performanceScale?: number;
+}
+
 /** One base-plan component after restriction mapping (consumed by Phase 4 UI). */
 export interface ScaledComponent {
   component: TrainingComponent;
@@ -59,6 +75,8 @@ export interface ScaledComponent {
   scaledVolume: number;
   /** Short, training-domain reason — no medical terminology. */
   modificationReason?: string;
+  /** Descriptive breakdown of the composed scale when anything was dialed. */
+  scaleFactors?: ScaleFactors;
 }
 
 /* ─────────────────────── Component classification helpers ─────────────── */
@@ -289,6 +307,19 @@ export function applyRestrictionsToBasePlan(
 
     const scale = regionScaleFor(region, restrictions) * sorenessScale * performanceScale;
 
+    /* Phase 10.6 — descriptive decomposition, only when anything was dialed. */
+    const dialed =
+      regionScaleFor(region, restrictions) < 1 || sorenessScale < 1 || performanceScale < 1;
+    const scaleFactors: ScaleFactors | undefined = dialed
+      ? {
+          region: regionScaleFor(region, restrictions),
+          ...(soreness.kind === "SCALE"
+            ? { sorenessScale, sorenessAreas: soreness.areas }
+            : {}),
+          ...(performanceScale < 1 ? { performanceScale } : {}),
+        }
+      : undefined;
+
     /* Step 1 — optional accessories are stripped before any set reduction. */
     if (component.optional && scale < 1) {
       prescription.push(
@@ -316,11 +347,17 @@ export function applyRestrictionsToBasePlan(
         modification: "REDUCED",
         scaledVolume: volume,
         modificationReason,
+        ...(scaleFactors !== undefined ? { scaleFactors } : {}),
       });
       continue;
     }
 
-    prescription.push({ component, modification: "KEPT", scaledVolume: volume });
+    prescription.push({
+      component,
+      modification: "KEPT",
+      scaledVolume: volume,
+      ...(scaleFactors !== undefined ? { scaleFactors } : {}),
+    });
   }
 
   return enforceDurationCap(prescription, restrictions.maxTrainingDurationMinutes, options);

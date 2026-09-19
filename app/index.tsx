@@ -365,6 +365,12 @@ export default function Index() {
                 — the session screen shows why.
               </Text>
             ) : null}
+            {result.reasons.includes("CNS_FATIGUE_FLAGGED") && soreAreasToday.length > 0 ? (
+              <Text className="text-xs text-modulate">
+                Tap test and soreness both flag today — blocks working sore areas
+                scale on top of the lighter plan.
+              </Text>
+            ) : null}
             {result.reasons.includes("SORENESS_FLAGGED") && soreAreasToday.length > 0 ? (
               <Text className="text-xs text-modulate">
                 Sore today: {soreAreasToday.map(soreAreaLabel).join(", ")} — those blocks are
