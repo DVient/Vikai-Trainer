@@ -354,6 +354,51 @@ type ReadinessInput = {
 
 ```
 
+### 11.2 FINGER-TAP FRESHNESS MODEL (Phase 10)
+
+The 10-second maximal finger-tap trial is the behavioral readout of central
+motor drive (Halstead–Reitan tradition: fixed 10-second trials, downstrokes
+counted, best trial as the criterion measure). Interpretation is strictly
+within-subject — absolute counts are never compared across people.
+
+```typescript
+type FingerTapTrial = {
+  id: string;
+  localDate: string; // YYYY-MM-DD
+  timezone: string;
+  recordedAt: string;
+  tapCount: number;  // downstrokes in a 10.0-second window
+};
+
+type FingerTapTier =
+  | "NOT_TESTED"   // no valid trial today
+  | "NO_BASELINE"  // tested today, not enough distinct prior days yet
+  | "FRESH"        // today/baseline ≥ 0.95 (inside day-to-day noise)
+  | "MODERATE"     // 0.85 ≤ ratio < 0.95
+  | "SIGNIFICANT"; // ratio < 0.85
+
+```
+
+Measurement rules:
+
+* **Trial validity:** 20–120 taps (plausible 10-second envelope). Invalid trials never count.
+* **Daily score:** the best valid trial of the local date (maximal-performance criterion).
+* **Baseline:** median of the top-3 daily bests within a rolling 14-day window, requiring ≥ 3 distinct valid days, today always excluded. Median-of-top-3 is robust to one fluke day (cannot raise the bar) and one bad day (cannot lower it).
+* **Band edges:** 5% and 15% decrement conventions follow jump-based monitoring practice, adapted to tap rate's ~3–5% day-to-day variability.
+
+### 11.3 TAP × SURVEY FUSION MATRIX (Phase 10)
+
+The objective tier decides WHETHER the rule fires; the survey axis (short sleep, drained energy, or an in-band readiness score) decides HOW STRONG the template is. Every flagged cell removes plyometrics AND high-impact work — central drive powers rate of force development first. FRESH / NO_BASELINE / NOT_TESTED fire no rule: the tap test can only ADD protection, never soften a survey-driven reduction (most-protective-wins merge).
+
+| Tier × Survey | Flagged | Clean |
+| --- | --- | --- |
+| SIGNIFICANT | 0.6 / 0.7 · cap 45 | 0.7 / 0.8 · cap 60 |
+| MODERATE | 0.65 / 0.75 · cap 60 | 0.8 / 0.85 · cap 75 |
+
+(Lower/upper body scales; `maxTrainingDurationMinutes` cap; plyometrics + high impact OFF in all flagged cells. Reason: `CNS_FATIGUE_FLAGGED`, global YELLOW.)
+
+```
+
 ---
 
 ## 12. READINESS SCORING
@@ -381,6 +426,9 @@ interface EngineInput {
   athlete: AthleteProfile;
   objective: TrainingObjective;
   readiness?: ReadinessInput;
+  carriedSoreAreas?: SoreArea[];          // Phase 8/9.7: post-session body map
+  carriedSoreAreasFrom?: string;          // Phase 10: source date for the carry window
+  fingerTapTrials?: FingerTapTrial[];     // Phase 10: objective freshness axis
   recentActivities: ActivityLog[];
   upcomingEvents: ScheduledEvent[];
   now: Date;
@@ -400,9 +448,11 @@ type EngineReason =
   | "IMMINENT_GAME"
   | "UPCOMING_GAME"
   | "HIGH_RECENT_WORKLOAD"
+  | "CNS_FATIGUE_FLAGGED"
   | "LOW_SLEEP"
   | "LOW_ENERGY"
   | "MULTIPLE_READINESS_CONCERNS"
+  | "SORENESS_FLAGGED"
   | "NORMAL_READINESS";
 
 type TrainingRestrictions = {
@@ -443,7 +493,10 @@ The autoregulation engine strictly evaluates input conditions in this order:
 4. Upcoming Game: Game in 12–24 hours.
 
 
-5. Recent Workload: High cumulative session loads or high RPE activities in the last 24–48 hours.
+5. Recent Workload: High cumulative session loads or high RPE activities in the last 24–48 hours (defaults recalibrated in Phase 10: single-session 750, cumulative-24h 1100).
+
+
+5b. Finger-Tap Fusion (Phase 10): objective CNS-freshness tier × survey evidence picks a protection template (§11.3). Evaluated after workload, ahead of the survey anchors — an objective performance decrement outranks self-report in the blend. Counts as a global YELLOW (unlike status-neutral soreness).
 
 
 6. Sleep Status: Short sleep (< 7 hours).
@@ -452,7 +505,7 @@ The autoregulation engine strictly evaluates input conditions in this order:
 7. Energy Status: Low or drained state.
 
 
-8. Combined Readiness: Evaluate arithmetic score.
+8. Combined Readiness: Evaluate arithmetic score (Phase 10: the YELLOW band tightens to ≤ 5 by default, so "7–8 h sleep + mildly stiff + normal energy" (score 6) no longer auto-reduces; two-plus explicit concerns keep the stricter template, and the band stays configurable).
 
 
 9. Generate Restrictions & Reasons: Output deterministic prescription object.
@@ -523,6 +576,8 @@ type RecentWorkload = {
 ```
 
 Thresholds must be stored as configurable parameters, not hardcoded strings.
+
+Phase 10 recalibration (per the "never a reduced day" review): defaults rise to `highSessionLoad = 750` and `highCumulative24hLoad = 1100` so a typical ~90-minute RPE-8 practice (load 720) no longer flags the next day on its own, and `readinessScoreYellowMax` tightens from 6 to 5 (see §15 step 8). The Settings screen exposes all thresholds plus Protective (700/1000/6) and Performance (850/1300/5) presets; the engine additionally enforces a `carriedSorenessCarryDays` window (default 2) so a stale post-session body map stops pricing later days.
 
 ---
 

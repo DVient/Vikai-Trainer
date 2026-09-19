@@ -5,7 +5,8 @@ import { DayStepper } from "../src/components/DayStepper";
 import { PowerGauge } from "../src/components/PowerGauge";
 import { ReminderStatusChip } from "../src/components/ReminderStatusChip";
 import { applyRestrictionsToBasePlan } from "../src/engine/generator";
-import { toLocalDateString } from "../src/engine/autoregulation";
+import { DEFAULT_ENGINE_THRESHOLDS, toLocalDateString } from "../src/engine/autoregulation";
+import { bestTapCountForDate } from "../src/engine/fingerTap";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { nextUpcomingEvents, SCHEDULED_EVENT_LABELS } from "../src/lib/format";
 import { todaySteps } from "../src/lib/flow";
@@ -41,6 +42,8 @@ export default function Index() {
   const activityLogs = useAppStore((state) => state.activityLogs);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const workoutProgress = useAppStore((state) => state.workoutProgress);
+  const fingerTapTrials = useAppStore((state) => state.fingerTapTrials);
+  const engineThresholds = useAppStore((state) => state.engineThresholds);
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
   const backfillNudgesDismissed = useAppStore((state) => state.backfillNudgesDismissed);
   const dismissBackfillNudge = useAppStore((state) => state.dismissBackfillNudge);
@@ -66,8 +69,17 @@ export default function Index() {
 
   const hasWorkoutLogToday = workoutLogs.some((entry) => entry.activityDate === localToday);
   const activityPartition = partitionActivities(activityLogs, workoutLogs, localToday);
+  // Phase 10 — the tap-test step is done once today's best trial is logged
+  // (validity judged with the same thresholds the engine evaluates with).
+  const hasTapTestToday =
+    bestTapCountForDate(
+      fingerTapTrials,
+      localToday,
+      engineThresholds ?? DEFAULT_ENGINE_THRESHOLDS,
+    ) !== undefined;
   const steps = todaySteps({
     hasCheckedInToday,
+    hasTapTestToday,
     hasWorkoutLogToday,
     activityPartition,
   });

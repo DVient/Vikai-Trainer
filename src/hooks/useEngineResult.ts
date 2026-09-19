@@ -19,11 +19,22 @@ export function useEngineResult() {
   const activityLogs = useAppStore((state) => state.activityLogs);
   const scheduledEvents = useAppStore((state) => state.scheduledEvents);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
+  const fingerTapTrials = useAppStore((state) => state.fingerTapTrials);
+  const engineThresholds = useAppStore((state) => state.engineThresholds);
 
   const now = new Date();
 
   return deriveEngineView(
-    { profile, trainingObjective, readinessInputs, activityLogs, scheduledEvents, workoutLogs },
+    {
+      profile,
+      trainingObjective,
+      readinessInputs,
+      activityLogs,
+      scheduledEvents,
+      workoutLogs,
+      fingerTapTrials,
+      engineThresholds,
+    },
     now,
   );
 }

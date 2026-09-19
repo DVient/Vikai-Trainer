@@ -13,6 +13,7 @@
  */
 
 import { evaluateAutoregulationEngine, toLocalDateString } from "../engine/autoregulation";
+import { DEFAULT_ENGINE_THRESHOLDS, type EngineThresholds } from "../engine/autoregulation";
 import { hasConsecutiveHighStressDays } from "../engine/generator";
 import {
   DEFAULT_ATHLETE_PROFILE,
@@ -24,6 +25,7 @@ import {
   type AthleteProfile,
   type EngineInput,
   type EngineResult,
+  type FingerTapTrial,
   type ReadinessInput,
   type ScheduledEvent,
   type SoreArea,
@@ -39,6 +41,10 @@ export interface EngineSourceState {
   scheduledEvents: readonly ScheduledEvent[];
   /** Session records — the latest one before today carries post-session feedback. */
   workoutLogs: readonly WorkoutLog[];
+  /** Phase 10 — finger-tap trials (objective CNS-freshness axis), all dates. */
+  fingerTapTrials?: readonly FingerTapTrial[];
+  /** Phase 10 — athlete-tunable engine thresholds (Settings); defaults when null/unset. */
+  engineThresholds?: EngineThresholds | null;
 }
 
 export interface DerivedEngineView {
@@ -91,6 +97,10 @@ export function deriveEngineView(state: EngineSourceState, now: Date): DerivedEn
     objective: state.trainingObjective ?? DEFAULT_OBJECTIVE,
     readiness: todayCheckIn === undefined ? undefined : { ...todayCheckIn },
     carriedSoreAreas,
+    // Phase 10 — the carried map only prices today within the carry window;
+    // the engine needs the source date to expire it.
+    carriedSoreAreasFrom: lastSessionBeforeToday?.activityDate,
+    fingerTapTrials: state.fingerTapTrials ?? [],
     recentActivities: [...state.activityLogs],
     upcomingEvents: [...state.scheduledEvents],
     now,
@@ -98,7 +108,7 @@ export function deriveEngineView(state: EngineSourceState, now: Date): DerivedEn
 
   return {
     input,
-    result: evaluateAutoregulationEngine(input),
+    result: evaluateAutoregulationEngine(input, state.engineThresholds ?? DEFAULT_ENGINE_THRESHOLDS),
     today,
     hasCheckedInToday: todayCheckIn !== undefined,
     carriedSoreAreas,

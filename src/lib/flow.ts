@@ -4,7 +4,8 @@
  * Derives the athlete's "Your Day" stepper from facts the app already knows.
  * Pure and deterministic: no storage, no clock — every input is provided
  * (AGENTS.md code quality). The order mirrors when information is worth
- * having: check in → log what already happened today (it shapes today's
+ * having: check in → run the 10-second tap test (its result blends with the
+ * check-in, Phase 10) → log what already happened today (it shapes today's
  * volume) → complete the Game Plan. Steps unlock in order but don't gate
  * each other — logging after the session is expected too (it shapes the
  * NEXT workout). The engine still gates what each screen can do.
@@ -12,7 +13,7 @@
 
 import type { ActivityPartition } from "./activityTiming";
 
-export type StepId = "checkin" | "gamePlan" | "log";
+export type StepId = "checkin" | "cns" | "gamePlan" | "log";
 
 export type StepState = "done" | "active" | "locked";
 
@@ -21,19 +22,21 @@ export interface DayStep {
   emoji: string;
   title: string;
   subtitle: string;
-  route: "/checkin" | "/workout" | "/practice-log";
+  route: "/checkin" | "/finger-tap" | "/workout" | "/practice-log";
   state: StepState;
 }
 
 export interface FlowInput {
   hasCheckedInToday: boolean;
+  /** True when at least one finger-tap trial is logged for today (Phase 10). */
+  hasTapTestToday: boolean;
   /** True when a workout log exists for today (Finish workout pressed). */
   hasWorkoutLogToday: boolean;
   /** Today's activity logs split around the workout (activityTiming). */
   activityPartition: ActivityPartition;
 }
 
-/** Derives the daily sequence: check in → log activities → complete plan. */
+/** Derives the daily sequence: check in → tap test → log activities → plan. */
 export function todaySteps(input: FlowInput): DayStep[] {
   const checkin: DayStep = {
     id: "checkin",
@@ -42,6 +45,19 @@ export function todaySteps(input: FlowInput): DayStep[] {
     subtitle: input.hasCheckedInToday ? "Done for today ✓ — update anytime" : "Unlock your power — under 5 sec",
     route: "/checkin",
     state: input.hasCheckedInToday ? "done" : "active",
+  };
+
+  const cns: DayStep = {
+    id: "cns",
+    emoji: "⚡",
+    title: "10-second tap test",
+    subtitle: !input.hasCheckedInToday
+      ? "After your check-in"
+      : input.hasTapTestToday
+        ? "Logged for today ✓"
+        : "Tap fast for 10 sec — measure your freshness",
+    route: "/finger-tap",
+    state: !input.hasCheckedInToday ? "locked" : input.hasTapTestToday ? "done" : "active",
   };
 
   const hasPre = input.activityPartition.pre.length > 0;
@@ -86,5 +102,5 @@ export function todaySteps(input: FlowInput): DayStep[] {
         : "active",
   };
 
-  return [checkin, log, gamePlan];
+  return [checkin, cns, log, gamePlan];
 }

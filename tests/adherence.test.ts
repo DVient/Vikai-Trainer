@@ -66,10 +66,14 @@ describe("adherenceSamplesFor", () => {
   });
 
   it("respects the lookback window on both ends", () => {
+    const progress = {
+      "2026-01-01": { "strength-a": done("strength-a") },
+      "2026-01-06": { "strength-a": done("strength-a") },
+    };
     const samples = adherenceSamplesFor(
       makePlan(),
       [makeLog("2025-12-31"), makeLog("2026-01-01"), makeLog("2026-01-06"), makeLog(TODAY)],
-      {},
+      progress,
       TODAY,
     );
 
@@ -77,6 +81,38 @@ describe("adherenceSamplesFor", () => {
     // 2026-01-01 (Thu) and 2026-01-06 (Tue) are full-template days inside
     // the 7-day window; 2025-12-31 is not.
     expect(strength?.plannedBlocks).toBe(6);
+    expect(strength?.completedBlocks).toBe(2);
+  });
+
+  it("skips session dates with zero check-offs — missing data, not skipped work (Phase 10)", () => {
+    // 2026-01-06 has a log but no check-offs at all: it must not drag every
+    // goal's completion ratio to 0 (that drove the "always reduced" bug).
+    const progress = {
+      "2026-01-03": { "strength-a": done("strength-a"), jumps: done("jumps"), sprints: done("sprints") },
+      // "2026-01-06" intentionally absent from workoutProgress
+    };
+    const samples = adherenceSamplesFor(
+      makePlan(),
+      [makeLog("2026-01-06"), makeLog("2026-01-03")],
+      progress,
+      TODAY,
+    );
+
+    const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
+    // Only 2026-01-03 is judged: planned 3, completed 1 for strength.
+    expect(byGoal.get("STRENGTH")).toEqual({ goal: "STRENGTH", plannedBlocks: 3, completedBlocks: 1 });
+    expect(byGoal.get("EXPLOSIVENESS")).toEqual({ goal: "EXPLOSIVENESS", plannedBlocks: 1, completedBlocks: 1 });
+  });
+
+  it("stays silent when every logged session lacks check-offs", () => {
+    const samples = adherenceSamplesFor(
+      makePlan(),
+      [makeLog("2026-01-06"), makeLog("2026-01-03")],
+      {},
+      TODAY,
+    );
+
+    expect(samples).toEqual([]);
   });
 
   it("falls back to the default template when no plan is active", () => {

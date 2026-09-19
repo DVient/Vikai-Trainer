@@ -234,6 +234,30 @@ export function isSoreArea(value: unknown): value is SoreArea {
   return typeof value === "string" && (SORE_AREA_IDS as readonly string[]).includes(value);
 }
 
+/* ───────────── §11.2 — Finger-tap freshness trials (Phase 10) ─────────── */
+
+/**
+ * One 10-second maximal finger-tap trial (Phase 10). The press count is the
+ * athlete's own device-measured motor speed for that trial — a training-
+ * domain freshness signal the engine compares against the athlete's rolling
+ * personal baseline. This is never a clinical measure and never produces
+ * medical output (AGENTS.md safety non-goals).
+ *
+ * Trials are never overwritten (like PersonalBest attempts): the daily score
+ * is the best valid trial of the day, and the engine's baseline is derived
+ * from the rolling history. A mistyped entry is removed explicitly.
+ */
+export interface FingerTapTrial {
+  id: string;
+  /** Local calendar date the trial belongs to, YYYY-MM-DD. */
+  localDate: string;
+  timezone: string;
+  /** ISO datetime string. */
+  recordedAt: string;
+  /** Presses counted during the 10-second window (downstrokes only). */
+  tapCount: number;
+}
+
 /** The daily check-in record (SPEC §11). */
 export interface ReadinessInput {
   id: string;
@@ -278,6 +302,19 @@ export interface EngineInput {
    * ignoring the carried body map (status semantics stay untouched).
    */
   carriedSoreAreas?: readonly SoreArea[];
+  /**
+   * Phase 10 — the local date (YYYY-MM-DD) the carried sore areas were
+   * recorded on. When provided, the engine enforces the carry window: sore
+   * feedback from a session older than `carriedSorenessCarryDays` no longer
+   * prices today. Absent ⇒ no recency information (areas apply as-is).
+   */
+  carriedSoreAreasFrom?: string;
+  /**
+   * Phase 10 — raw 10-second finger-tap trial history. The engine derives
+   * the rolling baseline, today's best valid trial, and the freshness tier
+   * itself; callers pass data, never conclusions.
+   */
+  fingerTapTrials?: readonly FingerTapTrial[];
   recentActivities: ActivityLog[];
   upcomingEvents: ScheduledEvent[];
   now: Date;
@@ -291,6 +328,7 @@ export type EngineReason =
   | "IMMINENT_GAME"
   | "UPCOMING_GAME"
   | "HIGH_RECENT_WORKLOAD"
+  | "CNS_FATIGUE_FLAGGED"
   | "LOW_SLEEP"
   | "LOW_ENERGY"
   | "MULTIPLE_READINESS_CONCERNS"

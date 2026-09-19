@@ -71,6 +71,7 @@ export const ENGINE_REASON_LABELS: Record<EngineReason, string> = {
   IMMINENT_GAME: "Game coming up",
   UPCOMING_GAME: "Game within 24h",
   HIGH_RECENT_WORKLOAD: "Big recent workload",
+  CNS_FATIGUE_FLAGGED: "Tap test below baseline",
   LOW_SLEEP: "Short sleep",
   LOW_ENERGY: "Low battery",
   MULTIPLE_READINESS_CONCERNS: "Running low",

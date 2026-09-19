@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 
+import { DEFAULT_ENGINE_THRESHOLDS, type EngineThresholds } from "../src/engine/autoregulation";
 import { tapLight, tapSuccess } from "../src/lib/haptics";
 import {
   DEFAULT_TEAM_COLORS,
@@ -16,7 +17,73 @@ import { useAppStore } from "../src/stores/useAppStore";
  * color drives accents, buttons, and the header, and every text surface
  * automatically uses whichever team color is most visible on it (with a
  * black/white fallback when neither reads). White + forest green by default.
+ *
+ * Phase 10 adds plan-adjustment tuning: the athlete (with a parent or coach)
+ * picks a sensitivity preset or fine-tunes the exact thresholds the engine
+ * uses. Every value is clamped to a safe range on apply (SPEC §18: stored
+ * parameters, never hardcoded logic).
  */
+
+/** Sensitivity presets (Phase 10): the shipped default is "Balanced". */
+const ENGINE_PRESETS: ReadonlyArray<{
+  id: "protective" | "balanced" | "performance";
+  label: string;
+  caption: string;
+  thresholds: EngineThresholds | null; // null = shipped defaults
+}> = [
+  {
+    id: "protective",
+    label: "Protective",
+    caption: "Trims the plan sooner — favors full days of rest.",
+    thresholds: {
+      ...DEFAULT_ENGINE_THRESHOLDS,
+      highSessionLoad: 700,
+      highCumulative24hLoad: 1000,
+      readinessScoreYellowMax: 6,
+    },
+  },
+  {
+    id: "balanced",
+    label: "Balanced",
+    caption: "The recommended fit for most athletes.",
+    thresholds: null,
+  },
+  {
+    id: "performance",
+    label: "Performance",
+    caption: "Trims the plan later — keeps more hard days.",
+    thresholds: {
+      ...DEFAULT_ENGINE_THRESHOLDS,
+      highSessionLoad: 850,
+      highCumulative24hLoad: 1300,
+      readinessScoreYellowMax: 5,
+    },
+  },
+];
+
+interface NumberFieldProps {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function NumberField({ label, hint, value, onChange }: NumberFieldProps) {
+  return (
+    <View className="gap-1">
+      <Text className="text-sm font-bold text-strong">{label}</Text>
+      <Text className="text-xs text-faint">{hint}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        className="h-12 rounded-lg border border-edge bg-edge-soft px-3 text-sm text-body"
+        value={value}
+        keyboardType="decimal-pad"
+        autoCorrect={false}
+        onChangeText={onChange}
+      />
+    </View>
+  );
+}
 
 const SWATCHES: ReadonlyArray<{ name: string; hex: string }> = [
   { name: "Forest green", hex: "#228B22" },
@@ -121,13 +188,181 @@ function ColorSlot({ title, caption, value, onSelect }: SlotProps) {
   );
 }
 
+/** Every tunable knob with its safe range (SPEC §18). */
+type TunableKey =
+  | "highSessionLoad"
+  | "highCumulative24hLoad"
+  | "readinessScoreYellowMax"
+  | "carriedSorenessCarryDays"
+  | "cnsModerateRatio"
+  | "cnsSignificantRatio"
+  | "cnsBaselineWindowDays"
+  | "cnsMinBaselineDays"
+  | "cnsMinTaps"
+  | "cnsMaxTaps"
+  | "cnsMaxTrialsPerDay";
+
+const TUNABLE_FIELDS: ReadonlyArray<{
+  key: TunableKey;
+  label: string;
+  hint: string;
+  min: number;
+  max: number;
+  isRatio?: boolean;
+}> = [
+  {
+    key: "highSessionLoad",
+    label: "Big single-session load",
+    hint: "Hardness × minutes for one session that triggers a lighter next day.",
+    min: 100,
+    max: 5000,
+  },
+  {
+    key: "highCumulative24hLoad",
+    label: "Big day total",
+    hint: "Combined load across 24 hours that triggers a lighter next day.",
+    min: 200,
+    max: 8000,
+  },
+  {
+    key: "readinessScoreYellowMax",
+    label: "Low check-in score limit",
+    hint: "Check-in scores at or below this keep the day from being fully green (0–9).",
+    min: 0,
+    max: 9,
+  },
+  {
+    key: "carriedSorenessCarryDays",
+    label: "Soreness carry-over days",
+    hint: "How many days a post-session body map keeps shaping later workouts (0–7).",
+    min: 0,
+    max: 7,
+  },
+  {
+    key: "cnsModerateRatio",
+    label: "Tap test — 'slightly below' line",
+    hint: "Today's taps ÷ baseline at or above this counts as fresh (0.5–1.0).",
+    min: 0.5,
+    max: 1,
+    isRatio: true,
+  },
+  {
+    key: "cnsSignificantRatio",
+    label: "Tap test — 'well below' line",
+    hint: "Below this ratio the day goes strongly lighter (0.5–1.0).",
+    min: 0.5,
+    max: 1,
+    isRatio: true,
+  },
+  {
+    key: "cnsBaselineWindowDays",
+    label: "Tap test — baseline window",
+    hint: "How many past days feed the personal baseline (3–60).",
+    min: 3,
+    max: 60,
+  },
+  {
+    key: "cnsMinBaselineDays",
+    label: "Tap test — days needed",
+    hint: "Distinct test days required before comparisons start (1–14).",
+    min: 1,
+    max: 14,
+  },
+  {
+    key: "cnsMinTaps",
+    label: "Tap test — lowest valid count",
+    hint: "Trials under this many taps don't count (5–300).",
+    min: 5,
+    max: 300,
+  },
+  {
+    key: "cnsMaxTaps",
+    label: "Tap test — highest valid count",
+    hint: "Trials over this many taps don't count (5–300).",
+    min: 5,
+    max: 300,
+  },
+  {
+    key: "cnsMaxTrialsPerDay",
+    label: "Tap test — trials per day",
+    hint: "How many attempts are allowed each day; the best one counts (1–10).",
+    min: 1,
+    max: 10,
+  },
+];
+
+const THRESHOLD_KEYS = Object.keys(DEFAULT_ENGINE_THRESHOLDS) as (keyof EngineThresholds)[];
+
+function sameThresholds(a: EngineThresholds, b: EngineThresholds): boolean {
+  return THRESHOLD_KEYS.every((key) => a[key] === b[key]);
+}
+
+function draftFrom(t: EngineThresholds): Record<TunableKey, string> {
+  const draft = {} as Record<TunableKey, string>;
+  for (const field of TUNABLE_FIELDS) {
+    draft[field.key] = String(t[field.key]);
+  }
+  return draft;
+}
+
+/** Parses a draft string and clamps it into the field's safe range. */
+function clampDraft(field: (typeof TUNABLE_FIELDS)[number], raw: string): number {
+  const parsed = Number(raw.trim().replace(",", "."));
+  const value = Number.isFinite(parsed) ? parsed : field.min;
+  const bounded = Math.min(field.max, Math.max(field.min, value));
+  return field.isRatio === true ? bounded : Math.round(bounded);
+}
+
 export default function Settings() {
   const router = useRouter();
   const teamColors = useAppStore((state) => state.teamColors);
   const setTeamColors = useAppStore((state) => state.setTeamColors);
+  const engineThresholds = useAppStore((state) => state.engineThresholds);
+  const setEngineThresholds = useAppStore((state) => state.setEngineThresholds);
+  const resetEngineThresholds = useAppStore((state) => state.resetEngineThresholds);
+
+  const effectiveThresholds = engineThresholds ?? DEFAULT_ENGINE_THRESHOLDS;
+  const [draft, setDraft] = useState<Record<TunableKey, string>>(() =>
+    draftFrom(effectiveThresholds),
+  );
+  const [applied, setApplied] = useState(false);
 
   const update = (patch: Partial<TeamColors>) => {
     setTeamColors({ ...teamColors, ...patch });
+  };
+
+  const activePresetId =
+    ENGINE_PRESETS.find((preset) =>
+      preset.thresholds === null
+        ? engineThresholds === null
+        : engineThresholds !== null && sameThresholds(preset.thresholds, engineThresholds),
+    )?.id ?? "custom";
+
+  const applyPreset = (preset: (typeof ENGINE_PRESETS)[number]) => {
+    tapSuccess();
+    setApplied(false);
+    if (preset.thresholds === null) {
+      resetEngineThresholds();
+      setDraft(draftFrom(DEFAULT_ENGINE_THRESHOLDS));
+      return;
+    }
+    const next = { ...preset.thresholds };
+    setEngineThresholds(next);
+    setDraft(draftFrom(next));
+  };
+
+  const applyTuning = () => {
+    const next: EngineThresholds = { ...effectiveThresholds };
+    for (const field of TUNABLE_FIELDS) {
+      next[field.key] = clampDraft(field, draft[field.key]);
+    }
+    // Keep the paired knobs in a sane order after clamping.
+    next.cnsSignificantRatio = Math.min(next.cnsSignificantRatio, next.cnsModerateRatio);
+    next.cnsMinTaps = Math.min(next.cnsMinTaps, next.cnsMaxTaps);
+    setEngineThresholds(next);
+    setDraft(draftFrom(next));
+    setApplied(true);
+    tapSuccess();
   };
 
   return (
@@ -166,6 +401,81 @@ export default function Settings() {
       >
         <Text className="text-sm font-black text-body">Reset to white + forest green</Text>
       </Pressable>
+
+      {/* ── Phase 10: plan-adjustment tuning ── */}
+      <View className="rounded-2xl border-2 border-modulate-line bg-modulate-soft p-4">
+        <Text className="text-lg font-black text-modulate">Plan adjustments 🎛️</Text>
+        <Text className="mt-1 text-sm leading-5 text-body">
+          These numbers decide when the app trims a training day. Balanced fits
+          most athletes. Pick a preset, or fine-tune below — every value is
+          clamped to a safe range when you apply.
+        </Text>
+      </View>
+
+      <View className="gap-2">
+        {ENGINE_PRESETS.map((preset) => {
+          const selected = activePresetId === preset.id;
+          return (
+            <Pressable
+              key={preset.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Preset ${preset.label}`}
+              accessibilityState={{ selected }}
+              onPress={() => applyPreset(preset)}
+              className={`min-h-[56px] rounded-xl border-2 p-3 ${
+                selected ? "border-go-line bg-go-soft" : "border-edge bg-card"
+              }`}
+            >
+              <Text className="text-sm font-black text-strong">
+                {preset.label}{selected ? " ✓" : ""}
+              </Text>
+              <Text className="text-xs text-faint">{preset.caption}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View className="rounded-2xl border border-edge bg-card p-4 gap-4">
+        <Text className="text-sm font-black text-strong">Fine-tune the numbers</Text>
+        {TUNABLE_FIELDS.map((field) => (
+          <NumberField
+            key={field.key}
+            label={field.label}
+            hint={field.hint}
+            value={draft[field.key]}
+            onChange={(value) => {
+              setDraft((current) => ({ ...current, [field.key]: value }));
+              setApplied(false);
+            }}
+          />
+        ))}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Apply tuning"
+          onPress={applyTuning}
+          className="h-12 items-center justify-center rounded-lg bg-accent px-4"
+        >
+          <Text className="text-sm font-black text-onaccent">Apply tuning</Text>
+        </Pressable>
+        {applied ? (
+          <Text className="text-xs font-semibold text-go">
+            Applied ✓ — today's plan already uses these numbers.
+          </Text>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reset plan adjustments to recommended defaults"
+          onPress={() => {
+            tapSuccess();
+            setApplied(false);
+            resetEngineThresholds();
+            setDraft(draftFrom(DEFAULT_ENGINE_THRESHOLDS));
+          }}
+          className="h-12 min-w-[48px] items-center justify-center rounded-lg border-2 border-edge px-4"
+        >
+          <Text className="text-sm font-black text-body">Reset to recommended defaults</Text>
+        </Pressable>
+      </View>
 
       <Pressable
         accessibilityRole="button"

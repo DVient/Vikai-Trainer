@@ -6,9 +6,10 @@ import { todaySteps, type DayStep, type FlowInput, type StepId } from "../src/li
 /** Derives the steps and unpacks them into named, defined references. */
 function makeSteps(
   overrides: Partial<FlowInput> = {},
-): { checkin: DayStep; gamePlan: DayStep; log: DayStep; order: StepId[] } {
+): { checkin: DayStep; cns: DayStep; gamePlan: DayStep; log: DayStep; order: StepId[] } {
   const steps = todaySteps({
     hasCheckedInToday: false,
+    hasTapTestToday: false,
     hasWorkoutLogToday: false,
     activityPartition: { pre: [], post: [] },
     ...overrides,
@@ -20,6 +21,7 @@ function makeSteps(
   };
   return {
     checkin: pick("checkin"),
+    cns: pick("cns"),
     gamePlan: pick("gamePlan"),
     log: pick("log"),
     order: steps.map((entry) => entry.id),
@@ -27,29 +29,43 @@ function makeSteps(
 }
 
 describe("todaySteps — the guided daily sequence", () => {
-  it("runs check-in → log activities → game plan", () => {
-    // Activities come BEFORE the workout in the flow: they shape its volume.
-    expect(makeSteps().order).toEqual(["checkin", "log", "gamePlan"]);
+  it("runs check-in → tap test → log activities → game plan", () => {
+    // The tap test sits right after the check-in: its result blends with the
+    // survey answers (Phase 10). Activities come BEFORE the workout in the
+    // flow: they shape its volume.
+    expect(makeSteps().order).toEqual(["checkin", "cns", "log", "gamePlan"]);
   });
 
   it("starts at step 1 with later steps locked on a fresh install", () => {
-    const { checkin, gamePlan, log } = makeSteps();
+    const { checkin, cns, gamePlan, log } = makeSteps();
 
     expect(checkin.state).toBe("active");
+    expect(cns.state).toBe("locked");
+    expect(cns.subtitle).toBe("After your check-in");
     expect(gamePlan.state).toBe("locked");
     expect(gamePlan.subtitle).toBe("Unlock with your check-in");
     expect(log.state).toBe("locked");
   });
 
-  it("unlocks the activity and plan steps after the check-in", () => {
-    const { checkin, gamePlan, log } = makeSteps({ hasCheckedInToday: true });
+  it("unlocks the tap-test, activity, and plan steps after the check-in", () => {
+    const { checkin, cns, gamePlan, log } = makeSteps({ hasCheckedInToday: true });
 
     expect(checkin.state).toBe("done");
     expect(checkin.subtitle).toContain("update anytime");
+    expect(cns.state).toBe("active");
+    expect(cns.subtitle).toBe("Tap fast for 10 sec — measure your freshness");
     expect(gamePlan.state).toBe("active");
     expect(gamePlan.subtitle).toBe("Log earlier activities first");
     expect(log.state).toBe("active");
     expect(log.subtitle).toBe("Before you train — anything on your legs today?");
+  });
+
+  it("marks the tap-test step done once today's trial is logged", () => {
+    const { cns } = makeSteps({ hasCheckedInToday: true, hasTapTestToday: true });
+
+    expect(cns.state).toBe("done");
+    expect(cns.subtitle).toBe("Logged for today ✓");
+    expect(cns.route).toBe("/finger-tap");
   });
 
   it("completes the log step with a pre-workout activity and updates the plan nudge", () => {
@@ -77,8 +93,9 @@ describe("todaySteps — the guided daily sequence", () => {
   });
 
   it("completes the whole loop when everything is done", () => {
-    const { checkin, gamePlan, log } = makeSteps({
+    const { checkin, cns, gamePlan, log } = makeSteps({
       hasCheckedInToday: true,
+      hasTapTestToday: true,
       hasWorkoutLogToday: true,
       activityPartition: {
         pre: [{ activityDate: "2026-01-02", createdAt: "2026-01-02T15:00:00.000Z" }],
@@ -87,12 +104,14 @@ describe("todaySteps — the guided daily sequence", () => {
     });
 
     expect(checkin.state).toBe("done");
+    expect(cns.state).toBe("done");
     expect(gamePlan.state).toBe("done");
     expect(log.state).toBe("done");
   });
 
   it("always exposes the same routes so any step can be revisited", () => {
     expect(makeSteps().checkin.route).toBe("/checkin");
+    expect(makeSteps().cns.route).toBe("/finger-tap");
     expect(makeSteps().gamePlan.route).toBe("/workout");
     expect(makeSteps().log.route).toBe("/practice-log");
   });

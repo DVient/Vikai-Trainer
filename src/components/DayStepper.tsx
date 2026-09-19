@@ -5,8 +5,8 @@ import type { DayStep, StepId } from "../lib/flow";
 
 /**
  * "Your Day" stepper (design iteration): the guided sequence on the Home Hub
- * — check in → Game Plan → log it. Active step glows GO-green, done steps
- * carry a ✓, locked steps show the padlock and what unlocks them.
+ * — check in → tap test → log it → Game Plan. Active step glows GO-green,
+ * done steps carry a ✓, locked steps show the padlock and what unlocks them.
  */
 
 interface DayStepperProps {
@@ -20,7 +20,7 @@ export function DayStepper({ steps, gamePlanSummary, onStepPress }: DayStepperPr
   return (
     <View className="rounded-2xl border border-edge bg-card p-4 gap-2">
       <Text className="text-xs font-bold uppercase tracking-widest text-faint">
-        Your day — 3 steps
+        Your day — {steps.length} steps
       </Text>
       {steps.map((step, index) => (
         <StepRow

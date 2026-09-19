@@ -6,7 +6,7 @@ import { OptionCard } from "../src/components/OptionCard";
 import { BodyMap } from "../src/components/BodyMap";
 import { Toast } from "../src/components/Toast";
 import { toLocalDateString } from "../src/engine/autoregulation";
-import { tapHeavy, tapSuccess } from "../src/lib/haptics";
+import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { useAppStore } from "../src/stores/useAppStore";
 import type { EnergyAnchor, JointStatus, SleepAnchor, SoreArea } from "../src/types";
 
@@ -185,6 +185,25 @@ export default function CheckIn() {
           Save check-in
         </Text>
       </Pressable>
+
+      {/* Phase 10 — the tap test pairs with the check-in: one objective
+          signal, one self-report. Offered right after a save, once per
+          screen visit; the Home stepper carries it the rest of the day. */}
+      {canSave ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Run the 10-second tap test"
+          onPress={() => {
+            tapLight();
+            router.navigate("/finger-tap");
+          }}
+          className="min-h-[48px] items-center justify-center rounded-xl border-2 border-go-line bg-go-soft"
+        >
+          <Text className="text-sm font-bold text-go">
+            Next: 10-second tap test ⚡ (optional, 10 sec)
+          </Text>
+        </Pressable>
+      ) : null}
 
       <Toast message={toast} />
       </ScrollView>

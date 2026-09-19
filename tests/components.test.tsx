@@ -154,6 +154,7 @@ import Index from "../app/index";
 import About from "../app/about";
 import Plan from "../app/plan";
 import CheckIn from "../app/checkin";
+import FingerTapTest from "../app/finger-tap";
 import PracticeLog from "../app/practice-log";
 import Workout from "../app/workout";
 import History from "../app/history";
@@ -240,6 +241,8 @@ function resetStore(): void {
     personalBests: [],
     teamColors: DEFAULT_TEAM_COLORS,
     backfillNudgesDismissed: [],
+    fingerTapTrials: [],
+    engineThresholds: null,
   });
   searchParamsMock.eventId = undefined;
   searchParamsMock.date = undefined;
@@ -351,13 +354,15 @@ describe("home hub (app/index)", () => {
   it("guides the sequence: step 1 active, later steps locked until check-in", () => {
     render(<Index />);
 
-    expect(screen.getByText("Your day — 3 steps")).toBeTruthy();
+    expect(screen.getByText("Your day — 4 steps")).toBeTruthy();
     expect(screen.getByText("1. 3-Tap Check-In")).toBeTruthy();
     expect(screen.getByText("Unlock your power — under 5 sec")).toBeTruthy();
+    // Phase 10: the tap test sits between the check-in and activity logging.
+    expect(screen.getByText("2. 10-second tap test")).toBeTruthy();
     // Activities come BEFORE the Game Plan: they shape its volume.
-    expect(screen.getByText("2. Log your activities")).toBeTruthy();
-    expect(screen.getByText("After your check-in")).toBeTruthy();
-    expect(screen.getByText("3. Complete your Game Plan")).toBeTruthy();
+    expect(screen.getByText("3. Log your activities")).toBeTruthy();
+    expect(screen.getAllByText("After your check-in")).toHaveLength(2); // tap test + log
+    expect(screen.getByText("4. Complete your Game Plan")).toBeTruthy();
     expect(screen.getByText("Unlock with your check-in")).toBeTruthy();
   });
 
@@ -387,10 +392,13 @@ describe("home hub (app/index)", () => {
     fireEvent.click(screen.getByText("1. 3-Tap Check-In"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/checkin");
 
-    fireEvent.click(screen.getByText("2. Log your activities"));
+    fireEvent.click(screen.getByText("2. 10-second tap test"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/finger-tap");
+
+    fireEvent.click(screen.getByText("3. Log your activities"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
 
-    fireEvent.click(screen.getByText("3. Complete your Game Plan"));
+    fireEvent.click(screen.getByText("4. Complete your Game Plan"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
 
     fireEvent.click(screen.getByLabelText("Log an activity"));
@@ -890,6 +898,71 @@ describe("check-in body map (Phase 7)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save check-in" }));
 
     expect(useAppStore.getState().readinessInputs[0]?.soreAreas).toBeUndefined();
+  });
+});
+
+describe("10-second tap test (app/finger-tap, Phase 10)", () => {
+  // The screen's 10-second window needs REAL timer faking (interval + Date
+  // moving together); the file-level setup fakes Date alone.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-01-05T15:00:00.000Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("runs the 10-second window, auto-saves the trial, and shows the result", () => {
+    render(<FingerTapTest />);
+
+    fireEvent.click(screen.getByLabelText("Start the 10-second tap test"));
+    expect(screen.getByText("Taps: 0")).toBeTruthy();
+    expect(screen.getByText("10.0s left")).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    // The window closes; an implausible 0-tap run is flagged in the result
+    // view but still lands in history — the engine filters validity itself.
+    expect(screen.getByText("0 taps")).toBeTruthy();
+    expect(screen.getByText(/That run looks off/)).toBeTruthy();
+    expect(screen.getByText("Not tested yet")).toBeTruthy();
+    expect(useAppStore.getState().fingerTapTrials).toHaveLength(1);
+  });
+
+  it("offers a re-test while trials remain, and routes home from Done", () => {
+    useAppStore
+      .getState()
+      .addFingerTapTrial({ localDate: localDate(0), timezone: TIMEZONE, tapCount: 80 });
+
+    render(<FingerTapTest />);
+
+    fireEvent.click(screen.getByLabelText("Start the 10-second tap test"));
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    // The just-saved trial counts too: 2 used of 3 ⇒ 1 attempt left.
+    expect(screen.getByText(/Test again \(1 left today\)/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Done — back to home"));
+    expect(routerMock.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("blocks a fourth attempt once the per-day trial guard is spent", () => {
+    for (let i = 0; i < 3; i += 1) {
+      useAppStore
+        .getState()
+        .addFingerTapTrial({ localDate: localDate(0), timezone: TIMEZONE, tapCount: 80 });
+    }
+
+    render(<FingerTapTest />);
+
+    expect(screen.getByText("No trials left today")).toBeTruthy();
+    expect(screen.getByText(/Trials used today: 3 of 3/)).toBeTruthy();
+    // The start button is still labeled but disabled (locked, not hidden).
+    const startButton = screen.getByLabelText("Start the 10-second tap test");
+    expect(startButton.getAttribute("aria-disabled")).toBe("true");
   });
 });
 

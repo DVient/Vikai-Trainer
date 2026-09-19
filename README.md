@@ -11,6 +11,7 @@ VIKAI builds each athlete's training day around *them*: how they slept, how thei
 ## What it does
 
 - **3-Tap Check-In → Ready State** — three taps (sleep, body feel, energy) charge the Home "battery": **Full Send 🔥 100%**, **Power Save 🌙** (scaled sets), or **Shielded 🛡️ 0%**. GREEN can never display without today's check-in.
+- **10-second tap test ⚡** — an objective freshness check: tap as fast as you can for 10 seconds and the app compares your speed against your own recent best (never other people). When the tap test and your check-in agree you're running low, the day leans lighter — two independent signals beat one.
 - **Daily Game Plan** — the generator maps the engine's restrictions onto a training template: high-load blocks scale down first, focus areas keep their work longest, and pain immediately shields the athlete (an adult check-in is requested — never a push-through).
 - **Live check-offs** — check blocks off as you go; logging a practice mid-session re-scales the remaining volume in place. Completed blocks keep credit and stay undoable.
 - **My Plan builder** — a preset persona (Jump higher, Get stronger, Faster first step, Two-way engine, All-round, or a skills-first focus) or a customized plan (up to 3 focus areas + 1–3 basketball skills, 4–12 weeks). Plans ramp +8%/week, deload every fourth week, taper the final week, and start at a level matched to recent training history.

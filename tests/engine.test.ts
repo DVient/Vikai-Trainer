@@ -12,6 +12,7 @@ import {
   type ActivityLog,
   type AthleteProfile,
   type EngineInput,
+  type FingerTapTrial,
   type ReadinessInput,
   type ScheduledEvent,
 } from "../src/types";
@@ -19,7 +20,9 @@ import {
 /**
  * Phase 2.2 — Engine unit test suite (FLOW 2.2 / SPEC §37).
  * Covers: pain override, game protection windows, workload triggers,
- * single & multiple readiness concerns, and pure-function determinism.
+ * single & multiple readiness concerns, pure-function determinism, and the
+ * Phase 10 finger-tap × survey fusion (SPEC §11.2) with its recalibrated
+ * workload defaults (750 / 1100) and tightened arithmetic band (≤ 5).
  */
 
 const NOW = new Date("2026-01-02T12:00:00.000Z");
@@ -81,6 +84,26 @@ function makeGame(hoursFromNow: number): ScheduledEvent {
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };
+}
+
+/** Phase 10 — a 10-second tap trial on a given local date. */
+function makeTapTrial(localDate: string, tapCount: number, id?: string): FingerTapTrial {
+  return {
+    id: id ?? `tap-${localDate}-${tapCount}`,
+    localDate,
+    timezone: TZ,
+    recordedAt: `${localDate}T12:00:00.000Z`,
+    tapCount,
+  };
+}
+
+/** Three prior days at 80 taps each ⇒ baseline = median-of-top-3 = 80. */
+function makeBaselineTrials(tapsPerDay = 80): FingerTapTrial[] {
+  return [
+    makeTapTrial("2025-12-30", tapsPerDay),
+    makeTapTrial("2025-12-31", tapsPerDay),
+    makeTapTrial("2026-01-01", tapsPerDay),
+  ];
 }
 
 /** Clean baseline: check-in present, no activities, no upcoming events. */
@@ -236,7 +259,7 @@ describe("game protection windows (precedence 3, SPEC §17)", () => {
     const result = evaluateAutoregulationEngine(
       makeInput({
         upcomingEvents: [makeGame(30)],
-        recentActivities: [makeActivity({ sessionRpe: 7, durationMinutes: 100 })],
+        recentActivities: [makeActivity({ sessionRpe: 7, durationMinutes: 110 })], // 770
       }),
     );
 
@@ -313,18 +336,18 @@ describe("game protection windows (precedence 3, SPEC §17)", () => {
 });
 
 describe("recent workload triggers (precedence 4, RPE × Duration)", () => {
-  it("does not trigger below the 700 single-session threshold", () => {
+  it("does not trigger below the 750 single-session threshold (Phase 10 recalibration)", () => {
     const result = evaluateAutoregulationEngine(
-      makeInput({ recentActivities: [makeActivity({ sessionRpe: 3, durationMinutes: 233 })] }),
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 74 })] }),
     );
 
     expect(result.reasons).not.toContain("HIGH_RECENT_WORKLOAD");
     expect(result.status).toBe("GREEN");
   });
 
-  it("triggers at exactly RPE × Duration = 700", () => {
+  it("triggers at exactly RPE × Duration = 750 (a typical 90-min RPE-8 practice no longer fires)", () => {
     const result = evaluateAutoregulationEngine(
-      makeInput({ recentActivities: [makeActivity({ sessionRpe: 7, durationMinutes: 100 })] }),
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 75 })] }),
     );
 
     expect(result.status).toBe("YELLOW");
@@ -334,12 +357,21 @@ describe("recent workload triggers (precedence 4, RPE × Duration)", () => {
     expect(result.restrictions.highImpactAllowed).toBe(false);
   });
 
-  it("triggers on cumulative 24h load reaching the configured sum", () => {
+  it("keeps a typical 90-minute RPE-8 practice (720) GREEN", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 8, durationMinutes: 90 })] }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
+
+  it("triggers on cumulative 24h load reaching the configured sum (550 + 550 = 1100)", () => {
     const result = evaluateAutoregulationEngine(
       makeInput({
         recentActivities: [
-          makeActivity({ id: "a", sessionRpe: 5, durationMinutes: 100 }),
-          makeActivity({ id: "b", sessionRpe: 5, durationMinutes: 100 }),
+          makeActivity({ id: "a", sessionRpe: 5, durationMinutes: 110 }), // 550
+          makeActivity({ id: "b", sessionRpe: 5, durationMinutes: 110 }), // 550
         ],
       }),
     );
@@ -352,7 +384,7 @@ describe("recent workload triggers (precedence 4, RPE × Duration)", () => {
       makeInput({
         recentActivities: [
           makeActivity({ id: "a", sessionRpe: 6, durationMinutes: 115 }), // 690
-          makeActivity({ id: "b", sessionRpe: 3, durationMinutes: 10 }), // 30
+          makeActivity({ id: "b", sessionRpe: 3, durationMinutes: 10 }), // 30 → 720 total
         ],
       }),
     );
@@ -396,18 +428,18 @@ describe("recent workload triggers (precedence 4, RPE × Duration)", () => {
     expect(result.reasons).toEqual(["HIGH_RECENT_WORKLOAD"]);
   });
 
-  it("triggers at the boundary from the top: RPE 10 × 70 minutes = 700 (SPEC §37)", () => {
+  it("triggers at the boundary from the top: RPE 10 × 75 minutes = 750 (SPEC §37)", () => {
     const result = evaluateAutoregulationEngine(
-      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 70 })] }),
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 75 })] }),
     );
 
     expect(result.status).toBe("YELLOW");
     expect(result.reasons).toEqual(["HIGH_RECENT_WORKLOAD"]);
   });
 
-  it("does not trigger just below the boundary at maximum RPE: 10 × 69 = 690", () => {
+  it("does not trigger just below the boundary at maximum RPE: 10 × 74 = 740", () => {
     const result = evaluateAutoregulationEngine(
-      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 69 })] }),
+      makeInput({ recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 74 })] }),
     );
 
     expect(result.status).toBe("GREEN");
@@ -473,7 +505,7 @@ describe("sleep & energy anchors and readiness scoring (precedence 5–6)", () =
     expect(result.restrictions.maxTrainingDurationMinutes).toBe(60);
   });
 
-  it("escalates via the arithmetic band at score 6", () => {
+  it("stays GREEN at score 6 (Phase 10: never reduced on soft anchors alone)", () => {
     const result = evaluateAutoregulationEngine(
       makeInput({
         readiness: makeReadiness({
@@ -482,6 +514,26 @@ describe("sleep & energy anchors and readiness scoring (precedence 5–6)", () =
           energyAnchor: "NORMAL",
         }),
       }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
+
+  it("re-arms the arithmetic band when a custom threshold raises the limit", () => {
+    const thresholds: EngineThresholds = {
+      ...DEFAULT_ENGINE_THRESHOLDS,
+      readinessScoreYellowMax: 6,
+    };
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({
+          sleepAnchor: "SEVEN_TO_EIGHT_HRS",
+          jointStatus: "MILD_STIFFNESS",
+          energyAnchor: "NORMAL",
+        }),
+      }),
+      thresholds,
     );
 
     expect(result.status).toBe("YELLOW");
@@ -690,5 +742,235 @@ describe("body-map soreness (Phase 7, status-neutral Phase 9.8)", () => {
     const second = evaluateAutoregulationEngine(input);
 
     expect(second).toEqual(first);
+  });
+});
+
+describe("finger-tap × survey fusion (Phase 10, SPEC §11.2)", () => {
+  it("SIGNIFICANT + clean survey ⇒ solid reduction (0.7 / 0.8, cap 60)", () => {
+    // 67/80 = 0.8375 < 0.85 ⇒ SIGNIFICANT; check-in is perfect ⇒ clean.
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 67)],
+      }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toEqual(["CNS_FATIGUE_FLAGGED"]);
+    expect(result.restrictions).toMatchObject({
+      lowerBodyAllowed: true,
+      lowerBodyScale: 0.7,
+      upperBodyAllowed: true,
+      upperBodyScale: 0.8,
+      plyometricsAllowed: false,
+      highImpactAllowed: false,
+      maxTrainingDurationMinutes: 60,
+    });
+  });
+
+  it("SIGNIFICANT + flagged survey ⇒ strongest reduction (0.6 / 0.7, cap 45)", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({ sleepAnchor: "UNDER_7_HRS" }),
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 67)],
+      }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toEqual(["CNS_FATIGUE_FLAGGED", "LOW_SLEEP"]);
+    expect(result.restrictions).toMatchObject({
+      lowerBodyScale: 0.6, // min(0.6 tap, 0.7 sleep)
+      upperBodyScale: 0.7, // min(0.7 tap, 0.8 sleep)
+      plyometricsAllowed: false,
+      highImpactAllowed: false,
+      maxTrainingDurationMinutes: 45, // min(45 tap, 75 sleep)
+    });
+  });
+
+  it("MODERATE + clean survey ⇒ light trim (0.8 / 0.85, cap 75)", () => {
+    // 75/80 = 0.9375 ⇒ MODERATE.
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 75)],
+      }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toEqual(["CNS_FATIGUE_FLAGGED"]);
+    expect(result.restrictions).toMatchObject({
+      lowerBodyScale: 0.8,
+      upperBodyScale: 0.85,
+      plyometricsAllowed: false,
+      highImpactAllowed: false,
+      maxTrainingDurationMinutes: 75,
+    });
+  });
+
+  it("MODERATE + flagged survey ⇒ strong-lite (0.65 / 0.75, cap 60)", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({ energyAnchor: "DRAINED" }),
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 75)],
+      }),
+    );
+
+    expect(result.status).toBe("YELLOW");
+    expect(result.reasons).toEqual(["CNS_FATIGUE_FLAGGED", "LOW_ENERGY"]);
+    expect(result.restrictions).toMatchObject({
+      lowerBodyScale: 0.65, // min(0.65 tap, 0.7 energy)
+      upperBodyScale: 0.75,
+      maxTrainingDurationMinutes: 60,
+    });
+  });
+
+  it("FRESH ⇒ no tap rule: the day keeps its survey-driven outcome untouched", () => {
+    // 76/80 = 0.95 ⇒ FRESH (inside the noise band).
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 76)],
+      }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
+
+  it("NO_BASELINE ⇒ no tap rule until enough distinct days exist", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        fingerTapTrials: [
+          makeTapTrial("2025-12-31", 80),
+          makeTapTrial("2026-01-01", 80),
+          makeTapTrial(TODAY, 40),
+        ],
+      }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
+
+  it("NOT_TESTED ⇒ no tap rule", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({ fingerTapTrials: makeBaselineTrials() }),
+    );
+
+    expect(result.status).toBe("GREEN");
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+  });
+
+  it("never softens a survey-driven reduction — tap only adds protection", () => {
+    // Low sleep alone: 0.7 / 0.8, cap 75. A FRESH tap day must not change it.
+    const withoutTap = evaluateAutoregulationEngine(
+      makeInput({ readiness: makeReadiness({ sleepAnchor: "UNDER_7_HRS" }) }),
+    );
+    const withFreshTap = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({ sleepAnchor: "UNDER_7_HRS" }),
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 80)],
+      }),
+    );
+
+    expect(withFreshTap.reasons).toEqual(["LOW_SLEEP"]);
+    expect(withFreshTap.restrictions).toEqual(withoutTap.restrictions);
+  });
+
+  it("uses the best valid trial of the day and ignores implausible counts", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        fingerTapTrials: [
+          ...makeBaselineTrials(),
+          makeTapTrial(TODAY, 5), // invalid: below the 20-tap envelope
+          makeTapTrial(TODAY, 60), // valid
+          makeTapTrial(TODAY, 75), // valid, best ⇒ MODERATE
+        ],
+      }),
+    );
+
+    expect(result.reasons).toEqual(["CNS_FATIGUE_FLAGGED"]);
+    expect(result.restrictions.lowerBodyScale).toBe(0.8);
+  });
+
+  it("sits between workload and sleep/energy in reason precedence", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: makeReadiness({ sleepAnchor: "UNDER_7_HRS" }),
+        recentActivities: [makeActivity({ sessionRpe: 10, durationMinutes: 80 })], // 800
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 67)],
+      }),
+    );
+
+    expect(result.reasons).toEqual([
+      "HIGH_RECENT_WORKLOAD",
+      "CNS_FATIGUE_FLAGGED",
+      "LOW_SLEEP",
+    ]);
+    // Merge keeps the most protective combination (workload 0.6/0.8/cap60
+    // ∧ tap 0.6/0.7/cap45 ∧ sleep 0.7/0.8/cap75).
+    expect(result.restrictions).toMatchObject({
+      lowerBodyScale: 0.6,
+      upperBodyScale: 0.7,
+      maxTrainingDurationMinutes: 45,
+    });
+  });
+
+  it("prices an objective tap signal even without a check-in (status stays CHECKIN_REQUIRED)", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        readiness: undefined,
+        fingerTapTrials: [...makeBaselineTrials(), makeTapTrial(TODAY, 67)],
+      }),
+    );
+
+    expect(result.status).toBe("CHECKIN_REQUIRED");
+    expect(result.reasons).toEqual(["CHECKIN_REQUIRED", "CNS_FATIGUE_FLAGGED"]);
+    expect(result.restrictions).toMatchObject({
+      plyometricsAllowed: false,
+      highImpactAllowed: false,
+      maxTrainingDurationMinutes: 60,
+    });
+    expect(result.recoveryActions).toHaveLength(2);
+  });
+});
+
+describe("carried-soreness carry window (Phase 10)", () => {
+  it("still prices a carried map inside the 2-day window", () => {
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        carriedSoreAreas: ["QUAD"],
+        carriedSoreAreasFrom: "2026-01-01", // yesterday
+      }),
+    );
+
+    expect(result.reasons).toContain("SORENESS_FLAGGED");
+    expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6 });
+  });
+
+  it("expires a carried map older than the window (stale feedback stops pricing)", () => {
+    // Window start = today − 2 = 2025-12-31; a map from 2025-12-30 is out.
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        carriedSoreAreas: ["QUAD"],
+        carriedSoreAreasFrom: "2025-12-30",
+      }),
+    );
+
+    expect(result.reasons).toEqual(["NORMAL_READINESS"]);
+    expect(result.restrictions.sorenessScale).toBeUndefined();
+  });
+
+  it("honors a custom carry-window length", () => {
+    const thresholds: EngineThresholds = {
+      ...DEFAULT_ENGINE_THRESHOLDS,
+      carriedSorenessCarryDays: 5,
+    };
+    const result = evaluateAutoregulationEngine(
+      makeInput({
+        carriedSoreAreas: ["QUAD"],
+        carriedSoreAreasFrom: "2025-12-30", // 3 days back — inside a 5-day window
+      }),
+      thresholds,
+    );
+
+    expect(result.restrictions.sorenessScale).toEqual({ QUAD: 0.6 });
   });
 });

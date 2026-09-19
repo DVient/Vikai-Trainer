@@ -179,7 +179,7 @@ describe("full workflow: check-in → engine → scaling → log → storage", (
       notes: "Practice felt manageable",
     });
 
-    // 420 session load is under the 700 threshold — status unchanged.
+    // 420 session load is under the 750 threshold — status unchanged.
     const view = derive();
     expect(view.result.reasons).toEqual(["UPCOMING_GAME"]);
 
@@ -383,7 +383,7 @@ describe("live session loop: check-offs, mid-session rescaling, finish", () => {
       timezone: TIMEZONE,
       activityType: "TEAM_PRACTICE",
       sessionRpe: 9,
-      durationMinutes: 90, // load 810 ≥ highSessionLoad (700)
+      durationMinutes: 90, // load 810 ≥ highSessionLoad (750)
     });
 
     // Day D+1 check-in with the same good anchors — but the rolling 24h

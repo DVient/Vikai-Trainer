@@ -8,6 +8,7 @@ import {
 import { DEFAULT_ATHLETE_PROFILE } from "../src/config/defaults";
 import { defaultPracticeEventDrafts } from "../src/lib/defaultSchedule";
 import { DEFAULT_TEAM_COLORS } from "../src/lib/theme";
+import { DEFAULT_ENGINE_THRESHOLDS } from "../src/engine/autoregulation";
 import { useAppStore, type VikaiTrainerAppState } from "../src/stores/useAppStore";
 
 /**
@@ -40,6 +41,8 @@ const INITIAL_SLICES = {
   defaultScheduleSeeded: false,
   teamColors: DEFAULT_TEAM_COLORS,
   backfillNudgesDismissed: [],
+  fingerTapTrials: [],
+  engineThresholds: null,
 } satisfies Partial<VikaiTrainerAppState>;
 
 function resetStore(): void {
@@ -517,5 +520,54 @@ describe("missed-day nudge dismissals (Phase 9.12)", () => {
       "2026-01-04",
       "2026-01-03",
     ]);
+  });
+});
+
+describe("finger-tap trials & engine thresholds (Phase 10)", () => {
+  it("appends a tap trial with a generated id and timestamp, full history kept", () => {
+    const first = useAppStore.getState().addFingerTapTrial({
+      localDate: "2026-01-02",
+      timezone: "America/New_York",
+      tapCount: 78,
+    });
+    const second = useAppStore.getState().addFingerTapTrial({
+      localDate: "2026-01-02",
+      timezone: "America/New_York",
+      tapCount: 82,
+    });
+
+    const trials = useAppStore.getState().fingerTapTrials;
+    expect(trials).toHaveLength(2);
+    expect(first.id).toMatch(/^tap-/);
+    expect(first.recordedAt).toBeTruthy();
+    expect(trials.map((entry) => entry.id)).toEqual([first.id, second.id]);
+  });
+
+  it("removes a mistyped tap trial", () => {
+    const trial = useAppStore.getState().addFingerTapTrial({
+      localDate: "2026-01-02",
+      timezone: "America/New_York",
+      tapCount: 78,
+    });
+    useAppStore.getState().removeFingerTapTrial(trial.id);
+
+    expect(useAppStore.getState().fingerTapTrials).toHaveLength(0);
+  });
+
+  it("stores tuned engine thresholds and resets to the shipped defaults (null)", () => {
+    const tuned = {
+      ...DEFAULT_ENGINE_THRESHOLDS,
+      highSessionLoad: 700,
+      highCumulative24hLoad: 1000,
+      readinessScoreYellowMax: 6,
+    };
+    useAppStore.getState().setEngineThresholds(tuned);
+
+    const stored = useAppStore.getState().engineThresholds;
+    expect(stored?.highSessionLoad).toBe(700);
+    expect(stored?.cnsModerateRatio).toBe(DEFAULT_ENGINE_THRESHOLDS.cnsModerateRatio);
+
+    useAppStore.getState().resetEngineThresholds();
+    expect(useAppStore.getState().engineThresholds).toBeNull();
   });
 });

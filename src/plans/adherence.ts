@@ -68,6 +68,12 @@ function localDateMinusDays(localDate: string, days: number): string {
  * `todayLocalDate` within the lookback window. Today's own (possibly
  * partial) session is deliberately excluded — it must never reprice the
  * day it belongs to. Recovery blocks are excluded from both sides.
+ *
+ * Phase 10 zero-checkoff guard: a session date with NO check-offs at all is
+ * skipped entirely — an unchecked-off day is missing data (the athlete may
+ * simply not tick boxes), not proof that every block was skipped. Counting
+ * such days made the completion ratio collapse toward 0 and reduced plan
+ * after plan; only dates with real check-off evidence are judged here.
  */
 export function adherenceSamplesFor(
   plan: BuiltPlan | null,
@@ -82,6 +88,7 @@ export function adherenceSamplesFor(
     ...new Set(workoutLogs.map((entry) => entry.activityDate)),
   ]
     .filter((date) => date >= windowStart && date < todayLocalDate)
+    .filter((date) => Object.keys(workoutProgress[date] ?? {}).length > 0)
     .sort();
 
   const totals = new Map<TrainingGoal, { planned: number; completed: number }>();

@@ -21,8 +21,14 @@
  *      (A game 24–36h out never forces a downgrade by itself; §17 rule 3 —
  *      it only matters through workload/readiness, which are evaluated below.)
  *   4. Recent workload         → session load (RPE × minutes) triggers (§18).
- *   5. Sleep & energy anchors  → single-concern YELLOW states.
- *   6. Arithmetic readiness    → combined-score band check, only reached when
+ *   5. Finger-tap fusion       → objective CNS-freshness tier × survey
+ *      evidence                picks a protection template (§11.2).
+ *   6. Sleep & energy anchors  → single-concern YELLOW states.
+ *   7. Arithmetic readiness    → combined-score band check, only reached when
+ *
+ * The finger-tap rule sits ahead of the survey anchors because an objective
+ * performance decrement outranks self-report in the blend (§11.2); the
+ * merge below still guarantees the most-protective combination overall.
  *      score                   → no earlier readiness rule fired.
  *
  * WINDOW SEMANTICS (documented approximations):
@@ -45,6 +51,7 @@ import type {
   EngineResult,
   EngineStatus,
   JointStatus,
+  ReadinessInput,
   RecentWorkload,
   ScheduledEvent,
   ScheduledEventType,
@@ -53,6 +60,12 @@ import type {
   TrainingRestrictions,
 } from "../types";
 import { isSoreArea } from "../types";
+import {
+  classifyTapTier,
+  DEFAULT_FINGER_TAP_THRESHOLDS,
+  localDateMinusDays,
+  type FingerTapThresholds,
+} from "./fingerTap";
 
 /* ───────────────────── §12 — Arithmetic readiness scoring ─────────────── */
 
@@ -76,7 +89,7 @@ const ENERGY_SCORE: Record<EnergyAnchor, number> = {
 
 /* ────────────── §18 — Configurable thresholds (never hardcoded) ───────── */
 
-export interface EngineThresholds {
+export interface EngineThresholds extends FingerTapThresholds {
   /** Kickoff within this many hours ⇒ imminent-game lock (SPEC §17). */
   imminentGameHours: number;
   /** Kickoff within (imminentGameHours, upcomingGameHours] ⇒ primer day (SPEC §17). */
@@ -95,16 +108,32 @@ export interface EngineThresholds {
    * the overlapping blocks are affected.
    */
   soreAreaScale: number;
+  /**
+   * Phase 10 — how many local days a post-session sore-area map keeps
+   * pricing later workouts (the bridge supplies the source date). A map
+   * older than this no longer applies; the morning body map is unaffected.
+   */
+  carriedSorenessCarryDays: number;
 }
 
+/**
+ * Phase 10 recalibration: workload defaults rise to 750 / 1100 so a single
+ * typical practice (≈ 90 min at RPE 8 = 720) no longer flags the next day on
+ * its own, and the arithmetic band tightens to ≤ 5 so "slept 7–8 h + mildly
+ * stiff + normal energy" (score 6) is no longer an automatic reduction —
+ * two-plus explicit concerns still fire the stricter template. All values
+ * stay configurable (SPEC §18); the Settings screen exposes them.
+ */
 export const DEFAULT_ENGINE_THRESHOLDS: EngineThresholds = {
   imminentGameHours: 12,
   upcomingGameHours: 24,
-  highSessionLoad: 700,
-  highCumulative24hLoad: 1000,
+  highSessionLoad: 750,
+  highCumulative24hLoad: 1100,
   highRpe: 8,
-  readinessScoreYellowMax: 6,
+  readinessScoreYellowMax: 5,
   soreAreaScale: 0.6,
+  ...DEFAULT_FINGER_TAP_THRESHOLDS,
+  carriedSorenessCarryDays: 2,
 };
 
 /* ────────────────────────── Date / window helpers ─────────────────────── */
@@ -360,16 +389,26 @@ function mergeFiredRules(restrictionsList: readonly TrainingRestrictions[]): Tra
 /**
  * Phase 9.7 — the effective sore-area map, from BOTH inputs the athlete
  * gives between workouts: the morning check-in's body map and the sore
- * areas carried in from the last session's close. Deduped, unknown ids
- * dropped. Empty/undefined when nothing is flagged — soreness pricing is
- * then absent from restrictions entirely.
+ * areas carried in from the last session's close. Phase 10 adds a carry
+ * window: when the caller supplies the source session's local date
+ * (`carriedSoreAreasFrom`), a carried map older than
+ * `carriedSorenessCarryDays` no longer prices today — stale feedback must
+ * not reduce days indefinitely. The morning body map is always today's own
+ * input and is never windowed. Deduped, unknown ids dropped. Empty/
+ * undefined when nothing applies.
  */
 function effectiveSorenessScale(
   input: EngineInput,
   areaScale: number,
+  thresholds: EngineThresholds,
 ): Partial<Record<SoreArea, number>> | undefined {
   const morning = input.readiness?.soreAreas ?? [];
-  const carried = input.carriedSoreAreas ?? [];
+  let carried = input.carriedSoreAreas ?? [];
+  if (input.carriedSoreAreasFrom !== undefined) {
+    const today = toLocalDateString(input.now, input.athlete.timezone);
+    const oldestApplicable = localDateMinusDays(today, thresholds.carriedSorenessCarryDays);
+    if (input.carriedSoreAreasFrom < oldestApplicable) carried = [];
+  }
   const areas = [...new Set([...morning, ...carried])].filter(isSoreArea);
   if (areas.length === 0) return undefined;
   const scale: Partial<Record<SoreArea, number>> = {};
@@ -377,6 +416,111 @@ function effectiveSorenessScale(
     scale[area] = areaScale;
   }
   return scale;
+}
+
+/* ───────────── Phase 10 — Finger-tap freshness fusion rule ────────────── */
+
+/**
+ * The survey axis of the Phase 10 fusion: true when ANY survey-based
+ * fatigue evidence exists today (short sleep, drained energy, or a readiness
+ * score inside the arithmetic band). Soreness is deliberately excluded —
+ * it is block-targeted pricing, not a whole-day state (Phase 9.8).
+ */
+export function surveyEvidenceFlagged(
+  readiness: ReadinessInput,
+  thresholds: EngineThresholds,
+): boolean {
+  const score =
+    SLEEP_SCORE[readiness.sleepAnchor] +
+    JOINT_SCORE[readiness.jointStatus] +
+    ENERGY_SCORE[readiness.energyAnchor];
+  return (
+    readiness.sleepAnchor === "UNDER_7_HRS" ||
+    readiness.energyAnchor === "DRAINED" ||
+    score <= thresholds.readinessScoreYellowMax
+  );
+}
+
+/**
+ * Phase 10 — the finger-tap × survey FUSION MATRIX (SPEC §11.2). The
+ * objective tier decides WHETHER the rule fires; the survey axis decides
+ * HOW STRONG the template is:
+ * - SIGNIFICANT + survey evidence ⇒ the strongest reduction (two independent
+ *   channels agree — the high-confidence case in multi-method monitoring).
+ * - SIGNIFICANT alone ⇒ a solid reduction: a real performance decrement
+ *   overrides "feels fine" (athletes normalize; the tap test is the harder
+ *   evidence — the same stance as Phase 8.3's performance-based loading).
+ * - MODERATE + survey evidence ⇒ strong-lite; MODERATE alone ⇒ a light trim.
+ * - FRESH / NO_BASELINE / NOT_TESTED ⇒ no rule: the tap test can only ADD
+ *   protection, never soften a survey-driven reduction (most-protective-wins).
+ * Every flagged cell removes plyometrics AND high-impact conditioning —
+ * central drive powers rate of force development first, so the highest-
+ * neural-demand work is exactly what a decline prices out.
+ */
+export function fingerTapFiredRule(
+  input: EngineInput,
+  thresholds: EngineThresholds,
+  surveyFlagged: boolean,
+): FiredRule | null {
+  const today = toLocalDateString(input.now, input.athlete.timezone);
+  const tap = classifyTapTier(input.fingerTapTrials ?? [], today, thresholds);
+  if (tap.tier !== "MODERATE" && tap.tier !== "SIGNIFICANT") return null;
+  const significant = tap.tier === "SIGNIFICANT";
+
+  const restriction: TrainingRestrictions = significant
+    ? surveyFlagged
+      ? {
+          lowerBodyAllowed: true,
+          lowerBodyScale: 0.6,
+          upperBodyAllowed: true,
+          upperBodyScale: 0.7,
+          plyometricsAllowed: false,
+          highImpactAllowed: false,
+          maxTrainingDurationMinutes: 45,
+        }
+      : {
+          lowerBodyAllowed: true,
+          lowerBodyScale: 0.7,
+          upperBodyAllowed: true,
+          upperBodyScale: 0.8,
+          plyometricsAllowed: false,
+          highImpactAllowed: false,
+          maxTrainingDurationMinutes: 60,
+        }
+    : surveyFlagged
+      ? {
+          lowerBodyAllowed: true,
+          lowerBodyScale: 0.65,
+          upperBodyAllowed: true,
+          upperBodyScale: 0.75,
+          plyometricsAllowed: false,
+          highImpactAllowed: false,
+          maxTrainingDurationMinutes: 60,
+        }
+      : {
+          lowerBodyAllowed: true,
+          lowerBodyScale: 0.8,
+          upperBodyAllowed: true,
+          upperBodyScale: 0.85,
+          plyometricsAllowed: false,
+          highImpactAllowed: false,
+          maxTrainingDurationMinutes: 75,
+        };
+
+  const recoveryAction = significant
+    ? surveyFlagged
+      ? "Tap test well below your best, and your check-in agrees: make today a recovery day."
+      : "Tap test well below your recent best: keep today's training low-stress."
+    : surveyFlagged
+      ? "Tap test trending down and your check-in agrees: keep the day light."
+      : "Tap test slightly below your best: trim the intensity a touch.";
+
+  return {
+    status: "YELLOW",
+    restrictions: restriction,
+    reason: "CNS_FATIGUE_FLAGGED",
+    recoveryAction,
+  };
 }
 
 export function evaluateAutoregulationEngine(
@@ -389,15 +533,31 @@ export function evaluateAutoregulationEngine(
    * the restrictions stop ignoring the athlete's last-known soreness. */
   const readiness = input.readiness;
   if (readiness === undefined) {
-    const carriedScale = effectiveSorenessScale(input, thresholds.soreAreaScale);
+    const carriedScale = effectiveSorenessScale(input, thresholds.soreAreaScale, thresholds);
+    const restrictionsList: TrainingRestrictions[] = [];
+    const reasons: EngineReason[] = ["CHECKIN_REQUIRED"];
+    const recoveryActions: string[] = [
+      "Complete today's readiness check-in to unlock your training status.",
+    ];
+    if (carriedScale !== undefined) {
+      restrictionsList.push({ ...baselineRestrictions(), sorenessScale: carriedScale });
+      reasons.push("SORENESS_FLAGGED");
+    }
+    // Phase 10 — an objective tap signal still prices restrictions while the
+    // day awaits its check-in (mirrors the carried-soreness pattern); the
+    // status semantics stay untouched (§27). Without a survey there is no
+    // survey axis, so the objective-only tier applies.
+    const tapRule = fingerTapFiredRule(input, thresholds, false);
+    if (tapRule !== null) {
+      restrictionsList.push(tapRule.restrictions);
+      reasons.push("CNS_FATIGUE_FLAGGED");
+      recoveryActions.push(tapRule.recoveryAction);
+    }
     return {
       status: "CHECKIN_REQUIRED",
-      restrictions:
-        carriedScale !== undefined
-          ? { ...baselineRestrictions(), sorenessScale: carriedScale }
-          : baselineRestrictions(),
-      reasons: carriedScale !== undefined ? ["CHECKIN_REQUIRED", "SORENESS_FLAGGED"] : ["CHECKIN_REQUIRED"],
-      recoveryActions: ["Complete today's readiness check-in to unlock your training status."],
+      restrictions: restrictionsList.length > 0 ? mergeFiredRules(restrictionsList) : baselineRestrictions(),
+      reasons,
+      recoveryActions,
       requiresAdultAttention: false,
     };
   }
@@ -428,6 +588,23 @@ export function evaluateAutoregulationEngine(
 
   /* Priorities 3–6 — collect every non-pain rule that fires, in precedence order. */
   const fired: FiredRule[] = [];
+
+  /*
+   * Anchors & the arithmetic score are computed once, up front: the single-
+   * concern rules and the arithmetic band below use them, and Phase 10's
+   * finger-tap fusion needs the survey axis (any survey-based fatigue
+   * evidence) to pick its template.
+   */
+  const lowSleep = readiness.sleepAnchor === "UNDER_7_HRS";
+  const lowEnergy = readiness.energyAnchor === "DRAINED";
+  const stiffness = readiness.jointStatus === "MILD_STIFFNESS";
+  const concernCount = (lowSleep ? 1 : 0) + (lowEnergy ? 1 : 0) + (stiffness ? 1 : 0);
+  const score =
+    SLEEP_SCORE[readiness.sleepAnchor] +
+    JOINT_SCORE[readiness.jointStatus] +
+    ENERGY_SCORE[readiness.energyAnchor];
+  const surveyFlagged =
+    lowSleep || lowEnergy || score <= thresholds.readinessScoreYellowMax;
 
   const games = findGameWindows(input.upcomingEvents, input.now, thresholds);
   if (games.imminent) {
@@ -498,10 +675,17 @@ export function evaluateAutoregulationEngine(
     });
   }
 
-  const lowSleep = readiness.sleepAnchor === "UNDER_7_HRS";
-  const lowEnergy = readiness.energyAnchor === "DRAINED";
-  const stiffness = readiness.jointStatus === "MILD_STIFFNESS";
-  const concernCount = (lowSleep ? 1 : 0) + (lowEnergy ? 1 : 0) + (stiffness ? 1 : 0);
+  /*
+   * Phase 10 — objective freshness (finger-tap × survey fusion, SPEC §11.2):
+   * evaluated right after workload, ahead of the survey anchors, because an
+   * objective performance decrement outranks self-report in the blend — the
+   * matrix above decides the template, the merge below keeps the most
+   * protective combination overall.
+   */
+  const tapRule = fingerTapFiredRule(input, thresholds, surveyFlagged);
+  if (tapRule !== null) {
+    fired.push(tapRule);
+  }
 
   if (lowSleep) {
     fired.push({
@@ -547,7 +731,7 @@ export function evaluateAutoregulationEngine(
    * it is block-targeted, not a global day status. The area set unions the
    * morning's body map with the last session's post-session map.
    */
-  const effectiveScale = effectiveSorenessScale(input, thresholds.soreAreaScale);
+  const effectiveScale = effectiveSorenessScale(input, thresholds.soreAreaScale, thresholds);
   if (effectiveScale !== undefined) {
     fired.push({
       status: "YELLOW",
@@ -559,11 +743,15 @@ export function evaluateAutoregulationEngine(
   }
 
   /*
-   * Priority 6 — Arithmetic readiness band (SPEC §12/§15 step 8). Reached only
-   * when no earlier readiness rule fired: with perfect anchors the minimum
-   * score is 7, so a sub-7 score here comes from mild stiffness or combined
-   * moderate anchors (e.g. 2+2+2). Two-plus explicit concerns were already
-   * handled above; their stricter template takes precedence over this one.
+   * Priority 7 — Arithmetic readiness band (SPEC §12/§15 step 8). Reached only
+   * when no earlier readiness rule fired. Phase 10 recalibration: the default
+   * band is ≤ 5, and with no low-sleep/low-energy concern the minimum
+   * reachable score is 6 (7–8 h sleep + mild stiffness + normal energy), so
+   * this arithmetic-only branch is dead code at the defaults — score-6 days
+   * stay GREEN ("never a day reduced without evidence"). It stays
+   * configurable: a higher `readinessScoreYellowMax` re-arms it. Two-plus
+   * explicit concerns were already handled above; their stricter template
+   * takes precedence over this one.
    */
   if (concernCount >= 2) {
     fired.push({
@@ -580,27 +768,21 @@ export function evaluateAutoregulationEngine(
       reason: "MULTIPLE_READINESS_CONCERNS",
       recoveryAction: "Multiple readiness concerns: prioritize full recovery today.",
     });
-  } else if (!lowSleep && !lowEnergy) {
-    const score =
-      SLEEP_SCORE[readiness.sleepAnchor] +
-      JOINT_SCORE[readiness.jointStatus] +
-      ENERGY_SCORE[readiness.energyAnchor];
-    if (score <= thresholds.readinessScoreYellowMax) {
-      fired.push({
-        status: "YELLOW",
-        restrictions: {
-          lowerBodyAllowed: true,
-          lowerBodyScale: 0.6,
-          upperBodyAllowed: true,
-          upperBodyScale: 0.7,
-          plyometricsAllowed: false,
-          highImpactAllowed: false,
-          maxTrainingDurationMinutes: 60,
-        },
-        reason: "MULTIPLE_READINESS_CONCERNS",
-        recoveryAction: `Readiness score is low (${score}/9): favor recovery-focused movement today.`,
-      });
-    }
+  } else if (!lowSleep && !lowEnergy && score <= thresholds.readinessScoreYellowMax) {
+    fired.push({
+      status: "YELLOW",
+      restrictions: {
+        lowerBodyAllowed: true,
+        lowerBodyScale: 0.6,
+        upperBodyAllowed: true,
+        upperBodyScale: 0.7,
+        plyometricsAllowed: false,
+        highImpactAllowed: false,
+        maxTrainingDurationMinutes: 60,
+      },
+      reason: "MULTIPLE_READINESS_CONCERNS",
+      recoveryAction: `Readiness score is low (${score}/9): favor recovery-focused movement today.`,
+    });
   }
 
   /* No rule fired ⇒ GREEN with the arithmetic confirmation. */

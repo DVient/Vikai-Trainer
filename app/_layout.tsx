@@ -105,6 +105,14 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="finger-tap"
+          options={{
+            title: "10-Second Tap Test",
+            headerBackVisible: false,
+            headerLeft: () => <HeaderBack color={roles.onAccent} />,
+          }}
+        />
+        <Stack.Screen
           name="practice-log"
           options={{ title: "Practice Log", headerBackVisible: false, headerLeft: () => <HeaderBack color={roles.onAccent} /> }}
         />

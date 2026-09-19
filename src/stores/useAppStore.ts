@@ -24,6 +24,7 @@ import {
   type AthleteProfile,
   type BuiltPlan,
   type CompletedComponent,
+  type FingerTapTrial,
   type NotificationIdentifiers,
   type NotificationSlot,
   type PersonalBest,
@@ -38,7 +39,7 @@ import { DEFAULT_ATHLETE_PROFILE } from "../config/defaults";
 import { defaultPracticeEventDrafts } from "../lib/defaultSchedule";
 import { DEFAULT_TEAM_COLORS, type TeamColors } from "../lib/theme";
 import { buildPlan, type PlanHistorySnapshot } from "../plans/planBuilder";
-import { toLocalDateString } from "../engine/autoregulation";
+import { DEFAULT_ENGINE_THRESHOLDS, toLocalDateString, type EngineThresholds } from "../engine/autoregulation";
 
 /** Collision-resistant local identifier (no native crypto dependency). */
 function createLocalId(prefix: string): string {
@@ -84,6 +85,16 @@ export interface VikaiTrainerAppState {
    * (one quiet reminder per forgotten day, never nagged twice).
    */
   backfillNudgesDismissed: string[];
+  /**
+   * Phase 10 — finger-tap trial history (10-second test, all local dates).
+   * The objective freshness axis for the engine's fusion rule (SPEC §11.2).
+   */
+  fingerTapTrials: FingerTapTrial[];
+  /**
+   * Phase 10 — athlete-tunable engine thresholds (Settings screen). Null =
+   * shipped defaults; the bridge falls back to DEFAULT_ENGINE_THRESHOLDS.
+   */
+  engineThresholds: EngineThresholds | null;
 
   /* ── Actions ── */
   /** Replaces the profile on confirmation (SPEC §32 overwrite semantics). */
@@ -151,6 +162,21 @@ export interface VikaiTrainerAppState {
   setTeamColors: (colors: TeamColors) => void;
   /** Silences the missed-day nudge for one local date (Phase 9.12). */
   dismissBackfillNudge: (localDate: string) => void;
+  /**
+   * Phase 10 — appends one completed 10-second finger-tap trial for a local
+   * date. `recordedAt` is stamped here (the store owns the clock).
+   */
+  addFingerTapTrial: (draft: {
+    localDate: string;
+    timezone: string;
+    tapCount: number;
+  }) => FingerTapTrial;
+  /** Removes a mistyped finger-tap trial. */
+  removeFingerTapTrial: (id: string) => void;
+  /** Applies Settings tuning (already-validated EngineThresholds). */
+  setEngineThresholds: (thresholds: EngineThresholds) => void;
+  /** Restores the shipped engine defaults (Settings reset). */
+  resetEngineThresholds: () => void;
 }
 
 export const useAppStore = create<VikaiTrainerAppState>()(
@@ -169,6 +195,8 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       defaultScheduleSeeded: false,
       teamColors: DEFAULT_TEAM_COLORS,
       backfillNudgesDismissed: [],
+      fingerTapTrials: [],
+      engineThresholds: null,
 
       setProfile: (profile) => {
         set({ profile });
@@ -371,6 +399,32 @@ export const useAppStore = create<VikaiTrainerAppState>()(
             ? state
             : { backfillNudgesDismissed: [...state.backfillNudgesDismissed, localDate] },
         );
+      },
+
+      addFingerTapTrial: (draft) => {
+        const record: FingerTapTrial = {
+          id: createLocalId("tap"),
+          localDate: draft.localDate,
+          timezone: draft.timezone,
+          recordedAt: new Date().toISOString(),
+          tapCount: draft.tapCount,
+        };
+        set((state) => ({ fingerTapTrials: [...state.fingerTapTrials, record] }));
+        return record;
+      },
+
+      removeFingerTapTrial: (id) => {
+        set((state) => ({
+          fingerTapTrials: state.fingerTapTrials.filter((entry) => entry.id !== id),
+        }));
+      },
+
+      setEngineThresholds: (thresholds) => {
+        set({ engineThresholds: { ...thresholds } });
+      },
+
+      resetEngineThresholds: () => {
+        set({ engineThresholds: null });
       },
 
       recordWorkoutLog: (draft) => {
