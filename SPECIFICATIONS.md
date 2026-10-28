@@ -803,6 +803,9 @@ Local entity stores managed via Zustand:
 * `scheduled_events`
 * `workout_logs`
 * `notification_preferences`
+* `active_program_id` *(additive, Phase 11 — the selected curated season program; null = the first registry program, preserving prior behavior for existing installs)*
+
+**Phase 11 — Curated season programs & schedule-aware shaping.** The hardcoded base plan is the first entry of a selectable program registry (`src/plans/programs.ts`): the early-season speed/power regimen (unchanged, now named) and an in-season game-day program whose weekday templates are built around the athlete's real week (skill + shooting sessions Mon/Wed/Thu mornings before school as designated skill-slot days, Tue/Wed/Thu practices with zero lower-body loading, one consolidated HIGH-CNS day, near-rest Friday, full Sunday reset, and the December tryout countdown as a phase note). Day plans are resolved through a schedule-aware shaping layer: a scheduled or logged team practice applies the legs-saved filter dynamically (off-template days included), and a scheduled or logged skill session makes the plan's own skill blocks step aside except on designated skill-slot weekdays. Built (custom) plans keep precedence over curated programs; the engine stays restriction-only.
 
 ---
 

@@ -17,13 +17,19 @@ import {
   buildWorkoutShareHtml,
   type WorkoutShareBlock,
 } from "../src/lib/workoutShare";
-import { seasonPhaseFor, exerciseDetailsFor } from "../src/plans/fall2026";
+import { seasonPhaseFor, weekdayOf } from "../src/plans/fall2026";
 import { powerLevel } from "../src/lib/power";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
 import { computePerformanceScales } from "../src/plans/adherence";
-import { BASE_PLAN_TITLES, defaultPlanForDate } from "../src/plans/basePlan";
+import { BASE_PLAN_TITLES } from "../src/plans/basePlan";
 import { activePlanForDay, blockVariant, planPhaseLabel, weekIndexOf } from "../src/plans/planBuilder";
+import {
+  programById,
+  programExerciseDetail,
+  programPhaseFor,
+  resolveDayPlan,
+} from "../src/plans/programs";
 import { libraryBlockById, libraryExerciseDetail } from "../src/plans/library";
 import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -46,22 +52,40 @@ export default function Workout() {
   const recordWorkoutLog = useAppStore((state) => state.recordWorkoutLog);
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const activityLogs = useAppStore((state) => state.activityLogs);
+  const scheduledEvents = useAppStore((state) => state.scheduledEvents);
 
   const localToday = toLocalDateString(new Date(), profile.timezone);
   const activePlan = useAppStore((state) => state.activePlan);
-  // Built plans replace the default template; no plan ⇒ today's default.
-  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : defaultPlanForDate(localToday);
+  const activeProgramId = useAppStore((state) => state.activeProgramId);
+  // Built plans replace the season program; no plan ⇒ the selected program's
+  // plan for today, shaped around the athlete's schedule.
+  const basePlan = resolveDayPlan(activeProgramId, activePlan, localToday, {
+    scheduledEvents,
+    activityLogs,
+    timezone: profile.timezone,
+  });
   const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,
     // Phase 8.3 — comfort-effort categories auto-scale from completion history.
-    performanceScales: computePerformanceScales(activePlan, workoutLogs, workoutProgress, localToday),
+    performanceScales: computePerformanceScales(
+      activePlan,
+      activeProgramId,
+      workoutLogs,
+      workoutProgress,
+      localToday,
+      { scheduledEvents, activityLogs, timezone: profile.timezone },
+    ),
   });
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
   const hasWorkoutLogToday = workoutLogs.some((entry) => entry.activityDate === localToday);
   const hasActivityToday = activityLogs.some((entry) => entry.activityDate === localToday);
   const seasonPhase = seasonPhaseFor(localToday);
+  const program = programById(activeProgramId);
+  const programPhase = programPhaseFor(program, localToday);
+  const dayNote =
+    activePlan === null ? program.dayNotes?.[weekdayOf(localToday)] : undefined;
 
   const [finishStep, setFinishStep] = useState<"idle" | "bodymap">("idle");
   const [soreAfter, setSoreAfter] = useState<SoreArea[]>([]);
@@ -80,8 +104,8 @@ export default function Workout() {
 
   const soreAreasToday = Object.keys(result.restrictions.sorenessScale ?? {}).filter(isSoreArea);
 
-  // Built plans rotate through their library pools; the default plan keeps
-  // the season-plan details.
+  // Built plans rotate through their library pools; curated programs keep
+  // their own season-plan details.
   const resolveDetail = (componentId: string) => {
     if (activePlan !== null) {
       const rotated = libraryExerciseDetail(
@@ -101,7 +125,7 @@ export default function Workout() {
         };
       }
     }
-    return exerciseDetailsFor(componentId, localToday);
+    return programExerciseDetail(program, componentId, localToday);
   };
 
   // Phase 9.14 — share the day's Game Plan as a self-contained HTML
@@ -172,9 +196,11 @@ export default function Workout() {
       const seasonLabel =
         activePlan && persona !== undefined
           ? `${persona.label} · Week ${weekIndexOf(activePlan, localToday) + 1}`
-          : seasonPhase !== undefined
-            ? `Fall 2026 · ${seasonPhase.label}`
-            : undefined;
+          : programPhase !== undefined
+            ? `${program.label} · ${programPhase.label}`
+            : seasonPhase !== undefined
+              ? `Fall 2026 · ${seasonPhase.label}`
+              : undefined;
 
       const { html, fileName } = buildWorkoutShareHtml(
         {
@@ -248,7 +274,23 @@ export default function Workout() {
 
       <Text className="text-center text-lg font-black text-strong">Today's Game Plan</Text>
 
-      {seasonPhase !== undefined ? (
+      {activePlan === null ? (
+        <View className="rounded-xl border border-edge bg-card p-3">
+          <Text className="text-xs font-bold uppercase tracking-widest text-go">
+            {program.label}
+            {programPhase !== undefined ? ` · ${programPhase.label}` : ""}
+          </Text>
+          <Text className="mt-1 text-xs text-faint">
+            {programPhase !== undefined ? programPhase.focus : program.basis}
+          </Text>
+          {programPhase?.note !== undefined ? (
+            <Text className="mt-1 text-xs font-semibold text-body">{programPhase.note}</Text>
+          ) : null}
+          {dayNote !== undefined ? (
+            <Text className="mt-1 text-xs font-semibold text-body">{dayNote}</Text>
+          ) : null}
+        </View>
+      ) : seasonPhase !== undefined ? (
         <View className="rounded-xl border border-edge bg-card p-3">
           <Text className="text-xs font-bold uppercase tracking-widest text-go">
             Fall 2026 · {seasonPhase.label}

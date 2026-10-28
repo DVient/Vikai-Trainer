@@ -255,6 +255,7 @@ function resetStore(): void {
     workoutProgress: {},
     notificationIdentifiers: { scheduleReminders: {} },
     activePlan: null,
+    activeProgramId: null,
     personalBests: [],
     teamColors: DEFAULT_TEAM_COLORS,
     backfillNudgesDismissed: [],
@@ -519,7 +520,7 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
     // Before: full volume.
     expect(screen.getAllByText("4 sets").length).toBeGreaterThanOrEqual(1);
 
-    // A heavy practice log arrives mid-session (load 900 ≥ 700 threshold).
+    // A heavy practice log arrives mid-session (load 900 ≥ 750 threshold).
     act(() => {
       useAppStore.setState({
         activityLogs: [
@@ -537,8 +538,11 @@ describe("game plan session screen — check-offs and mid-session rescaling", ()
       });
     });
 
-    // Remaining rows re-scale (lower body 4 × 0.6 = 2); the group appears.
-    expect(screen.getAllByText("4 → 2 sets").length).toBeGreaterThanOrEqual(1);
+    // Phase 11 — the logged practice makes today a practice day: the
+    // legs-saved shaping removes the lower/full-body power blocks outright,
+    // and the workload rule scales what remains (upper 4 × 0.8 = 3).
+    expect(screen.getAllByText("4 → 3 sets").length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByLabelText("Toggle Squat pattern strength")).toBeNull();
     expect(screen.getByText("Adjusted out today")).toBeTruthy();
     // Finishing is available only when nothing remains.
     expect(screen.queryByLabelText("Finish workout")).toBeNull();
@@ -717,7 +721,7 @@ describe("calendar (app/history)", () => {
     expect(screen.getByText("Fri, Jan 9")).toBeTruthy(); // sub-header + week label
     expect(screen.getByText("🏆 Game — Rivalry night")).toBeTruthy();
     expect(
-      screen.getAllByText("Planned: Skills + tempo primer — Base template").length,
+      screen.getAllByText("Planned: Skills + tempo primer — Speed, Power & Explosiveness").length,
     ).toBeGreaterThanOrEqual(1); // Friday is a pre-season low day; Monday matches
 
     // Back to the default week view.
@@ -744,21 +748,25 @@ describe("calendar (app/history)", () => {
 
     // Today (frozen Monday, pre-season low day) — the low-day template runs.
     expect(
-      screen.getAllByText("Planned: Skills + tempo primer — Base template").length,
+      screen.getAllByText("Planned: Skills + tempo primer — Speed, Power & Explosiveness")
+        .length,
     ).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Planned workout")).toBeTruthy();
 
     // Wednesday (pre-season low day) — skills + tempo primer planned.
     fireEvent.click(screen.getByLabelText("Day 2026-01-07"));
     expect(
-      screen.getAllByText("Planned: Skills + tempo primer — Base template").length,
+      screen.getAllByText("Planned: Skills + tempo primer — Speed, Power & Explosiveness")
+        .length,
     ).toBeGreaterThanOrEqual(1); // Today card (Monday) + chosen Wednesday
     // The practice shows in the chosen-day timeline inside the Scheduled card.
     expect(screen.getAllByText(/Team practice/).length).toBeGreaterThanOrEqual(1);
 
     // Sunday — recovery-only plan.
     fireEvent.click(screen.getByLabelText("Day 2026-01-11"));
-    expect(screen.getByText("Planned: Recovery & skills — Base template")).toBeTruthy();
+    expect(
+      screen.getByText("Planned: Recovery & skills — Speed, Power & Explosiveness"),
+    ).toBeTruthy();
   });
 });
 
@@ -1293,7 +1301,10 @@ describe("exercise detail + video library (Fall 2026 plan)", () => {
 
     render(<Workout />);
 
-    expect(screen.getByText("Fall 2026 · Team practice integration")).toBeTruthy();
+    // Phase 11 — the curated program card names the program and the phase.
+    expect(
+      screen.getByText("Speed, Power & Explosiveness · Team practice integration"),
+    ).toBeTruthy();
     expect(screen.getByText("Practice nights: Tuesday, Wednesday & Thursday.")).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText("See the work: Squat pattern strength"));
@@ -2262,5 +2273,119 @@ describe("missed-day backfill (Phase 9.12)", () => {
       expect(screen.getByText("Sharing isn't available on this device.")).toBeTruthy(),
     );
     expect(sharingSpy.shareAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("season programs + schedule-aware shaping (Phase 11)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("lists the curated programs on My Plan and persists a selection", () => {
+    render(<Plan />);
+
+    expect(screen.getByLabelText("Training program: Speed, Power & Explosiveness")).toBeTruthy();
+    expect(screen.getByLabelText("Training program: In-Season Game Day")).toBeTruthy();
+    // The custom-plan builder stays fully available below the picker.
+    expect(screen.getByText("Build my training plan 🎯")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Training program: In-Season Game Day"));
+    expect(useAppStore.getState().activeProgramId).toBe("in-season-game-day");
+  });
+
+  it("notes the custom-plan precedence when a built plan is running", () => {
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+    useAppStore.getState().buildTrainingPlan({ personaId: "ALL_ROUND", periodWeeks: 6 });
+
+    render(<Plan />);
+
+    expect(
+      screen.getByText(/Your custom plan is running right now/),
+    ).toBeTruthy();
+  });
+
+  it("Home names the active season program when no custom plan runs", () => {
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Index />);
+
+    expect(screen.getByText("🏀 In-Season Game Day")).toBeTruthy();
+    expect(screen.getByText("Season program — tap to change plan")).toBeTruthy();
+  });
+
+  it("renders the in-season Monday: the before-school court session, power blocks, and the day note", () => {
+    // Monday, October 26 2026 — game-season week under the new program.
+    vi.setSystemTime(new Date("2026-10-26T15:00:00.000Z"));
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Workout />);
+
+    // The program card carries the phase and the AM/PM structure line.
+    expect(screen.getByText(/In-Season Game Day · Game season/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Morning before school: skill + shooting session on the court, then the weight room. PM: tempo + holds.",
+      ),
+    ).toBeTruthy();
+
+    // The day's blocks: court skill first, then the power day, no practice
+    // leg work duplicated elsewhere in the week.
+    expect(screen.getByLabelText("Toggle Ball-handling technique")).toBeTruthy();
+    expect(screen.getByLabelText("Toggle Acceleration sprints")).toBeTruthy();
+    expect(screen.getByLabelText("Toggle Squat pattern strength")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("See the work: Ball-handling technique"));
+    expect(screen.getByText("Separation Pull-Ups")).toBeTruthy();
+  });
+
+  it("keeps the court block on a skill-slot day even when the session is scheduled", () => {
+    vi.setSystemTime(new Date("2026-10-26T15:00:00.000Z"));
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      scheduledEvents: [
+        {
+          id: "skill-am",
+          eventType: "SKILL_SESSION",
+          startAt: "2026-10-26T11:30:00.000Z", // 7:30 AM ET — before school
+          title: "Skill + shooting",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<Workout />);
+
+    // Monday is a skill-slot weekday: the court block IS that session's plan.
+    expect(screen.getByLabelText("Toggle Ball-handling technique")).toBeTruthy();
+  });
+
+  it("strips the plan's skill blocks on a non-slot day with a scheduled skill session", () => {
+    // Tuesday, October 27 2026 — practice night; no court block in the
+    // template, so a surprise skill session strips nothing… but under the
+    // default program the fallback skill block yields to the session.
+    vi.setSystemTime(new Date("2026-01-05T15:00:00.000Z"));
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      scheduledEvents: [
+        {
+          id: "skill-am",
+          eventType: "SKILL_SESSION",
+          startAt: "2026-01-05T12:30:00.000Z", // 7:30 AM ET
+          title: "Skill + shooting",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+
+    render(<Workout />);
+
+    // Monday Jan 5 is a pre-season low day with the scanning/skill block —
+    // the scheduled morning session covers it, so the block steps aside.
+    expect(screen.queryByLabelText("Toggle Ball-handling technique")).toBeNull();
+    expect(screen.getByLabelText("Toggle Upper push strength")).toBeTruthy();
   });
 });

@@ -37,6 +37,7 @@ const INITIAL_SLICES = {
   workoutProgress: {},
   notificationIdentifiers: { scheduleReminders: {} },
   activePlan: null,
+  activeProgramId: null,
   personalBests: [],
   defaultScheduleSeeded: false,
   teamColors: DEFAULT_TEAM_COLORS,
@@ -432,6 +433,36 @@ describe("plan builder — store integration", () => {
     expect(plan.components[0]?.id).toBe("skill-shooting");
     expect(plan.components[1]?.id).toBe("skill-ballhandling");
     expect(plan.components[0]?.priority).toBe(1);
+  });
+});
+
+describe("season program selection (Phase 11)", () => {
+  it("selects a curated program and clears it back to the default", () => {
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+    expect(useAppStore.getState().activeProgramId).toBe("in-season-game-day");
+
+    useAppStore.getState().setActiveProgram(null);
+    expect(useAppStore.getState().activeProgramId).toBeNull();
+  });
+
+  it("ignores unknown program ids — a stale value can never corrupt the store", () => {
+    useAppStore.getState().setActiveProgram("not-a-real-program");
+    expect(useAppStore.getState().activeProgramId).toBeNull();
+
+    // A valid selection followed by an invalid one keeps the valid selection.
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+    useAppStore.getState().setActiveProgram("still-not-real");
+    expect(useAppStore.getState().activeProgramId).toBe("in-season-game-day");
+  });
+
+  it("survives a persisted write (the slice rides the §33 store)", async () => {
+    useAppStore.getState().setActiveProgram("in-season-game-day");
+
+    const calls = AsyncStorageMock.setItem.mock.calls as Array<[string, string]>;
+    const last = calls.at(-1);
+    if (!last) throw new Error("expected a persisted store write");
+    const persisted = JSON.parse(last[1]) as { state: { activeProgramId: string | null } };
+    expect(persisted.state.activeProgramId).toBe("in-season-game-day");
   });
 });
 

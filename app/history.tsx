@@ -18,8 +18,8 @@ import {
 } from "../src/lib/calendar";
 import { buildExport } from "../src/lib/export";
 import { tapLight, tapSuccess } from "../src/lib/haptics";
-import { defaultPlanFocusLabel } from "../src/plans/basePlan";
 import { planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
+import { programById, programFocusLabel } from "../src/plans/programs";
 import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
 
@@ -50,6 +50,8 @@ function HistoryScreen() {
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const scheduledEvents = useAppStore((state) => state.scheduledEvents);
   const activePlan = useAppStore((state) => state.activePlan);
+  const activeProgramId = useAppStore((state) => state.activeProgramId);
+  const program = programById(activeProgramId);
 
   const now = new Date();
   const today = toLocalDateString(now, profile.timezone);
@@ -96,7 +98,7 @@ function HistoryScreen() {
       const detail = `${personaLabel} · ${planPhaseLabel(activePlan, date)} · Week ${weekIndexOf(activePlan, date) + 1}`;
       return { label: personaLabel, detail };
     }
-    return { label: defaultPlanFocusLabel(date), detail: "Base template" };
+    return { label: programFocusLabel(program, date), detail: program.label };
   };
 
   const todayTimeline = useMemo(
@@ -169,6 +171,7 @@ function HistoryScreen() {
           scheduledEvents: state.scheduledEvents,
           personalBests: state.personalBests,
           activePlan: state.activePlan,
+          activeProgramId: state.activeProgramId,
         },
         new Date(),
       );

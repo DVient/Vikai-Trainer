@@ -170,6 +170,7 @@ export interface PlannedWorkoutEntry {
 /** Emoji for a planned-workout focus label (timeline rows). */
 export function plannedWorkoutEmoji(label: string): string {
   if (label.includes("Practice")) return "🏀";
+  if (label.includes("Game")) return "🏀";
   if (label.includes("Recovery")) return "🧘";
   return "🏋️";
 }

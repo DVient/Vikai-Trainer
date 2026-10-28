@@ -3,7 +3,8 @@ import { Pressable, Text, View } from "react-native";
 
 import { BASE_PLAN_TITLES } from "../plans/basePlan";
 import { libraryBlockById } from "../plans/library";
-import { exerciseDetailsFor, type ComponentDetail } from "../plans/fall2026";
+import { DEFAULT_PROGRAM, programExerciseDetail } from "../plans/programs";
+import type { ComponentDetail } from "../plans/fall2026";
 import { tapLight } from "../lib/haptics";
 import { scaleStoryLine } from "../lib/scaleStory";
 import type { ScaleFactors } from "../engine/generator";
@@ -39,7 +40,9 @@ export function SessionChecklist({ view, localDate, onToggle, resolveDetail }: S
   const remaining = view.rows.filter((row) => row.state === "remaining");
   const done = view.rows.filter((row) => row.state === "done");
   const skipped = view.rows.filter((row) => row.state === "skipped");
-  const resolve = resolveDetail ?? ((componentId: string) => exerciseDetailsFor(componentId, localDate));
+  const resolve =
+    resolveDetail ??
+    ((componentId: string) => programExerciseDetail(DEFAULT_PROGRAM, componentId, localDate));
 
   return (
     <View className="gap-2">

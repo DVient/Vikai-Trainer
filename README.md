@@ -13,8 +13,9 @@ VIKAI builds each athlete's training day around *them*: how they slept, how thei
 - **3-Tap Check-In → Ready State** — three taps (sleep, body feel, energy) charge the Home "battery": **Full Send 🔥 100%**, **Power Save 🌙** (scaled sets), or **Shielded 🛡️ 0%**. GREEN can never display without today's check-in.
 - **10-second tap test ⚡** — an objective freshness check: tap as fast as you can for 10 seconds and the app compares your speed against your own recent best (never other people). When the tap test and your check-in agree you're running low, the day leans lighter — two independent signals beat one.
 - **Daily Game Plan** — the generator maps the engine's restrictions onto a training template: high-load blocks scale down first, focus areas keep their work longest, and pain immediately shields the athlete (an adult check-in is requested — never a push-through).
+- **Season programs 🗓️** — curated, selectable default plans: **⚡ Speed, Power & Explosiveness** (the early-season conditioning build) and **🏀 In-Season Game Day** (built around skill + shooting sessions Mon/Wed/Thu mornings before school, Tue/Wed/Thu practices with legs saved, one consolidated power day, a near-rest Friday, and a full Sunday reset — including the December tryout countdown). The day's plan also considers the calendar: a scheduled or logged practice saves the legs, and a skill session covers the plan's own skill blocks instead of stacking volume.
 - **Live check-offs** — check blocks off as you go; logging a practice mid-session re-scales the remaining volume in place. Completed blocks keep credit and stay undoable.
-- **My Plan builder** — a preset persona (Jump higher, Get stronger, Faster first step, Two-way engine, All-round, or a skills-first focus) or a customized plan (up to 3 focus areas + 1–3 basketball skills, 4–12 weeks). Plans ramp +8%/week, deload every fourth week, taper the final week, and start at a level matched to recent training history.
+- **My Plan builder** — a preset persona (Jump higher, Get stronger, Faster first step, Two-way engine, All-round, or a skills-first focus) or a customized plan (up to 3 focus areas + 1–3 basketball skills, 4–12 weeks). Plans ramp +8%/week, deload every fourth week, taper the final week, and start at a level matched to recent training history. A built plan always wins over the season program until you switch back.
 - **Personal milestones** — every plan brings benchmark drills (jump touch, lane agility, spot shooting…) with fixed protocols; log attempts and track best-per-drill over time.
 - **Practice Log & Calendar** — record activities before/after training (they shape volume), schedule games and practices, reschedule, and build recurring series. Game-proximity windows automatically protect fresh legs.
 - **Reminders** — local check-in, fuel-up, and event notifications (no server push).
@@ -41,7 +42,7 @@ VIKAI builds each athlete's training day around *them*: how they slept, how thei
 ```
 app/               Expo Router screens (Home, check-in, workout, plan, calendar, …)
 src/engine/        Pure autoregulation engine — restrictions only, fully deterministic
-src/plans/         Block library, base plan, personas, plan builder, milestones
+src/plans/         Block library, base plan, season programs, personas, plan builder, milestones
 src/lib/           Presentation math (power, flow, session views, formatting)
 src/components/    UI components (battery gauge, checklists, banners, …)
 src/stores/        Zustand store + local persistence (SPEC storage schema)

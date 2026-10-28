@@ -8,7 +8,8 @@
  * training goal over the recent window, and derives next-session scales.
  *
  * Layer placement: plans-domain data shaping (it resolves each session's
- * plan via activePlanForDay). The ENGINE never sees adherence data — it
+ * plan — built or curated program — shaped around that day's real schedule).
+ * The ENGINE never sees adherence data — it
  * stays a pure physio/restriction calculator (AGENTS.md decoupling); the
  * Workout Generator consumes the scales as a mapping option, exactly like
  * `primaryGoals` and `stripOptional`.
@@ -19,9 +20,26 @@
  * and DECELERATION are eligible.
  */
 
-import type { BuiltPlan, CompletedComponent, TrainingComponent, TrainingGoal, WorkoutLog } from "../types";
+import type {
+  ActivityLog,
+  BuiltPlan,
+  CompletedComponent,
+  ScheduledEvent,
+  TrainingComponent,
+  TrainingGoal,
+  WorkoutLog,
+} from "../types";
 import { activePlanForDay } from "./planBuilder";
-import { defaultPlanForDate } from "./basePlan";
+import { programById, programPlanForDate } from "./programs";
+import { sessionTypesForDate, shapeForScheduledEvents } from "./weekStructure";
+import { weekdayOf } from "./fall2026";
+
+/** The schedule context adherence needs to resolve each past day shaped. */
+export interface AdherenceContext {
+  scheduledEvents: readonly ScheduledEvent[];
+  activityLogs: readonly ActivityLog[];
+  timezone: string;
+}
 
 /** One window's plan-vs-completion record, aggregated per training goal. */
 export interface AdherenceSample {
@@ -77,9 +95,11 @@ function localDateMinusDays(localDate: string, days: number): string {
  */
 export function adherenceSamplesFor(
   plan: BuiltPlan | null,
+  programId: string | null,
   workoutLogs: readonly WorkoutLog[],
   workoutProgress: Readonly<Record<string, Record<string, CompletedComponent>>>,
   todayLocalDate: string,
+  context: AdherenceContext,
   lookbackDays = 7,
 ): AdherenceSample[] {
   const windowStart = localDateMinusDays(todayLocalDate, lookbackDays);
@@ -93,8 +113,20 @@ export function adherenceSamplesFor(
 
   const totals = new Map<TrainingGoal, { planned: number; completed: number }>();
   for (const date of sessionDates) {
-    const components: readonly TrainingComponent[] =
-      plan !== null ? activePlanForDay(plan, date) : defaultPlanForDate(date);
+    // Phase 11 — each past day resolves SHAPED: blocks the real schedule
+    // covered (a scheduled skill session, a dynamic practice day) were never
+    // "planned" for that date, so they can't count as skipped work.
+    const base: readonly TrainingComponent[] =
+      plan !== null
+        ? activePlanForDay(plan, date)
+        : programPlanForDate(programById(programId), date);
+    const program = plan !== null ? undefined : programById(programId);
+    const slotExempt = program?.skillSlotWeekdays?.includes(weekdayOf(date)) ?? false;
+    const components = shapeForScheduledEvents(
+      base,
+      sessionTypesForDate(context.scheduledEvents, context.activityLogs, date, context.timezone),
+      slotExempt,
+    );
     const dayProgress = workoutProgress[date] ?? {};
     for (const component of components) {
       if (component.type === "RECOVERY") continue;
@@ -134,13 +166,15 @@ export function performanceScales(
 /** One-call convenience for screens: store slices ⇒ generator option. */
 export function computePerformanceScales(
   plan: BuiltPlan | null,
+  programId: string | null,
   workoutLogs: readonly WorkoutLog[],
   workoutProgress: Readonly<Record<string, Record<string, CompletedComponent>>>,
   todayLocalDate: string,
+  context: AdherenceContext,
   options: AdherenceOptions = DEFAULT_ADHERENCE_OPTIONS,
 ): Partial<Record<TrainingGoal, number>> {
   return performanceScales(
-    adherenceSamplesFor(plan, workoutLogs, workoutProgress, todayLocalDate),
+    adherenceSamplesFor(plan, programId, workoutLogs, workoutProgress, todayLocalDate, context),
     options,
   );
 }

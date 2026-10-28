@@ -14,8 +14,8 @@ import {
   rpeBand,
   validateActivityDraft,
 } from "../src/lib/format";
-import { activePlanForDay, blockVariant } from "../src/plans/planBuilder";
-import { BASE_PLAN_TITLES, defaultPlanForDate } from "../src/plans/basePlan";
+import { BASE_PLAN_TITLES } from "../src/plans/basePlan";
+import { resolveDayPlan } from "../src/plans/programs";
 import { libraryBlockById } from "../src/plans/library";
 import { useAppStore } from "../src/stores/useAppStore";
 import type { ActivityType, SoreArea } from "../src/types";
@@ -60,6 +60,8 @@ export default function PracticeLog() {
   const workoutLogs = useAppStore((state) => state.workoutLogs);
   const workoutProgress = useAppStore((state) => state.workoutProgress);
   const activePlan = useAppStore((state) => state.activePlan);
+  const activeProgramId = useAppStore((state) => state.activeProgramId);
+  const scheduledEvents = useAppStore((state) => state.scheduledEvents);
   const profile = useAppStore((state) => state.profile);
 
   const [activityType, setActivityType] = useState<ActivityType>("TEAM_PRACTICE");
@@ -83,9 +85,11 @@ export default function PracticeLog() {
 
   const dayWorkout = workoutLogs.find((entry) => entry.activityDate === targetDate);
   const dayProgress = workoutProgress[targetDate] ?? {};
-  const dayBlocks = (
-    activePlan ? activePlanForDay(activePlan, targetDate) : defaultPlanForDate(targetDate)
-  ).filter((component) => !component.optional);
+  const dayBlocks = resolveDayPlan(activeProgramId, activePlan, targetDate, {
+    scheduledEvents,
+    activityLogs,
+    timezone: profile.timezone,
+  }).filter((component) => !component.optional);
 
   const { pre, post } = partitionActivities(activityLogs, workoutLogs, targetDate);
   const orderedEntries = [...pre, ...post].filter(

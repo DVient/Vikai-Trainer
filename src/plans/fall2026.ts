@@ -748,14 +748,18 @@ export const FALL_COMPONENT_DETAILS: ReadonlyArray<ComponentDetail> = [
 ];
 
 /**
- * Resolves today's exercise detail for a base-plan component: the most
- * specific entry wins (weekday match → phase match → default).
+ * Resolves the most specific detail entry for a component: the weekday match
+ * wins, then a phase match, then the plan-wide default. Shared by the Fall
+ * 2026 season plan and every curated training program (Phase 11) — the same
+ * specificity ranking everywhere.
  */
-export function exerciseDetailsFor(componentId: string, localDate: string): ComponentDetail | undefined {
-  const phase = seasonPhaseFor(localDate);
-  const weekday = weekdayOf(localDate);
-
-  const matches = FALL_COMPONENT_DETAILS.filter(
+export function resolveDetailEntry(
+  details: ReadonlyArray<ComponentDetail>,
+  componentId: string,
+  phase: SeasonPhase | undefined,
+  weekday: number,
+): ComponentDetail | undefined {
+  const matches = details.filter(
     (entry) =>
       entry.componentId === componentId &&
       (entry.phaseId === undefined || entry.phaseId === phase?.id) &&
@@ -768,4 +772,17 @@ export function exerciseDetailsFor(componentId: string, localDate: string): Comp
   const chosen = withWeekday ?? withPhase ?? fallback;
 
   return chosen;
+}
+
+/**
+ * Resolves today's exercise detail for a base-plan component: the most
+ * specific entry wins (weekday match → phase match → default).
+ */
+export function exerciseDetailsFor(componentId: string, localDate: string): ComponentDetail | undefined {
+  return resolveDetailEntry(
+    FALL_COMPONENT_DETAILS,
+    componentId,
+    seasonPhaseFor(localDate),
+    weekdayOf(localDate),
+  );
 }

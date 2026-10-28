@@ -24,8 +24,16 @@
  */
 
 import { DEFAULT_SEASON_CONFIG } from "../config/defaults";
+import { toLocalDateString } from "../engine/autoregulation";
 import { weekdayOf } from "./fall2026";
-import type { TrainingComponent } from "../types";
+import { libraryBlockById } from "./library";
+import type {
+  ActivityLog,
+  ActivityType,
+  ScheduledEvent,
+  ScheduledEventType,
+  TrainingComponent,
+} from "../types";
 
 export type DayRole = "recovery" | "practice" | "post-practice" | "low" | "full";
 
@@ -112,4 +120,81 @@ export function sessionOrder(
   components: readonly TrainingComponent[],
 ): readonly TrainingComponent[] {
   return [...components].sort((a, b) => orderClass(a) - orderClass(b));
+}
+
+/* ────────── Phase 11 — schedule-aware day shaping ──────────────────────── */
+
+/**
+ * Logged activities map onto the scheduled-event vocabulary for shaping:
+ * a completed skill session covers the same volume a scheduled one would.
+ * Only the types the shaping rules act on are mapped — everything else
+ * (workload, §20, game windows) stays the engine's business.
+ */
+const ACTIVITY_SESSION_TYPES: Partial<Record<ActivityType, ScheduledEventType>> = {
+  TEAM_PRACTICE: "TEAM_PRACTICE",
+  SKILL_WORK: "SKILL_SESSION",
+  GAME: "GAME",
+};
+
+/**
+ * The session types "in effect" for ONE local date: scheduled events whose
+ * local startAt falls on the date, plus that date's own logged activities
+ * mapped onto the event vocabulary. Pure — timezone comes from the caller.
+ */
+export function sessionTypesForDate(
+  scheduledEvents: readonly ScheduledEvent[],
+  activityLogs: readonly ActivityLog[],
+  localDate: string,
+  timezone: string,
+): ScheduledEventType[] {
+  const types = new Set<ScheduledEventType>();
+  for (const event of scheduledEvents) {
+    const kickoff = new Date(event.startAt);
+    if (!Number.isFinite(kickoff.getTime())) continue;
+    if (toLocalDateString(kickoff, timezone) === localDate) types.add(event.eventType);
+  }
+  for (const activity of activityLogs) {
+    const mapped = ACTIVITY_SESSION_TYPES[activity.activityType];
+    if (mapped !== undefined && activity.activityDate === localDate) types.add(mapped);
+  }
+  return [...types];
+}
+
+/**
+ * Applies the schedule to ONE day's resolved base plan:
+ * - A team practice (or camp) on the date ⇒ the legs-saved filter applies,
+ *   dynamically — a practice on an off-template day now protects the legs
+ *   exactly like the static Tue/Wed/Thu roles always have (idempotent there).
+ * - A skill session (scheduled, or already logged earlier that day) ⇒ the
+ *   plan's own SKILL blocks step aside so the app never stacks duplicate
+ *   skill volume — EXCEPT when `skillSlotExempt` is true: curated programs
+ *   may designate weekdays whose court block IS that standing session's
+ *   content (the block stays so the athlete can check it off).
+ * - Games are untouched here: the engine's §17 windows own game protection.
+ */
+export function shapeForScheduledEvents(
+  components: readonly TrainingComponent[],
+  sessionTypes: readonly ScheduledEventType[],
+  skillSlotExempt = false,
+): readonly TrainingComponent[] {
+  if (sessionTypes.length === 0) return components;
+  const hasPractice =
+    sessionTypes.includes("TEAM_PRACTICE") || sessionTypes.includes("BASKETBALL_CAMP");
+  const hasSkill =
+    sessionTypes.includes("SKILL_SESSION") || sessionTypes.includes("ID_SESSION");
+  if (!hasPractice && !hasSkill) return components;
+
+  return components.filter((component) => {
+    if (
+      hasPractice &&
+      component.stress === "HIGH" &&
+      (component.bodyRegion === "LOWER" || component.bodyRegion === "FULL")
+    ) {
+      return false;
+    }
+    if (hasSkill && !skillSlotExempt && libraryBlockById(component.id)?.kind === "SKILL") {
+      return false;
+    }
+    return true;
+  });
 }

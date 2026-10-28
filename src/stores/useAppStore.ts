@@ -39,6 +39,7 @@ import { DEFAULT_ATHLETE_PROFILE } from "../config/defaults";
 import { defaultPracticeEventDrafts } from "../lib/defaultSchedule";
 import { DEFAULT_TEAM_COLORS, type TeamColors } from "../lib/theme";
 import { buildPlan, type PlanHistorySnapshot } from "../plans/planBuilder";
+import { TRAINING_PROGRAMS } from "../plans/programs";
 import { DEFAULT_ENGINE_THRESHOLDS, toLocalDateString, type EngineThresholds } from "../engine/autoregulation";
 
 /** Collision-resistant local identifier (no native crypto dependency). */
@@ -69,8 +70,15 @@ export interface VikaiTrainerAppState {
   workoutProgress: Record<string, Record<string, CompletedComponent>>;
   /** Per-notification identifier tracking (SPEC §35 / AGENTS.md guardrail). */
   notificationIdentifiers: NotificationIdentifiers;
-  /** The athlete's active built plan; null = the default 9-block template. */
+  /** The athlete's active built plan; null = the selected season program. */
   activePlan: BuiltPlan | null;
+  /**
+   * Phase 11 — the selected curated season program; null = the first registry
+   * program (the existing regimen), so existing installs behave exactly as
+   * before. Additive to the §33 schema; no persist version bump (the
+   * rehydration merge supplies the default for older stores).
+   */
+  activeProgramId: string | null;
   /** Benchmark attempts, full history (PB = best per drill, derived). */
   personalBests: PersonalBest[];
   /**
@@ -150,8 +158,14 @@ export interface VikaiTrainerAppState {
     periodWeeks: number;
     startDate?: string;
   }) => BuiltPlan;
-  /** Clears the active plan — the app returns to the default template. */
+  /** Clears the active plan — the app returns to the selected season program. */
   clearTrainingPlan: () => void;
+  /**
+   * Phase 11 — selects the curated season program the default template runs
+   * (null = the first registry program). Unknown ids are ignored so a stale
+   * or malformed value can never corrupt the store.
+   */
+  setActiveProgram: (programId: string | null) => void;
   /** Logs one benchmark attempt (history is never overwritten). */
   addPersonalBest: (draft: { drillId: string; value: number; activityDate?: string }) => PersonalBest;
   /** Removes a mistyped benchmark attempt. */
@@ -191,6 +205,7 @@ export const useAppStore = create<VikaiTrainerAppState>()(
       workoutProgress: {},
       notificationIdentifiers: { scheduleReminders: {} },
       activePlan: null,
+      activeProgramId: null,
       personalBests: [],
       defaultScheduleSeeded: false,
       teamColors: DEFAULT_TEAM_COLORS,
@@ -299,6 +314,13 @@ export const useAppStore = create<VikaiTrainerAppState>()(
 
       clearTrainingPlan: () => {
         set({ activePlan: null });
+      },
+
+      setActiveProgram: (programId) => {
+        if (programId !== null && !TRAINING_PROGRAMS.some((program) => program.id === programId)) {
+          return;
+        }
+        set({ activeProgramId: programId });
       },
 
       addPersonalBest: (draft) => {

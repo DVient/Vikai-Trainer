@@ -32,6 +32,8 @@ export interface ExportSourceState {
   scheduledEvents: readonly ScheduledEvent[];
   personalBests: readonly PersonalBest[];
   activePlan: BuiltPlan | null;
+  /** Phase 11 — the selected curated season program. */
+  activeProgramId: string | null;
 }
 
 export interface BuiltExport {
@@ -181,6 +183,7 @@ function buildJson(state: ExportSourceState, exportedAt: string): string {
       (a, b) => (a.activityDate === b.activityDate ? (a.recordedAt < b.recordedAt ? -1 : 1) : a.activityDate < b.activityDate ? -1 : 1),
     ),
     activePlan: state.activePlan,
+    activeProgramId: state.activeProgramId,
   };
   return JSON.stringify(payload, null, 2);
 }

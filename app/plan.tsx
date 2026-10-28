@@ -20,16 +20,18 @@ import {
 } from "../src/plans/milestones";
 import { BASE_PLAN_TITLES } from "../src/plans/basePlan";
 import { libraryBlockById, SKILL_OPTIONS } from "../src/plans/library";
+import { DEFAULT_PROGRAM, TRAINING_PROGRAMS } from "../src/plans/programs";
 import { TRAINING_GOAL_LABELS } from "../src/lib/format";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { useAppStore } from "../src/stores/useAppStore";
-import type { PersonaId, TrainingGoal } from "../src/types";
+import type { BuiltPlan, PersonaId, TrainingGoal } from "../src/types";
 
 /**
- * My Plan (Plan Builder): where the athlete picks a persona and a time
- * period, and the app builds their training plan. Three states — build,
- * active (with milestones), and ended (recap + set a new goal). The doing
- * stays on the Game Plan screens; this screen is the plan's home.
+ * My Plan (Plan Builder): where the athlete picks a curated season program
+ * or builds their own training plan from a persona and a time period.
+ * Three states — build, active (with milestones), and ended (recap + set a
+ * new goal). The doing stays on the Game Plan screens; this screen is the
+ * plan's home.
  */
 
 const SELECTABLE_GOALS: TrainingGoal[] = [
@@ -40,6 +42,57 @@ const SELECTABLE_GOALS: TrainingGoal[] = [
   "SPEED",
   "DECELERATION",
 ];
+
+/**
+ * The curated season programs the athlete can pick from. The Game Plan
+ * follows the selected program whenever no custom plan is running.
+ */
+function ProgramPicker({ activePlan }: { activePlan: BuiltPlan | null }) {
+  const activeProgramId = useAppStore((state) => state.activeProgramId);
+  const setActiveProgram = useAppStore((state) => state.setActiveProgram);
+
+  return (
+    <View className="gap-2">
+      <Text className="text-sm font-bold text-strong">Season program 🗓️</Text>
+      <Text className="text-xs text-faint">
+        The plan the Game Plan follows when no custom plan is running.
+      </Text>
+      {TRAINING_PROGRAMS.map((program) => {
+        const selected = (activeProgramId ?? DEFAULT_PROGRAM.id) === program.id;
+        return (
+          <Pressable
+            key={program.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Training program: ${program.label}`}
+            accessibilityState={{ selected }}
+            onPress={() => {
+              tapLight();
+              tapSuccess();
+              setActiveProgram(program.id);
+            }}
+            className={`min-h-[64px] rounded-2xl border-2 p-3 ${
+              selected ? "border-accent bg-soft" : "border-edge bg-card"
+            }`}
+          >
+            <Text className="text-base font-bold text-strong">
+              {program.emoji} {program.label}
+            </Text>
+            <Text className="mt-0.5 text-xs text-faint">{program.blurb}</Text>
+            {selected && program.fuelNote !== undefined ? (
+              <Text className="mt-1 text-xs font-semibold text-go">{program.fuelNote}</Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+      {activePlan !== null ? (
+        <Text className="text-xs font-semibold text-modulate">
+          Your custom plan is running right now. The program you pick here
+          takes over when you use your season program instead.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 export default function Plan() {
   const router = useRouter();
@@ -140,12 +193,14 @@ export default function Plan() {
         className="flex-1 bg-app"
         contentContainerClassName="w-full max-w-md self-center gap-4 p-4 pb-8"
       >
+        <ProgramPicker activePlan={activePlan} />
+
         <View className="rounded-2xl border-2 border-go-line bg-go-soft p-4">
           <Text className="text-lg font-black text-go">Build my training plan 🎯</Text>
           <Text className="mt-1 text-sm text-body">
-            Pick what you're training for and how long. The app builds your
-            plan from your focus, your recent work, and how often you've been
-            showing up.
+            Or build a plan around your goal — pick what you're training for
+            and how long. The app builds it from your focus, your recent work,
+            and how often you've been showing up.
           </Text>
         </View>
 
@@ -393,6 +448,8 @@ export default function Plan() {
         </Text>
       </View>
 
+      <ProgramPicker activePlan={activePlan} />
+
       {status === "final-week" ? (
         <View className="rounded-2xl border border-modulate-line bg-modulate-soft p-4">
           <Text className="text-sm font-semibold text-modulate">
@@ -556,7 +613,7 @@ export default function Plan() {
 
       <View className="gap-1">
         <Text className="text-xs text-faint">
-          Changed your mind? The default plan is always here.
+          Changed your mind? Your season program is always here.
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -569,7 +626,7 @@ export default function Plan() {
           }}
           className="h-12 items-center justify-center rounded-xl border-2 border-edge bg-card"
         >
-          <Text className="text-sm font-bold text-faint">Reset to default plan</Text>
+          <Text className="text-sm font-bold text-faint">Use my season program instead</Text>
         </Pressable>
       </View>
     </ScrollView>

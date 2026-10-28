@@ -18,8 +18,9 @@ import { soreAreaLabel } from "../src/lib/bodyMap";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
 import { ADULT_ATTENTION_MESSAGE } from "../src/lib/status";
 import { computePerformanceScales } from "../src/plans/adherence";
-import { BASE_PLAN_TITLES, defaultPlanForDate } from "../src/plans/basePlan";
+import { BASE_PLAN_TITLES } from "../src/plans/basePlan";
 import { activePlanForDay, planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
+import { programById, resolveDayPlan } from "../src/plans/programs";
 import { libraryBlockById } from "../src/plans/library";
 import { personaById } from "../src/plans/personas";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -50,19 +51,32 @@ export default function Index() {
   const profile = useAppStore((state) => state.profile);
   const trainingObjective = useAppStore((state) => state.trainingObjective);
   const activePlan = useAppStore((state) => state.activePlan);
+  const activeProgramId = useAppStore((state) => state.activeProgramId);
   const clearTrainingPlan = useAppStore((state) => state.clearTrainingPlan);
 
   const now = new Date();
   const localToday = toLocalDateString(now, profile.timezone);
-  // Built plans replace the default template; no plan ⇒ exactly today's
-  // default 9-block behavior.
-  const basePlan = activePlan ? activePlanForDay(activePlan, localToday) : defaultPlanForDate(localToday);
+  // Built plans replace the season program; no plan ⇒ the selected program's
+  // plan for today, shaped around the athlete's schedule.
+  const basePlan = resolveDayPlan(activeProgramId, activePlan, localToday, {
+    scheduledEvents,
+    activityLogs,
+    timezone: profile.timezone,
+  });
   const prescription = applyRestrictionsToBasePlan(basePlan, result.restrictions, {
     stripOptional,
     primaryGoals: trainingObjective.primaryGoals,
     // Phase 8.3 — comfort-effort categories auto-scale from completion history.
-    performanceScales: computePerformanceScales(activePlan, workoutLogs, workoutProgress, localToday),
+    performanceScales: computePerformanceScales(
+      activePlan,
+      activeProgramId,
+      workoutLogs,
+      workoutProgress,
+      localToday,
+      { scheduledEvents, activityLogs, timezone: profile.timezone },
+    ),
   });
+  const program = programById(activeProgramId);
   const session = buildSessionView(prescription, workoutProgress[localToday] ?? {});
   const power = powerLevel(result);
   const streak = checkInStreak(readinessInputs, localToday);
@@ -266,12 +280,12 @@ export default function Index() {
           <Text className="text-base font-bold text-strong">
             {activePlan !== null
               ? `${personaById(activePlan.personaId ?? "ALL_ROUND")?.label ?? "Custom plan"}`
-              : "My Plan"}
+              : `${program.emoji} ${program.label}`}
           </Text>
           <Text className="text-sm text-faint">
             {activePlan !== null
               ? `${planPhaseLabel(activePlan, localToday)} · Week ${Math.min(weekIndexOf(activePlan, localToday) + 1, activePlan.periodWeeks)} of ${activePlan.periodWeeks}`
-              : "Build a plan around your goal"}
+              : "Season program — tap to change plan"}
           </Text>
         </View>
         <Text className="text-xl text-faint">›</Text>

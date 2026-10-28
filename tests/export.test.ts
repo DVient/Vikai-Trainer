@@ -19,6 +19,7 @@ const EMPTY_STATE: ExportSourceState = {
   scheduledEvents: [],
   personalBests: [],
   activePlan: null,
+  activeProgramId: null,
 };
 
 function seededState(): ExportSourceState {

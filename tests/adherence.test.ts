@@ -49,7 +49,7 @@ describe("adherenceSamplesFor", () => {
       "2026-01-06": { "strength-a": done("strength-a"), "strength-b": done("strength-b"), jumps: done("jumps"), sprints: done("sprints") },
       "2026-01-03": { "strength-a": done("strength-a"), jumps: done("jumps") }, // Saturday — full-template day
     };
-    const samples = adherenceSamplesFor(makePlan(), [makeLog("2026-01-06"), makeLog("2026-01-03")], progress, TODAY);
+    const samples = adherenceSamplesFor(makePlan(), null, [makeLog("2026-01-06"), makeLog("2026-01-03")], progress, TODAY, { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" });
 
     const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
     // Two logs on full-template days, 3 strength blocks per session: planned 6, completed 3.
@@ -60,7 +60,7 @@ describe("adherenceSamplesFor", () => {
 
   it("excludes today's own session — the day stays locked", () => {
     const progress = { [TODAY]: { "strength-a": done("strength-a") } };
-    const samples = adherenceSamplesFor(makePlan(), [makeLog(TODAY)], progress, TODAY);
+    const samples = adherenceSamplesFor(makePlan(), null, [makeLog(TODAY)], progress, TODAY, { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" });
 
     expect(samples).toEqual([]);
   });
@@ -72,9 +72,11 @@ describe("adherenceSamplesFor", () => {
     };
     const samples = adherenceSamplesFor(
       makePlan(),
+      null,
       [makeLog("2025-12-31"), makeLog("2026-01-01"), makeLog("2026-01-06"), makeLog(TODAY)],
       progress,
       TODAY,
+      { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" },
     );
 
     const strength = samples.find((sample) => sample.goal === "STRENGTH");
@@ -93,9 +95,11 @@ describe("adherenceSamplesFor", () => {
     };
     const samples = adherenceSamplesFor(
       makePlan(),
+      null,
       [makeLog("2026-01-06"), makeLog("2026-01-03")],
       progress,
       TODAY,
+      { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" },
     );
 
     const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
@@ -107,9 +111,11 @@ describe("adherenceSamplesFor", () => {
   it("stays silent when every logged session lacks check-offs", () => {
     const samples = adherenceSamplesFor(
       makePlan(),
+      null,
       [makeLog("2026-01-06"), makeLog("2026-01-03")],
       {},
       TODAY,
+      { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" },
     );
 
     expect(samples).toEqual([]);
@@ -118,7 +124,7 @@ describe("adherenceSamplesFor", () => {
   it("falls back to the default template when no plan is active", () => {
     // Monday, Jan 5 2026 — a pre-season LOW day: upper + skills + easy work.
     const progress = { "2026-01-05": { "skill-ballhandling": done("skill-ballhandling") } };
-    const samples = adherenceSamplesFor(null, [makeLog("2026-01-05")], progress, TODAY);
+    const samples = adherenceSamplesFor(null, null, [makeLog("2026-01-05")], progress, TODAY, { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" });
 
     const byGoal = new Map(samples.map((sample) => [sample.goal, sample]));
     expect(byGoal.get("STRENGTH")?.plannedBlocks).toBe(3); // upper push + two accessories, recovery excluded
@@ -176,9 +182,11 @@ describe("computePerformanceScales (screen convenience)", () => {
 
     const scales = computePerformanceScales(
       makePlan(),
+      null,
       [makeLog("2026-01-06"), makeLog("2026-01-04")],
       progress,
       TODAY,
+      { scheduledEvents: [], activityLogs: [], timezone: "America/New_York" },
     );
 
     // Strength: 0/6 completed → 0.8. Speed/explosiveness: full and exempt.
