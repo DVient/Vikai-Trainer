@@ -166,3 +166,29 @@ export function nextStepFor(input: FlowInput): HeroAction {
     route: active.route,
   };
 }
+
+/* ─────────── Phase 12 — step numbering across the guided day ──────────── */
+
+/**
+ * The canonical order of the guided day. `todaySteps` returns its steps in
+ * this order (pinned by test), and every flow screen numbers itself against
+ * it so "Step 4 of 4" on the Game Plan means the same thing as the Home
+ * stepper's "4. Complete your Game Plan".
+ */
+export const STEP_ORDER: readonly StepId[] = ["checkin", "cns", "log", "gamePlan"];
+
+export interface FlowStepPosition {
+  /** 1-based position of the step in the day's sequence. */
+  position: number;
+  /** How many steps the day has. */
+  total: number;
+}
+
+/**
+ * Where a step sits in the guided day. Pure and static — the sequence is
+ * fixed, so a screen can number itself without knowing the day's state.
+ */
+export function flowStepPosition(id: StepId): FlowStepPosition {
+  const index = STEP_ORDER.indexOf(id);
+  return { position: Math.max(1, index + 1), total: STEP_ORDER.length };
+}

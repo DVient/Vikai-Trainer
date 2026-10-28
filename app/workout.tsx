@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { BodyMap } from "../src/components/BodyMap";
+import { FlowStepBadge } from "../src/components/FlowStepBadge";
 import { PowerGauge } from "../src/components/PowerGauge";
 import { SessionChecklist } from "../src/components/SessionChecklist";
 import { StatusBanner } from "../src/components/StatusBanner";
@@ -272,7 +273,13 @@ export default function Workout() {
         </Text>
       ) : null}
 
-      <Text className="text-center text-lg font-black text-strong">Today's Game Plan</Text>
+      {/* Phase 12 — the session is the last step of the guided day; the
+          badge echoes the Home stepper's numbering so the athlete always
+          knows where they are. */}
+      <View className="items-center gap-1">
+        <FlowStepBadge id="gamePlan" done={hasWorkoutLogToday} />
+        <Text className="text-center text-lg font-black text-strong">Today's Game Plan</Text>
+      </View>
 
       {/* Phase 12 — one "today" context card: the plan that is running, its
           phase and the day's AM/PM structure, plus the focus goals. */}

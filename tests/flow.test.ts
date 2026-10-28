@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { partitionActivities } from "../src/lib/activityTiming";
 import {
+  flowStepPosition,
   nextStepFor,
+  STEP_ORDER,
   todaySteps,
   type DayStep,
   type FlowInput,
@@ -206,6 +208,34 @@ describe("nextStepFor — the Home 'your next step' hero (Phase 12)", () => {
     expect(hero.id).toBe("complete");
     expect(hero.emoji).toBe("🎉");
     expect(hero.route).toBe("/practice-log");
+  });
+});
+
+describe("flowStepPosition — step numbering across the guided day (Phase 12)", () => {
+  it("numbers the day's steps 1..4 in the canonical order", () => {
+    expect(flowStepPosition("checkin")).toEqual({ position: 1, total: 4 });
+    expect(flowStepPosition("cns")).toEqual({ position: 2, total: 4 });
+    expect(flowStepPosition("log")).toEqual({ position: 3, total: 4 });
+    expect(flowStepPosition("gamePlan")).toEqual({ position: 4, total: 4 });
+  });
+
+  it("matches the order todaySteps actually returns — the numbering can't drift", () => {
+    const steps = todaySteps({
+      hasCheckedInToday: true,
+      hasTapTestToday: true,
+      hasWorkoutLogToday: true,
+      activityPartition: { pre: [], post: [] },
+    });
+    expect(steps.map((step) => step.id)).toEqual([...STEP_ORDER]);
+    for (const step of steps) {
+      expect(flowStepPosition(step.id).position).toBe(steps.indexOf(step) + 1);
+    }
+  });
+
+  it("never returns a zero position for an unknown id (defensive)", () => {
+    const position = flowStepPosition("not-a-step" as StepId);
+    expect(position.position).toBe(1);
+    expect(position.total).toBe(4);
   });
 });
 

@@ -70,7 +70,9 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
  */
 export default function EventForm() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ eventId?: string }>();
+  // Phase 12 — `?date=` opens add-mode on a chosen calendar day (the
+  // calendar's quick action for a future day).
+  const params = useLocalSearchParams<{ eventId?: string; date?: string }>();
   const scheduledEvents = useAppStore((state) => state.scheduledEvents);
   const profile = useAppStore((state) => state.profile);
   const activePlan = useAppStore((state) => state.activePlan);
@@ -89,14 +91,24 @@ export default function EventForm() {
 
   const prefill = existing ? prefillFromIso(existing.startAt, profile.timezone) : undefined;
   const today = toLocalDateString(new Date(), profile.timezone);
+  // A requested date only applies in add mode and only when well-formed —
+  // anything else falls back to the defaults below.
+  const requestedDate =
+    existing === undefined &&
+    typeof params.date === "string" &&
+    DATE_PATTERN.test(params.date)
+      ? params.date
+      : undefined;
 
   // Add-mode starts at today · 6:00 PM (the seeded default practice time)
   // so a save can succeed with zero typing; the grid and chips adjust it.
+  // The calendar's quick action opens it on the chosen day instead.
+  const initialDate = prefill?.dateText ?? requestedDate ?? today;
   const [eventType, setEventType] = useState<ScheduledEventType>(
     existing?.eventType ?? "TEAM_PRACTICE",
   );
   const [title, setTitle] = useState(existing?.title ?? "");
-  const [dateText, setDateText] = useState(prefill?.dateText ?? today);
+  const [dateText, setDateText] = useState(initialDate);
   const [hour, setHour] = useState(
     () => splitTimeText(prefill?.timeText ?? "")?.hours ?? 18,
   );
@@ -121,8 +133,8 @@ export default function EventForm() {
   // (existing events, planned sessions) so double-booking is visible while
   // picking. Cursor opens on the selected date's month.
   const [cursor, setCursor] = useState(() => ({
-    year: Number(dateText.slice(0, 4)),
-    month: Number(dateText.slice(5, 7)),
+    year: Number(initialDate.slice(0, 4)),
+    month: Number(initialDate.slice(5, 7)),
   }));
   const weeks = useMemo(() => monthMatrix(cursor.year, cursor.month), [cursor]);
   const plannedWorkoutDates = useMemo(

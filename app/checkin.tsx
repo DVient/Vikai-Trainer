@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput,
 
 import { OptionCard } from "../src/components/OptionCard";
 import { BodyMap } from "../src/components/BodyMap";
+import { FlowStepBadge } from "../src/components/FlowStepBadge";
 import { Toast } from "../src/components/Toast";
 import { toLocalDateString } from "../src/engine/autoregulation";
 import { tapHeavy, tapLight, tapSuccess } from "../src/lib/haptics";
@@ -100,6 +101,10 @@ export default function CheckIn() {
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="w-full max-w-md self-center gap-5 p-4"
       >
+      {/* Phase 12 — the check-in opens the guided day (matches the Home
+          stepper's numbering). */}
+      <FlowStepBadge id="checkin" />
+
       <SelectorGroup label="Tap 1 — Sleep 😴">
         {SLEEP_OPTIONS.map((option) => (
           <OptionCard

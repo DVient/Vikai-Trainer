@@ -2480,3 +2480,71 @@ describe("guided home layout (Phase 12)", () => {
     expect(screen.getByLabelText("Open calendar")).toBeTruthy();
   });
 });
+
+describe("step numbering + calendar quick actions (Phase 12)", () => {
+  it("numbers every screen of the guided day like the Home stepper does", () => {
+    render(<CheckIn />);
+    expect(screen.getByLabelText("Step 1 of 4")).toBeTruthy();
+
+    render(<FingerTapTest />);
+    expect(screen.getByLabelText("Step 2 of 4")).toBeTruthy();
+
+    render(<PracticeLog />);
+    expect(screen.getByLabelText("Step 3 of 4")).toBeTruthy();
+
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+    render(<Workout />);
+    expect(screen.getByLabelText("Step 4 of 4")).toBeTruthy();
+  });
+
+  it("marks the session's step done once the workout is closed", () => {
+    useAppStore.setState({
+      readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)],
+      workoutLogs: [{ id: "w1", activityDate: localDate(0), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }],
+    });
+
+    render(<Workout />);
+
+    expect(screen.getByLabelText("Step 4 of 4")).toBeTruthy();
+    expect(screen.getByText("✓ done")).toBeTruthy();
+  });
+
+  it("hides the day-step badge in backfill mode — a past day isn't a step of today", () => {
+    searchParamsMock.date = "2026-01-04";
+
+    render(<PracticeLog />);
+
+    expect(screen.getByText(/Updating/)).toBeTruthy();
+    expect(screen.queryByLabelText("Step 3 of 4")).toBeNull();
+  });
+
+  it("offers a Log-today quick action on the calendar's Today card", () => {
+    render(<History />);
+
+    fireEvent.click(screen.getByLabelText("Log today's activities"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+  });
+
+  it("offers an add-event quick action on a chosen future day", () => {
+    render(<History />);
+
+    fireEvent.click(screen.getByLabelText("Day 2026-01-07"));
+    fireEvent.click(screen.getByLabelText("Add an event on Wed, Jan 7"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/event-form?date=2026-01-07");
+  });
+
+  it("opens the event editor on the requested calendar day", () => {
+    searchParamsMock.date = "2026-01-09";
+
+    render(<EventForm />);
+
+    // Zero typing still saves — but on the requested day, not today.
+    fireEvent.click(screen.getByRole("button", { name: "Save event" }));
+
+    const events = useAppStore.getState().scheduledEvents;
+    expect(events).toHaveLength(1);
+    const prefill = prefillFromIso(events[0]!.startAt, TIMEZONE);
+    expect(prefill.dateText).toBe("2026-01-09");
+    expect(prefill.timeText).toBe("18:00");
+  });
+});

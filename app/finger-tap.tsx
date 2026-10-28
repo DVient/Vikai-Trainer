@@ -12,6 +12,7 @@ import {
   trialsLoggedToday,
   type FingerTapTier,
 } from "../src/engine/fingerTap";
+import { FlowStepBadge } from "../src/components/FlowStepBadge";
 import { tapLight, tapSuccess } from "../src/lib/haptics";
 import { useAppStore } from "../src/stores/useAppStore";
 
@@ -131,6 +132,9 @@ export default function FingerTapTest() {
       className="flex-1 bg-app"
       contentContainerClassName="w-full max-w-md self-center gap-4 p-4"
     >
+      {/* Phase 12 — step 2 of the guided day, right after the check-in. */}
+      <FlowStepBadge id="cns" />
+
       <View className="rounded-2xl border border-edge bg-card p-4 gap-1">
         <Text className="text-base font-black text-strong">
           Tap fast for 10 seconds ⚡

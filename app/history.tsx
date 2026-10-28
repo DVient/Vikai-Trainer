@@ -228,6 +228,18 @@ function HistoryScreen() {
         <Text className="text-xs font-bold uppercase tracking-widest text-faint">
           Today · {formatDateLong(today)}
         </Text>
+        {/* Phase 12 — quick action: logging lives one tap from the Today card. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Log today's activities"
+          onPress={() => {
+            tapLight();
+            router.navigate("/practice-log");
+          }}
+          className="mt-3 h-12 min-w-[48px] items-center justify-center rounded-xl border-2 border-accent bg-soft"
+        >
+          <Text className="text-sm font-black text-go">＋ Log today</Text>
+        </Pressable>
         {todayTimeline.length === 0 ? (
           <Text className="mt-2 text-sm text-faint">
             Nothing logged yet — your first session starts today.
@@ -282,6 +294,20 @@ function HistoryScreen() {
                 <Text className="text-sm font-black text-go">
                   ＋ Update this day — it shapes today's plan
                 </Text>
+              </Pressable>
+            ) : selected > today ? (
+              /* Phase 12 — quick action: plan a commitment on a chosen future
+                 day; the editor opens with that date pre-selected. */
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Add an event on ${formatDateLong(selected)}`}
+                onPress={() => {
+                  tapLight();
+                  router.navigate(`/event-form?date=${selected}`);
+                }}
+                className="mt-3 h-12 items-center justify-center rounded-xl border-2 border-accent bg-soft"
+              >
+                <Text className="text-sm font-black text-go">＋ Add an event on this day</Text>
               </Pressable>
             ) : null}
           </>

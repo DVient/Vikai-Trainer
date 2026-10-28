@@ -3,6 +3,7 @@ import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 import { BodyMap } from "../src/components/BodyMap";
+import { FlowStepBadge } from "../src/components/FlowStepBadge";
 import { OptionCard } from "../src/components/OptionCard";
 import { Toast } from "../src/components/Toast";
 import { partitionActivities } from "../src/lib/activityTiming";
@@ -188,7 +189,11 @@ export default function PracticeLog() {
             into today's Game Plan.
           </Text>
         </View>
-      ) : null}
+      ) : (
+        /* Phase 12 — logging is step 3 of the guided day (the backfill
+           editor works on a past day, where day-step numbering doesn't apply). */
+        <FlowStepBadge id="log" />
+      )}
 
       <View className="gap-2">
         <Text className="text-sm font-bold text-strong">What did you do?</Text>
