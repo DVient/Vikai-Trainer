@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { partitionActivities } from "../src/lib/activityTiming";
-import { todaySteps, type DayStep, type FlowInput, type StepId } from "../src/lib/flow";
+import {
+  nextStepFor,
+  todaySteps,
+  type DayStep,
+  type FlowInput,
+  type StepId,
+} from "../src/lib/flow";
 
 /** Derives the steps and unpacks them into named, defined references. */
 function makeSteps(
@@ -114,6 +120,92 @@ describe("todaySteps — the guided daily sequence", () => {
     expect(makeSteps().cns.route).toBe("/finger-tap");
     expect(makeSteps().gamePlan.route).toBe("/workout");
     expect(makeSteps().log.route).toBe("/practice-log");
+  });
+});
+
+describe("nextStepFor — the Home 'your next step' hero (Phase 12)", () => {
+  it("offers the check-in first on a fresh day", () => {
+    const hero = nextStepFor({
+      hasCheckedInToday: false,
+      hasTapTestToday: false,
+      hasWorkoutLogToday: false,
+      activityPartition: { pre: [], post: [] },
+    });
+
+    expect(hero.id).toBe("checkin");
+    expect(hero.title).toBe("Check in first");
+    expect(hero.subtitle).toBe("Three taps. Unlocks today's plan.");
+    expect(hero.route).toBe("/checkin");
+  });
+
+  it("advances to the tap test once the check-in is done", () => {
+    const hero = nextStepFor({
+      hasCheckedInToday: true,
+      hasTapTestToday: false,
+      hasWorkoutLogToday: false,
+      activityPartition: { pre: [], post: [] },
+    });
+
+    expect(hero.id).toBe("cns");
+    expect(hero.route).toBe("/finger-tap");
+    expect(hero.title).toBe("Do the 10-second tap test");
+  });
+
+  it("offers activity logging before the session when nothing is logged yet", () => {
+    const hero = nextStepFor({
+      hasCheckedInToday: true,
+      hasTapTestToday: true,
+      hasWorkoutLogToday: false,
+      activityPartition: { pre: [], post: [] },
+    });
+
+    expect(hero.id).toBe("log");
+    expect(hero.route).toBe("/practice-log");
+    expect(hero.title).toBe("Log your activities");
+  });
+
+  it("hands the day to the session once the earlier steps are done", () => {
+    const hero = nextStepFor({
+      hasCheckedInToday: true,
+      hasTapTestToday: true,
+      hasWorkoutLogToday: false,
+      activityPartition: {
+        pre: [{ activityDate: "2026-01-02", createdAt: "2026-01-02T15:00:00.000Z" }],
+        post: [],
+      },
+    });
+
+    expect(hero.id).toBe("gamePlan");
+    expect(hero.route).toBe("/workout");
+    expect(hero.title).toBe("Start today's session");
+  });
+
+  it("still asks for activity logging after a finished session (it shapes the next one)", () => {
+    const hero = nextStepFor({
+      hasCheckedInToday: true,
+      hasTapTestToday: true,
+      hasWorkoutLogToday: true,
+      activityPartition: { pre: [], post: [] },
+    });
+
+    expect(hero.id).toBe("log");
+    expect(hero.route).toBe("/practice-log");
+  });
+
+  it("resolves to the session-complete handoff once the whole day is done", () => {
+    const hero = nextStepFor({
+      hasCheckedInToday: true,
+      hasTapTestToday: true,
+      hasWorkoutLogToday: true,
+      activityPartition: {
+        pre: [{ activityDate: "2026-01-02", createdAt: "2026-01-02T15:00:00.000Z" }],
+        post: [],
+      },
+    });
+
+    expect(hero.id).toBe("complete");
+    expect(hero.emoji).toBe("🎉");
+    expect(hero.route).toBe("/practice-log");
   });
 });
 

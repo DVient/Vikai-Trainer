@@ -356,17 +356,19 @@ describe("home hub (app/index)", () => {
     expect(screen.getByText("Check-in pending")).toBeTruthy();
   });
 
-  it("encourages the check-in and shows its timestamp once done", () => {
+  it("encourages the check-in first and advances the hero as the day progresses", () => {
     render(<Index />);
 
+    // Phase 12 — the hero is the single primary action: the check-in first.
     expect(screen.getByText("Check in first")).toBeTruthy();
     expect(screen.getByText("Three taps. Unlocks today's plan.")).toBeTruthy();
 
     act(() => {
       useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
     });
-    expect(screen.getByText("Checked in")).toBeTruthy();
-    expect(screen.getByText(/update if anything changed/)).toBeTruthy();
+    // The hero hands off to the next step of the day, not a static card.
+    expect(screen.getByText("Do the 10-second tap test")).toBeTruthy();
+    expect(screen.queryByText("Check in first")).toBeNull();
   });
 
   it("guides the sequence: step 1 active, later steps locked until check-in", () => {
@@ -419,8 +421,9 @@ describe("home hub (app/index)", () => {
     fireEvent.click(screen.getByText("4. Complete your Game Plan"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/workout");
 
-    fireEvent.click(screen.getByLabelText("Log an activity"));
-    expect(routerMock.navigate).toHaveBeenCalledWith("/practice-log");
+    // The hero is the primary action — it leads to the same day flow.
+    fireEvent.click(screen.getByLabelText("Next step: Do the 10-second tap test"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/finger-tap");
 
     // The Game Plan summary card is the route into the full session.
     fireEvent.click(screen.getByLabelText("Open today's session"));
@@ -428,6 +431,9 @@ describe("home hub (app/index)", () => {
 
     fireEvent.click(screen.getByText("Calendar"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/history");
+
+    fireEvent.click(screen.getByLabelText("Open my plan"));
+    expect(routerMock.navigate).toHaveBeenCalledWith("/plan");
 
     fireEvent.click(screen.getByText(/-day streak/));
     expect(routerMock.navigate).toHaveBeenCalledWith("/history");
@@ -782,7 +788,7 @@ describe("team skin settings (app/settings, Phase C)", () => {
     expect(headerEntry).toBeDefined();
 
     render((headerEntry?.headerRight ?? (() => null))());
-    fireEvent.click(screen.getByLabelText("Team skin settings"));
+    fireEvent.click(screen.getByLabelText("Open settings"));
     expect(routerMock.navigate).toHaveBeenCalledWith("/settings");
   });
 
@@ -1836,7 +1842,8 @@ describe("my plan — build, milestones, completion loop", () => {
     render(<Index />);
 
     // The speed-first plan leads with the sprint block; the squat block
-    // from the default template is nowhere in today's prescription.
+    // from the default template is nowhere in today's prescription. The
+    // compact plan row keeps the phase and week visible.
     expect(screen.getByText(/Building · Week 1 of 8/)).toBeTruthy();
     expect(screen.queryByLabelText("Toggle Squat pattern strength")).toBeNull();
   });
@@ -2235,7 +2242,7 @@ describe("missed-day backfill (Phase 9.12)", () => {
     expect(screen.queryByText("Did anything happen yesterday?")).toBeNull();
   });
 
-  it("exports the JSON backup and CSV through the share sheet", async () => {
+  it("exports the JSON backup and CSV from Settings through the share sheet", async () => {
     useAppStore.getState().logActivity({
       activityDate: localDate(0),
       timezone: TIMEZONE,
@@ -2244,8 +2251,10 @@ describe("missed-day backfill (Phase 9.12)", () => {
       durationMinutes: 60,
     });
 
-    render(<History />);
+    // Phase 12 — the data download lives on the Settings page.
+    render(<Settings />);
 
+    expect(screen.getByText("Your data — everything stays on this phone")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Export all data as a JSON backup"));
     await waitFor(() => expect(sharingSpy.shareAsync).toHaveBeenCalledTimes(1));
     const [jsonUri, jsonOptions] = sharingSpy.shareAsync.mock.calls[0] as [string, { mimeType: string }];
@@ -2266,7 +2275,7 @@ describe("missed-day backfill (Phase 9.12)", () => {
 
   it("explains itself when the share sheet is unavailable", async () => {
     sharingSpy.isAvailableAsync.mockResolvedValue(false);
-    render(<History />);
+    render(<Settings />);
 
     fireEvent.click(screen.getByLabelText("Export all data as a spreadsheet CSV"));
     await waitFor(() =>
@@ -2310,8 +2319,12 @@ describe("season programs + schedule-aware shaping (Phase 11)", () => {
 
     render(<Index />);
 
-    expect(screen.getByText("🏀 In-Season Game Day")).toBeTruthy();
-    expect(screen.getByText("Season program — tap to change plan")).toBeTruthy();
+    // Phase 12 — the program lives in the compact Plan & calendar row.
+    expect(screen.getByText("In-Season Game Day")).toBeTruthy();
+    expect(screen.getByText("My Plan")).toBeTruthy();
+    expect(
+      screen.getByLabelText("Open calendar: past sessions and upcoming events"),
+    ).toBeTruthy();
   });
 
   it("renders the in-season Monday: the before-school court session, power blocks, and the day note", () => {
@@ -2387,5 +2400,83 @@ describe("season programs + schedule-aware shaping (Phase 11)", () => {
     // the scheduled morning session covers it, so the block steps aside.
     expect(screen.queryByLabelText("Toggle Ball-handling technique")).toBeNull();
     expect(screen.getByLabelText("Toggle Upper push strength")).toBeTruthy();
+  });
+});
+
+describe("guided home layout (Phase 12)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("advances the hero through the whole day: check-in → tap → log → session → complete", () => {
+    render(<Index />);
+
+    // Fresh day: the check-in is the single primary action.
+    expect(screen.getByText("Check in first")).toBeTruthy();
+    expect(screen.queryByLabelText("Open check-in")).toBeNull(); // no duplicate card
+
+    act(() => {
+      useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+    });
+    expect(screen.getByLabelText("Next step: Do the 10-second tap test")).toBeTruthy();
+
+    act(() => {
+      useAppStore.getState().addFingerTapTrial({
+        localDate: localDate(0),
+        timezone: TIMEZONE,
+        tapCount: 80,
+      });
+    });
+    expect(screen.getByLabelText("Next step: Log your activities")).toBeTruthy();
+
+    // A pre-workout activity lands: the session becomes the next action —
+    // and the summary card no longer stacks a second identical button.
+    act(() => {
+      useAppStore.setState({
+        activityLogs: [
+          {
+            id: "pre-1",
+            activityDate: localDate(0),
+            timezone: TIMEZONE,
+            activityType: "TEAM_PRACTICE",
+            sessionRpe: 6,
+            durationMinutes: 60,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      });
+    });
+    expect(screen.getByLabelText("Next step: Start today's session")).toBeTruthy();
+    expect(screen.queryByLabelText("Open today's session")).toBeNull();
+
+    // Finishing the session hands the day to the success state.
+    act(() => {
+      useAppStore.setState({
+        workoutLogs: [{ id: "w1", activityDate: localDate(0), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }],
+      });
+    });
+    expect(screen.getByLabelText("Next step: Session complete")).toBeTruthy();
+  });
+
+  it("keeps the summary card's session button when the hero is on an earlier step", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Index />);
+
+    // The hero is on the tap-test step, so the summary still offers the jump.
+    expect(screen.getByLabelText("Next step: Do the 10-second tap test")).toBeTruthy();
+    expect(screen.getByLabelText("Open today's session")).toBeTruthy();
+  });
+
+  it("keeps the standalone log card off Home — logging lives in the flow", () => {
+    useAppStore.setState({ readinessInputs: [makeCheckIn(localDate(0), GOOD_ANCHORS)] });
+
+    render(<Index />);
+
+    expect(screen.queryByLabelText("Log an activity")).toBeNull();
+    // The wayfinding row is compact: two half-width cards.
+    expect(screen.getByLabelText("Open my plan")).toBeTruthy();
+    expect(screen.getByLabelText("Open calendar")).toBeTruthy();
   });
 });

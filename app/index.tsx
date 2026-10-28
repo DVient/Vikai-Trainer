@@ -9,9 +9,8 @@ import { DEFAULT_ENGINE_THRESHOLDS, toLocalDateString } from "../src/engine/auto
 import { bestTapCountForDate } from "../src/engine/fingerTap";
 import { useEngineResult } from "../src/hooks/useEngineResult";
 import { nextUpcomingEvents, SCHEDULED_EVENT_LABELS } from "../src/lib/format";
-import { todaySteps } from "../src/lib/flow";
+import { nextStepFor, todaySteps } from "../src/lib/flow";
 import { buildSessionView } from "../src/lib/session";
-import { formatTimeOfDay } from "../src/lib/calendar";
 import { partitionActivities } from "../src/lib/activityTiming";
 import { checkInStreak, powerLevel } from "../src/lib/power";
 import { soreAreaLabel } from "../src/lib/bodyMap";
@@ -27,13 +26,15 @@ import { useAppStore } from "../src/stores/useAppStore";
 import { isSoreArea } from "../src/types";
 
 /**
- * Home Hub: the Ready State battery, the guided day flow, the athlete's
- * plan, and a compact Game Plan summary that opens the full session on
- * /workout — where blocks are checked off and logging mid-session re-scales
- * the remaining rows. The battery alone carries the engine state (GO /
- * Power Save / Shielded); reason chips live on the session screen where
- * the athlete acts on them. GREEN can never display without today's
- * check-in (SPEC §27 rule).
+ * Home Hub (guided flow): the Ready State battery, ONE state-aware "your
+ * next step" action that advances check-in → tap test → log → Game Plan,
+ * the day stepper, and a compact Game Plan summary that opens the full
+ * session on /workout — where blocks are checked off and logging
+ * mid-session re-scales the remaining rows. Wayfinding (plan, calendar)
+ * sits in a compact row below the day's work. The battery alone carries
+ * the engine state (GO / Power Save / Shielded); reason chips live on the
+ * session screen. GREEN can never display without today's check-in
+ * (SPEC §27 rule).
  */
 export default function Index() {
   const router = useRouter();
@@ -97,10 +98,15 @@ export default function Index() {
     hasWorkoutLogToday,
     activityPartition,
   });
+  // Phase 12 — Home offers exactly ONE obvious next action: the first step
+  // that still needs doing, or the session-complete handoff.
+  const hero = nextStepFor({
+    hasCheckedInToday,
+    hasTapTestToday,
+    hasWorkoutLogToday,
+    activityPartition,
+  });
 
-  const latestCheckIn = [...readinessInputs]
-    .filter((entry) => entry.localDate === localToday)
-    .at(-1);
   const upcoming = nextUpcomingEvents(scheduledEvents, now, 3);
   const nextGame = upcoming.find((view) => view.event.eventType === "GAME");
   const soreAreasToday = Object.keys(result.restrictions.sorenessScale ?? {}).filter(isSoreArea);
@@ -141,7 +147,7 @@ export default function Index() {
             <View className="flex-row">
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Team skin settings"
+                accessibilityLabel="Open settings"
                 onPress={() => {
                   tapLight();
                   router.navigate("/settings");
@@ -201,26 +207,25 @@ export default function Index() {
 
       <ReminderStatusChip />
 
+      {/* Phase 12 — the single primary action: the first step of the day
+          that still needs doing, or the session-complete handoff. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Open check-in"
-        onPress={() => router.navigate("/checkin")}
-        className={`min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 p-4 ${
-          hasCheckedInToday
+        accessibilityLabel={`Next step: ${hero.title}`}
+        onPress={() => {
+          tapLight();
+          router.navigate(hero.route);
+        }}
+        className={`min-h-[72px] flex-row items-center gap-3 rounded-2xl border-2 p-4 ${
+          hero.id === "complete"
             ? "border-go-line bg-go-soft"
-            : "border-go-line bg-go-soft"
+            : "border-accent bg-soft"
         }`}
       >
-        <Text className="text-2xl">{hasCheckedInToday ? "✅" : "😴"}</Text>
+        <Text className="text-3xl">{hero.emoji}</Text>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-strong">
-            {hasCheckedInToday ? "Checked in" : "Check in first"}
-          </Text>
-          <Text className="text-xs text-faint">
-            {hasCheckedInToday && latestCheckIn
-              ? `${formatTimeOfDay(latestCheckIn.recordedAt, profile.timezone)} — update if anything changed`
-              : "Three taps. Unlocks today's plan."}
-          </Text>
+          <Text className="text-base font-black text-strong">{hero.title}</Text>
+          <Text className="mt-0.5 text-sm text-body">{hero.subtitle}</Text>
         </View>
         <Text className="text-xl text-faint">›</Text>
       </Pressable>
@@ -260,78 +265,6 @@ export default function Index() {
             <Text className="text-sm font-bold text-faint">✕</Text>
           </Pressable>
         </Pressable>
-      ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open my plan"
-        onPress={() => {
-          tapLight();
-          router.navigate("/plan");
-        }}
-        className={
-          activePlan !== null
-            ? "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-go-line bg-go-soft p-4"
-            : "min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
-        }
-      >
-        <Text className="text-3xl">🎯</Text>
-        <View className="flex-1">
-          <Text className="text-base font-bold text-strong">
-            {activePlan !== null
-              ? `${personaById(activePlan.personaId ?? "ALL_ROUND")?.label ?? "Custom plan"}`
-              : `${program.emoji} ${program.label}`}
-          </Text>
-          <Text className="text-sm text-faint">
-            {activePlan !== null
-              ? `${planPhaseLabel(activePlan, localToday)} · Week ${Math.min(weekIndexOf(activePlan, localToday) + 1, activePlan.periodWeeks)} of ${activePlan.periodWeeks}`
-              : "Season program — tap to change plan"}
-          </Text>
-        </View>
-        <Text className="text-xl text-faint">›</Text>
-      </Pressable>
-
-      {activePlan !== null && planStatus(activePlan, localToday) === "final-week" ? (
-        <View className="rounded-2xl border border-modulate-line bg-modulate-soft p-4">
-          <Text className="text-sm font-semibold text-modulate">
-            Last week of your plan — record fresh test results so your next plan
-            starts from reality.
-          </Text>
-        </View>
-      ) : null}
-
-      {activePlan !== null && planStatus(activePlan, localToday) === "ended" ? (
-        <View className="rounded-2xl border-2 border-go-line bg-go-soft p-4">
-          <Text className="text-base font-bold text-go">
-            Your {activePlan.periodWeeks}-week plan is complete 🎉
-          </Text>
-          <Text className="mt-1 text-sm text-body">
-            Ready for the next one? Set a new goal and the app will build your
-            next plan from everything you just did.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Set a new goal"
-            onPress={() => {
-              tapLight();
-              router.navigate("/plan");
-            }}
-            className="mt-3 h-12 items-center justify-center rounded-xl bg-accent"
-          >
-            <Text className="text-sm font-black text-onaccent">Set a new goal 🎯</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Reset to default plan"
-            onPress={() => {
-              tapLight();
-              clearTrainingPlan();
-            }}
-            className="mt-2 h-12 items-center justify-center rounded-xl border-2 border-edge bg-card"
-          >
-            <Text className="text-sm font-bold text-body">Reset to default plan</Text>
-          </Pressable>
-        </View>
       ) : null}
 
       <View className="rounded-2xl border border-edge bg-card p-4 gap-3">
@@ -391,19 +324,24 @@ export default function Index() {
                 scaled.
               </Text>
             ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Open today's session"
-              onPress={() => {
-                tapLight();
-                router.navigate("/workout");
-              }}
-              className="h-14 items-center justify-center rounded-xl bg-accent"
-            >
-              <Text className="text-base font-black text-onaccent">
-                Open today's session →
-              </Text>
-            </Pressable>
+            {/* Phase 12 — the hero already offers the session when it is the
+                next step; the summary keeps its own button only when the
+                athlete can jump ahead from an earlier step. */}
+            {hero.route !== "/workout" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open today's session"
+                onPress={() => {
+                  tapLight();
+                  router.navigate("/workout");
+                }}
+                className="h-14 items-center justify-center rounded-xl bg-accent"
+              >
+                <Text className="text-base font-black text-onaccent">
+                  Open today's session →
+                </Text>
+              </Pressable>
+            ) : null}
           </>
         )}
 
@@ -419,35 +357,98 @@ export default function Index() {
         ) : null}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Log an activity"
-        onPress={() => router.navigate("/practice-log")}
-        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
-      >
-        <Text className="text-2xl">📝</Text>
-        <View className="flex-1">
-          <Text className="text-sm font-bold text-strong">Log activity</Text>
-          <Text className="text-xs text-faint">
-            What you did shapes today's volume — and your next workout
+      {/* Phase 12 — wayfinding grouped into one compact row: the athlete's
+          plan (season program or custom build) and the calendar. */}
+      <View className="flex-row gap-3">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open my plan"
+          onPress={() => {
+            tapLight();
+            router.navigate("/plan");
+          }}
+          className={`min-h-[72px] flex-1 flex-row items-center gap-2 rounded-2xl border-2 p-3 ${
+            activePlan !== null
+              ? "border-go-line bg-go-soft"
+              : "border-edge bg-card"
+          }`}
+        >
+          <Text className="text-2xl">🎯</Text>
+          <View className="flex-1">
+            <Text className="text-sm font-bold text-strong" numberOfLines={2}>
+              {activePlan !== null
+                ? personaById(activePlan.personaId ?? "ALL_ROUND")?.label ?? "Custom plan"
+                : program.label}
+            </Text>
+            <Text className="text-xs text-faint" numberOfLines={1}>
+              {activePlan !== null
+                ? `${planPhaseLabel(activePlan, localToday)} · Week ${Math.min(weekIndexOf(activePlan, localToday) + 1, activePlan.periodWeeks)} of ${activePlan.periodWeeks}`
+                : "My Plan"}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open calendar: past sessions and upcoming events"
+          onPress={() => {
+            tapLight();
+            router.navigate("/history");
+          }}
+          className="min-h-[72px] flex-1 flex-row items-center gap-2 rounded-2xl border-2 border-edge bg-card p-3"
+        >
+          <Text className="text-2xl">📅</Text>
+          <View className="flex-1">
+            <Text className="text-sm font-bold text-strong">Calendar</Text>
+            <Text className="text-xs text-faint" numberOfLines={1}>
+              Past & upcoming
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+
+      {activePlan !== null && planStatus(activePlan, localToday) === "final-week" ? (
+        <View className="rounded-2xl border border-modulate-line bg-modulate-soft p-4">
+          <Text className="text-sm font-semibold text-modulate">
+            Last week of your plan — record fresh test results so your next plan
+            starts from reality.
           </Text>
         </View>
-        <Text className="text-xl text-faint">›</Text>
-      </Pressable>
+      ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open calendar"
-        onPress={() => router.navigate("/history")}
-        className="min-h-[64px] flex-row items-center gap-3 rounded-2xl border-2 border-edge bg-card p-4"
-      >
-        <Text className="text-3xl">📅</Text>
-        <View className="flex-1">
-          <Text className="text-base font-bold text-strong">Calendar</Text>
-          <Text className="text-sm text-faint">Past sessions & upcoming events</Text>
+      {activePlan !== null && planStatus(activePlan, localToday) === "ended" ? (
+        <View className="rounded-2xl border-2 border-go-line bg-go-soft p-4">
+          <Text className="text-base font-bold text-go">
+            Your {activePlan.periodWeeks}-week plan is complete 🎉
+          </Text>
+          <Text className="mt-1 text-sm text-body">
+            Ready for the next one? Set a new goal and the app will build your
+            next plan from everything you just did.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Set a new goal"
+            onPress={() => {
+              tapLight();
+              router.navigate("/plan");
+            }}
+            className="mt-3 h-12 items-center justify-center rounded-xl bg-accent"
+          >
+            <Text className="text-sm font-black text-onaccent">Set a new goal 🎯</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reset to default plan"
+            onPress={() => {
+              tapLight();
+              clearTrainingPlan();
+            }}
+            className="mt-2 h-12 items-center justify-center rounded-xl border-2 border-edge bg-card"
+          >
+            <Text className="text-sm font-bold text-body">Reset to default plan</Text>
+          </Pressable>
         </View>
-        <Text className="text-xl text-faint">›</Text>
-      </Pressable>
+      ) : null}
 
       {upcoming.length > 0 ? (
         <View className="rounded-2xl bg-card border border-edge p-4">

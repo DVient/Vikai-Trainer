@@ -137,7 +137,8 @@ describe("§6.2 audit: accessible touch targets (≥48×48px)", () => {
       "min-h-[64px]",
     );
     expect(readFileSync(join("app", "practice-log.tsx"), "utf8")).toContain("min-w-[48px]");
-    expect(readFileSync(join("app", "index.tsx"), "utf8")).toContain("min-h-[64px]");
+    // Phase 12 — Home's hero and wayfinding cards raise the bar to 72px.
+    expect(readFileSync(join("app", "index.tsx"), "utf8")).toContain("min-h-[72px]");
     expect(readFileSync(join("app", "checkin.tsx"), "utf8")).toContain("h-14");
   });
 });

@@ -16,8 +16,7 @@ import {
   type PlannedWorkoutEntry,
   type WeekScheduleDay,
 } from "../src/lib/calendar";
-import { buildExport } from "../src/lib/export";
-import { tapLight, tapSuccess } from "../src/lib/haptics";
+import { tapLight } from "../src/lib/haptics";
 import { planPhaseLabel, planStatus, weekIndexOf } from "../src/plans/planBuilder";
 import { programById, programFocusLabel } from "../src/plans/programs";
 import { personaById } from "../src/plans/personas";
@@ -30,7 +29,7 @@ import { useAppStore } from "../src/stores/useAppStore";
  * today's full contents, then the Scheduled card — the next 7 days by
  * default, or the chosen day's contents when a day on the grid is selected
  * (with a way back). Event rows open the editor; athletes add their own
- * commitments with the ＋ button.
+ * commitments with the ＋ button. Data export lives in Settings (Phase 12).
  */
 export default function History() {
   // The boundary wraps the whole screen component from outside so even a
@@ -135,57 +134,6 @@ function HistoryScreen() {
       const next = new Date(Date.UTC(current.year, current.month - 1 + delta, 1));
       return { year: next.getUTCFullYear(), month: next.getUTCMonth() + 1 };
     });
-  };
-
-  // Phase 9.12 — data export: the whole local store as JSON (complete
-  // backup) or a sectioned CSV (spreadsheet), delivered through the share
-  // sheet. Files land in the cache dir; the athlete saves or sends them.
-  //
-  // The share plumbing carries NATIVE modules (expo-file-system /
-  // expo-sharing). OTA updates can add JavaScript to an installed APK but
-  // never native code, so the imports stay dynamic: APKs built before those
-  // modules existed render this screen normally, and pressing export rejects
-  // lazily into a friendly note instead of crashing the screen at load.
-  const [exportNote, setExportNote] = useState<string | null>(null);
-  const shareExport = async (kind: "json" | "csv") => {
-    setExportNote(null);
-    try {
-      const [{ File, Paths }, Sharing] = await Promise.all([
-        import("expo-file-system"),
-        import("expo-sharing"),
-      ]);
-      const available = await Sharing.isAvailableAsync();
-      if (!available) {
-        setExportNote("Sharing isn't available on this device.");
-        return;
-      }
-      const state = useAppStore.getState();
-      const { json, csv, dateKey } = buildExport(
-        {
-          profile: state.profile,
-          trainingObjective: state.trainingObjective,
-          readinessInputs: state.readinessInputs,
-          activityLogs: state.activityLogs,
-          workoutLogs: state.workoutLogs,
-          workoutProgress: state.workoutProgress,
-          scheduledEvents: state.scheduledEvents,
-          personalBests: state.personalBests,
-          activePlan: state.activePlan,
-          activeProgramId: state.activeProgramId,
-        },
-        new Date(),
-      );
-      const extension = kind === "json" ? "json" : "csv";
-      const file = new File(Paths.cache, `vikai-export-${dateKey}.${extension}`);
-      file.write(kind === "json" ? json : csv);
-      await Sharing.shareAsync(file.uri, {
-        mimeType: kind === "json" ? "application/json" : "text/csv",
-        dialogTitle: "Export Vikai Trainer data",
-      });
-      tapSuccess();
-    } catch {
-      setExportNote("Sharing isn't available on this device.");
-    }
   };
 
   const renderTimelineRows = (entries: ReturnType<typeof dayTimeline>) => (
@@ -344,37 +292,6 @@ function HistoryScreen() {
             Nothing scheduled this week — tap ＋ Add to plan your season.
           </Text>
         )}
-      </View>
-
-      <View className="rounded-2xl border border-edge bg-card p-4">
-        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
-          Your data — everything stays on this phone
-        </Text>
-        <View className="mt-2 flex-row gap-2">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Export all data as a JSON backup"
-            onPress={() => {
-              void shareExport("json");
-            }}
-            className="h-12 flex-1 items-center justify-center rounded-xl border-2 border-edge bg-app"
-          >
-            <Text className="text-xs font-black text-body">⬇ JSON backup</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Export all data as a spreadsheet CSV"
-            onPress={() => {
-              void shareExport("csv");
-            }}
-            className="h-12 flex-1 items-center justify-center rounded-xl border-2 border-edge bg-app"
-          >
-            <Text className="text-xs font-black text-body">⬇ Spreadsheet (CSV)</Text>
-          </Pressable>
-        </View>
-        {exportNote !== null ? (
-          <Text className="mt-2 text-xs font-semibold text-shield">{exportNote}</Text>
-        ) : null}
       </View>
 
       <View className="flex-row flex-wrap gap-2 pb-2">

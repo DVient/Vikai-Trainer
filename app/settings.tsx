@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 
 import { DEFAULT_ENGINE_THRESHOLDS, type EngineThresholds } from "../src/engine/autoregulation";
 import { tapLight, tapSuccess } from "../src/lib/haptics";
+import { buildExport } from "../src/lib/export";
 import {
   DEFAULT_TEAM_COLORS,
   parseHexColor,
@@ -12,16 +13,15 @@ import {
 import { useAppStore } from "../src/stores/useAppStore";
 
 /**
- * Team Skin — the athlete picks two team colors and the whole app repaints
- * instantly: the secondary color becomes the screen background, the primary
- * color drives accents, buttons, and the header, and every text surface
- * automatically uses whichever team color is most visible on it (with a
- * black/white fallback when neither reads). White + forest green by default.
- *
- * Phase 10 adds plan-adjustment tuning: the athlete (with a parent or coach)
- * picks a sensitivity preset or fine-tunes the exact thresholds the engine
- * uses. Every value is clamped to a safe range on apply (SPEC §18: stored
- * parameters, never hardcoded logic).
+ * Settings — the app's configuration hub:
+ * - Team colors (Phase 9.5): the athlete picks two team colors and the whole
+ *   app repaints instantly — the secondary color becomes the screen
+ *   background, the primary drives accents, buttons, and the header, and
+ *   every text surface uses whichever team color is most visible on it.
+ * - Plan adjustments (Phase 10): a sensitivity preset or fine-tuned engine
+ *   thresholds, clamped to safe ranges on apply (SPEC §18).
+ * - Your data (Phase 12, moved from the calendar): the whole local store as a
+ *   JSON backup or a sectioned CSV through the OS share sheet.
  */
 
 /** Sensitivity presets (Phase 10): the shipped default is "Balanced". */
@@ -477,6 +477,14 @@ export default function Settings() {
         </Pressable>
       </View>
 
+      {/* ── Phase 12: data export (moved from the calendar screen) ──
+          The share plumbing carries NATIVE modules (expo-file-system /
+          expo-sharing). OTA updates can add JavaScript to an installed APK
+          but never native code, so the imports stay dynamic: APKs built
+          before those modules existed render this screen normally, and
+          pressing export rejects lazily into a friendly note. */}
+      <DataExportCard />
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back to home"
@@ -490,5 +498,91 @@ export default function Settings() {
         <Text className="text-sm font-black text-onaccent">Done</Text>
       </Pressable>
     </ScrollView>
+  );
+}
+
+/**
+ * Your data (Phase 12): the whole local store as JSON (complete backup) or a
+ * sectioned CSV (spreadsheet), delivered through the share sheet. Files land
+ * in the cache dir; the athlete saves or sends them.
+ */
+function DataExportCard() {
+  const [exportNote, setExportNote] = useState<string | null>(null);
+
+  const shareExport = async (kind: "json" | "csv") => {
+    setExportNote(null);
+    try {
+      const [{ File, Paths }, Sharing] = await Promise.all([
+        import("expo-file-system"),
+        import("expo-sharing"),
+      ]);
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        setExportNote("Sharing isn't available on this device.");
+        return;
+      }
+      const state = useAppStore.getState();
+      const { json, csv, dateKey } = buildExport(
+        {
+          profile: state.profile,
+          trainingObjective: state.trainingObjective,
+          readinessInputs: state.readinessInputs,
+          activityLogs: state.activityLogs,
+          workoutLogs: state.workoutLogs,
+          workoutProgress: state.workoutProgress,
+          scheduledEvents: state.scheduledEvents,
+          personalBests: state.personalBests,
+          activePlan: state.activePlan,
+          activeProgramId: state.activeProgramId,
+        },
+        new Date(),
+      );
+      const extension = kind === "json" ? "json" : "csv";
+      const file = new File(Paths.cache, `vikai-export-${dateKey}.${extension}`);
+      file.write(kind === "json" ? json : csv);
+      await Sharing.shareAsync(file.uri, {
+        mimeType: kind === "json" ? "application/json" : "text/csv",
+        dialogTitle: "Export Vikai Trainer data",
+      });
+      tapSuccess();
+    } catch {
+      setExportNote("Sharing isn't available on this device.");
+    }
+  };
+
+  return (
+    <View className="rounded-2xl border border-edge bg-card p-4">
+      <Text className="text-xs font-bold uppercase tracking-widest text-faint">
+        Your data — everything stays on this phone
+      </Text>
+      <Text className="mt-1 text-xs text-faint">
+        Take your records with you — a complete backup or a spreadsheet.
+      </Text>
+      <View className="mt-2 flex-row gap-2">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Export all data as a JSON backup"
+          onPress={() => {
+            void shareExport("json");
+          }}
+          className="h-12 flex-1 items-center justify-center rounded-xl border-2 border-edge bg-app"
+        >
+          <Text className="text-xs font-black text-body">⬇ JSON backup</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Export all data as a spreadsheet CSV"
+          onPress={() => {
+            void shareExport("csv");
+          }}
+          className="h-12 flex-1 items-center justify-center rounded-xl border-2 border-edge bg-app"
+        >
+          <Text className="text-xs font-black text-body">⬇ Spreadsheet (CSV)</Text>
+        </Pressable>
+      </View>
+      {exportNote !== null ? (
+        <Text className="mt-2 text-xs font-semibold text-shield">{exportNote}</Text>
+      ) : null}
+    </View>
   );
 }

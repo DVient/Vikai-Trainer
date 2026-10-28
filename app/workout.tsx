@@ -274,52 +274,45 @@ export default function Workout() {
 
       <Text className="text-center text-lg font-black text-strong">Today's Game Plan</Text>
 
-      {activePlan === null ? (
-        <View className="rounded-xl border border-edge bg-card p-3">
-          <Text className="text-xs font-bold uppercase tracking-widest text-go">
-            {program.label}
-            {programPhase !== undefined ? ` · ${programPhase.label}` : ""}
-          </Text>
-          <Text className="mt-1 text-xs text-faint">
-            {programPhase !== undefined ? programPhase.focus : program.basis}
-          </Text>
-          {programPhase?.note !== undefined ? (
-            <Text className="mt-1 text-xs font-semibold text-body">{programPhase.note}</Text>
-          ) : null}
-          {dayNote !== undefined ? (
-            <Text className="mt-1 text-xs font-semibold text-body">{dayNote}</Text>
-          ) : null}
-        </View>
-      ) : seasonPhase !== undefined ? (
-        <View className="rounded-xl border border-edge bg-card p-3">
-          <Text className="text-xs font-bold uppercase tracking-widest text-go">
-            Fall 2026 · {seasonPhase.label}
-          </Text>
-          <Text className="mt-1 text-xs text-faint">{seasonPhase.focus}</Text>
-          {seasonPhase.note !== undefined ? (
-            <Text className="mt-1 text-xs font-semibold text-body">{seasonPhase.note}</Text>
-          ) : null}
-        </View>
-      ) : null}
+      {/* Phase 12 — one "today" context card: the plan that is running, its
+          phase and the day's AM/PM structure, plus the focus goals. */}
+      <View className="rounded-xl border border-edge bg-card p-3">
+        <Text className="text-xs font-bold uppercase tracking-widest text-go">
+          {activePlan === null
+            ? `${program.label}${programPhase !== undefined ? ` · ${programPhase.label}` : ""}`
+            : seasonPhase !== undefined
+              ? `Fall 2026 · ${seasonPhase.label}`
+              : "Fall 2026"}
+        </Text>
+        <Text className="mt-1 text-xs text-faint">
+          {activePlan === null
+            ? programPhase !== undefined
+              ? programPhase.focus
+              : program.basis
+            : seasonPhase !== undefined
+              ? seasonPhase.focus
+              : program.basis}
+        </Text>
+        {activePlan === null && programPhase?.note !== undefined ? (
+          <Text className="mt-1 text-xs font-semibold text-body">{programPhase.note}</Text>
+        ) : seasonPhase?.note !== undefined ? (
+          <Text className="mt-1 text-xs font-semibold text-body">{seasonPhase.note}</Text>
+        ) : null}
+        {activePlan === null && dayNote !== undefined ? (
+          <Text className="mt-1 text-xs font-semibold text-body">{dayNote}</Text>
+        ) : null}
+        <Text className="mt-1 text-xs font-semibold text-body">
+          {`Focus: ${trainingObjective.primaryGoals
+            .map((goal) => TRAINING_GOAL_LABELS[goal])
+            .join(" · ")}`}
+        </Text>
+      </View>
 
       {hasCheckedInToday ? null : (
         <Text className="rounded-xl bg-card px-3 py-2 text-center text-xs text-faint">
           Showing the unscaled base plan — check in to scale it to your day.
         </Text>
       )}
-
-      <View className="rounded-2xl bg-card border border-edge p-4">
-        <Text className="text-xs font-bold uppercase tracking-widest text-faint">
-          Focus
-        </Text>
-        <Text className="mt-1 text-lg font-black text-strong">
-          {trainingObjective.primaryGoals.map((goal) => TRAINING_GOAL_LABELS[goal]).join(" · ")}
-        </Text>
-        <Text className="mt-1 text-xs text-faint">
-          Quality over volume — the plan protects the high/low balance. On
-          lighter days, your focus areas keep their work longest.
-        </Text>
-      </View>
 
       {!hasWorkoutLogToday && !hasActivityToday ? (
         <Pressable

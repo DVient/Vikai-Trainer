@@ -144,7 +144,7 @@ export default function RootLayout() {
         <Stack.Screen
           name="settings"
           options={{
-            title: "Team Skin",
+            title: "Settings",
             presentation: "modal",
             headerBackVisible: false,
             headerLeft: () => <HeaderBack color={roles.onAccent} />,

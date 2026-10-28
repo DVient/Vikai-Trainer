@@ -75,7 +75,7 @@ vi.mock("react-native", async () => {
   return mod;
 });
 
-import History from "../app/history";
+import Settings from "../app/settings";
 import Workout from "../app/workout";
 import About from "../app/about";
 import { useAppStore } from "../src/stores/useAppStore";
@@ -100,8 +100,8 @@ describe("export on an APK without the export native modules (OTA crash guard)",
     cleanup();
   });
 
-  it("calendar renders, export degrades to a note, no crash", async () => {
-    render(<History />);
+  it("settings renders, export degrades to a note, no crash (Phase 12: data moved here)", async () => {
+    render(<Settings />);
 
     // The screen itself survives the throwaway imports at module scope…
     expect(screen.getByText("Your data — everything stays on this phone")).toBeTruthy();
